@@ -1,6 +1,6 @@
 package VDP2_PKG;
 
-	typedef struct packed
+	typedef struct packed	//RW,180000
 	{
 		bit         DISP;
 		bit [ 5: 0] UNUSED;
@@ -10,8 +10,9 @@ package VDP2_PKG;
 		bit         UNUSED2;
 		bit [ 2: 0] HRESO;
 	} TVMD_t;
+	parameter bit [15:0] TVMD_MASK = 16'h81F7;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180002
 	{
 		bit [ 5: 0] UNUSED;
 		bit         EXLTEN;
@@ -20,8 +21,9 @@ package VDP2_PKG;
 		bit         DASEL;
 		bit         EXBGEN;
 	} EXTEN_t;
+	parameter bit [15:0] EXTEN_MASK = 16'h0303;
 
-	typedef struct packed
+	typedef struct packed	//RO,180004
 	{
 		bit [ 5: 0] UNUSED;
 		bit         EXLTFG;
@@ -32,27 +34,31 @@ package VDP2_PKG;
 		bit         ODD;
 		bit         PAL;
 	} TVSTAT_t;
+	parameter bit [15:0] TVSTAT_MASK = 16'h030F;
 	
-	typedef struct packed
-	{
-		bit [ 5: 0] UNUSED;
-		bit [ 9: 0] HCT;
-	} HCNT_t;
-	
-	typedef struct packed
-	{
-		bit [ 5: 0] UNUSED;
-		bit [ 9: 0] VCT;
-	} VCNT_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,180006
 	{
 		bit         VRAMSZ;
 		bit [10: 0] UNUSED;
 		bit [ 3: 0] VER;
 	} VRSIZE_t;
+	parameter bit [15:0] VRSIZE_MASK = 16'h800F;
 	
-	typedef struct packed
+	typedef struct packed	//RO,180008
+	{
+		bit [ 5: 0] UNUSED;
+		bit [ 9: 0] HCT;
+	} HCNT_t;
+	parameter bit [15:0] HCNT_MASK = 16'h03FF;
+	
+	typedef struct packed	//RO,18000A
+	{
+		bit [ 5: 0] UNUSED;
+		bit [ 9: 0] VCT;
+	} VCNT_t;
+	parameter bit [15:0] VCNT_MASK = 16'h03FF;
+	
+	typedef struct packed	//RW,18000E
 	{
 		bit         CRKTE;
 		bit         UNUSED;
@@ -65,40 +71,45 @@ package VDP2_PKG;
 		bit [ 1: 0] RDBSA1;
 		bit [ 1: 0] RDBSA0;
 	} RAMCTL_t;
+	parameter bit [15:0] RAMCTL_MASK = 16'h33FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180010,180018
 	{
 		bit [ 3: 0] VCP0x0;
 		bit [ 3: 0] VCP1x0;
 		bit [ 3: 0] VCP2x0;
 		bit [ 3: 0] VCP3x0;
 	} CYCx0L_t;
+	parameter bit [15:0] CYCx0L_MASK = 16'hFFFF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180012,18001A
 	{
 		bit [ 3: 0] VCP4x0;
 		bit [ 3: 0] VCP5x0;
 		bit [ 3: 0] VCP6x0;
 		bit [ 3: 0] VCP7x0;
 	} CYCx0U_t;
+	parameter bit [15:0] CYCx0U_MASK = 16'hFFFF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180014,18001C
 	{
 		bit [ 3: 0] VCP0x1;
 		bit [ 3: 0] VCP1x1;
 		bit [ 3: 0] VCP2x1;
 		bit [ 3: 0] VCP3x1;
 	} CYCx1L_t;
+	parameter bit [15:0] CYCx1L_MASK = 16'hFFFF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180016,18001E
 	{
 		bit [ 3: 0] VCP4x1;
 		bit [ 3: 0] VCP5x1;
 		bit [ 3: 0] VCP6x1;
 		bit [ 3: 0] VCP7x1;
 	} CYCx1U_t;
+	parameter bit [15:0] CYCx1U_MASK = 16'hFFFF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180020
 	{
 		bit [ 2: 0] UNUSED;
 		bit         R0TPON;
@@ -114,8 +125,40 @@ package VDP2_PKG;
 		bit         N1ON;
 		bit         N0ON;
 	} BGON_t;
+	parameter bit [15:0] BGON_MASK = 16'h1F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180022
+	{
+		bit [ 3: 0] MZSZV;
+		bit [ 3: 0] MZSZH;
+		bit [ 2: 0] UNUSED;
+		bit         R0MZE;
+		bit         N3MZE;
+		bit         N2MZE;
+		bit         N1MZE;
+		bit         N0MZE;
+	} MZCTL_t;
+	parameter bit [15:0] MZCTL_MASK = 16'hFF1F;
+	
+	typedef struct packed	//RW,180024
+	{
+		bit [10: 0] UNUSED;
+		bit         R0SFCS;
+		bit         N3SFCS;
+		bit         N2SFCS;
+		bit         N1SFCS;
+		bit         N0SFCS;
+	} SFSEL_t;
+	parameter bit [15:0] SFSEL_MASK = 16'h001F;
+	
+	typedef struct packed	//RW,180026
+	{
+		bit [ 7: 0] SFCDB;
+		bit [ 7: 0] SFCDA;
+	} SFCODE_t;
+	parameter bit [15:0] SFCODE_MASK = 16'hFFFF;
+	
+	typedef struct packed	//RW,180028
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 1: 0] N1CHCN;
@@ -128,8 +171,9 @@ package VDP2_PKG;
 		bit         N0BMEN;
 		bit         N0CHSZ;
 	} CHCTLA_t;
+	parameter bit [15:0] CHCTLA_MASK = 16'h3F7F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18002A
 	{
 		bit         UNUSED;
 		bit [ 2: 0] R0CHCN;
@@ -144,42 +188,9 @@ package VDP2_PKG;
 		bit         N2CHCN;
 		bit         N2CHSZ;
 	} CHCTLB_t;
+	parameter bit [15:0] CHCTLB_MASK = 16'h7733;
 	
-	typedef struct packed
-	{
-		bit         NxPNB;
-		bit         NxCNSM;
-		bit [ 3: 0] UNUSED;
-		bit         NxSPR;
-		bit         NxSCC;
-		bit [ 6: 4] NxSPLT;
-		bit [ 4: 0] NxSCN;
-	} PNCNx_t;
-	
-	typedef struct packed
-	{
-		bit         R0PNB;
-		bit         R0CNSM;
-		bit [ 3: 0] UNUSED;
-		bit         R0SPR;
-		bit         R0SCC;
-		bit [ 6: 4] R0SPLT;
-		bit [ 4: 0] R0SCN;
-	} PNCR_t;
-	
-	typedef struct packed
-	{
-		bit [ 1: 0] RBOVR;
-		bit [ 1: 0] RBPLSZ;
-		bit [ 1: 0] RAOVR;
-		bit [ 1: 0] RAPLSZ;
-		bit [ 1: 0] N3PLSZ;
-		bit [ 1: 0] N2PLSZ;
-		bit [ 1: 0] N1PLSZ;
-		bit [ 1: 0] N0PLSZ;
-	} PLSZ_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,18002C
 	{
 		bit [ 1: 0] UNUSED;
 		bit         N1BMPR;
@@ -192,8 +203,9 @@ package VDP2_PKG;
 		bit         UNUSED4;
 		bit [ 6: 4] N0BMP;
 	} BMPNA_t;
+	parameter bit [15:0] BMPNA_MASK = 16'h3737;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18002E
 	{
 		bit [ 9: 0] UNUSED;
 		bit         R0BMPR;
@@ -201,8 +213,46 @@ package VDP2_PKG;
 		bit         UNUSED2;
 		bit [ 6: 4] R0BMP;
 	} BMPNB_t;
+	parameter bit [15:0] BMPNB_MASK = 16'h0037;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180030,180032,180034,180036
+	{
+		bit         NxPNB;
+		bit         NxCNSM;
+		bit [ 3: 0] UNUSED;
+		bit         NxSPR;
+		bit         NxSCC;
+		bit [ 6: 4] NxSPLT;
+		bit [ 4: 0] NxSCN;
+	} PNCNx_t;
+	parameter bit [15:0] PNCNx_MASK = 16'hC3FF;
+	
+	typedef struct packed	//RW,180038
+	{
+		bit         R0PNB;
+		bit         R0CNSM;
+		bit [ 3: 0] UNUSED;
+		bit         R0SPR;
+		bit         R0SCC;
+		bit [ 6: 4] R0SPLT;
+		bit [ 4: 0] R0SCN;
+	} PNCR_t;
+	parameter bit [15:0] PNCR_MASK = 16'hC3FF;
+	
+	typedef struct packed	//RW,18003A
+	{
+		bit [ 1: 0] RBOVR;
+		bit [ 1: 0] RBPLSZ;
+		bit [ 1: 0] RAOVR;
+		bit [ 1: 0] RAPLSZ;
+		bit [ 1: 0] N3PLSZ;
+		bit [ 1: 0] N2PLSZ;
+		bit [ 1: 0] N1PLSZ;
+		bit [ 1: 0] N0PLSZ;
+	} PLSZ_t;
+	parameter bit [15:0] PLSZ_MASK = 16'hFFFF;
+	
+	typedef struct packed	//RW,18003C
 	{
 		bit         UNUSED;
 		bit [ 8: 6] N3MP;
@@ -213,173 +263,178 @@ package VDP2_PKG;
 		bit         UNUSED4;
 		bit [ 8: 6] N0MP;
 	} MPOFN_t;
+	parameter bit [15:0] MPOFN_MASK = 16'h7777;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18003E
 	{
 		bit [ 8: 0] UNUSED;
 		bit [ 8: 6] RBMP;
 		bit         UNUSED2;
 		bit [ 8: 6] RAMP;
 	} MPOFR_t;
+	parameter bit [15:0] MPOFR_MASK = 16'h0077;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180040,180044,180048,18004C
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] NxMPB;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] NxMPA;
 	} MPABNx_t;
+	parameter bit [15:0] MPABNx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180042,180046,18004A,18004E
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] NxMPD;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] NxMPC;
 	} MPCDNx_t;
+	parameter bit [15:0] MPCDNx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180050,180060
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPB;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPA;
 	} MPABRx_t;
+	parameter bit [15:0] MPABRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180052,180062
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPD;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPC;
 	} MPCDRx_t;
+	parameter bit [15:0] MPCDRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180054,180064
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPF;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPE;
 	} MPEFRx_t;
+	parameter bit [15:0] MPEFRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180056,180066
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPH;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPG;
 	} MPGHRx_t;
+	parameter bit [15:0] MPGHRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180058,180068
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPJ;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPI;
 	} MPIJRx_t;
+	parameter bit [15:0] MPIJRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18005A,18006A
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPL;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPK;
 	} MPKLRx_t;
+	parameter bit [15:0] MPKLRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18005C,18006C
 	{
 		bit  [1:0] UNUSED;
 		bit  [5:0] RxMPN;
 		bit  [1:0] UNUSED2;
 		bit  [5:0] RxMPM;
 	} MPMNRx_t;
+	parameter bit [15:0] MPMNRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18005E,18006E
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 5: 0] RxMPP;
 		bit [ 1: 0] UNUSED2;
 		bit [ 5: 0] RxMPO;
 	} MPOPRx_t;
+	parameter bit [15:0] MPOPRx_MASK = 16'h3F3F;
 	
-	typedef struct packed
-	{
-		bit [15: 0] RxOPN;
-	} OVPNRx_t;
-	
-	typedef struct packed
-	{
-		bit [ 3: 0] MZSZV;
-		bit [ 3: 0] MZSZH;
-		bit [ 2: 0] UNUSED;
-		bit         R0MZE;
-		bit         N3MZE;
-		bit         N2MZE;
-		bit         N1MZE;
-		bit         N0MZE;
-	} MZCTL_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,180070,180080
 	{
 		bit [ 4: 0] UNUSED;
 		bit [10: 0] NxSCXI;
 	} SCXINx_t;
+	parameter bit [15:0] SCXINx_MASK = 16'h07FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180072,180082
 	{
 		bit [ 1: 8] NxSCXD;
 		bit [ 7: 0] UNUSED;
 	} SCXDNx_t;
+	parameter bit [15:0] SCXDNx_MASK = 16'hFF00;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180074,180084
 	{
 		bit [ 4: 0] UNUSED;
 		bit [10: 0] NxSCYI;
 	} SCYINx_t;
+	parameter bit [15:0] SCYINx_MASK = 16'h07FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180076,180086
 	{
 		bit [ 1: 8] NxSCYD;
 		bit [ 7: 0] UNUSED;
 	} SCYDNx_t;
+	parameter bit [15:0] SCYDNx_MASK = 16'hFF00;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180078,180088
 	{
-		bit [ 4: 0] UNUSED;
-		bit [10: 0] NxSCX;
-	} SCXNx_t;
-	
-	typedef struct packed
-	{
-		bit [ 4: 0] UNUSED;
-		bit [10: 0] NxSCY;
-	} SCYNx_t;
-	
-	typedef struct packed
-	{
-		bit [12: 0] UNUSED;
+		bit [11: 0] UNUSED;
 		bit [ 3: 0] NxZMXI;
 	} ZMXINx_t;
+	parameter bit [15:0] ZMXINx_MASK = 16'h0007;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18007A,18008A
 	{
 		bit  [1:8] NxZMXD;
 		bit  [7:0] UNUSED;
 	} ZMXDNx_t;
+	parameter bit [15:0] ZMXDNx_MASK = 16'hFF00;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18007C,18008C
 	{
-		bit [12: 0] UNUSED;
+		bit [11: 0] UNUSED;
 		bit [ 3: 0] NxZMYI;
 	} ZMYINx_t;
+	parameter bit [15:0] ZMYINx_MASK = 16'h0007;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18007E,18008E
 	{
 		bit [ 1: 8] NxZMYD;
 		bit [ 7: 0] UNUSED;
 	} ZMYDNx_t;
+	parameter bit [15:0] ZMYDNx_MASK = 16'hFF00;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180090,180094
+	{
+		bit [ 4: 0] UNUSED;
+		bit [10: 0] NxSCX;
+	} SCXNx_t;
+	parameter bit [15:0] SCXNx_MASK = 16'h07FF;
+	
+	typedef struct packed	//RW,180092,180096
+	{
+		bit [ 4: 0] UNUSED;
+		bit [10: 0] NxSCY;
+	} SCYNx_t;
+	parameter bit [15:0] SCYNx_MASK = 16'h07FF;
+	
+	typedef struct packed	//RW,180098
 	{
 		bit [ 5: 0] UNUSED;
 		bit         N1ZMQT;
@@ -388,8 +443,9 @@ package VDP2_PKG;
 		bit         N0ZMQT;
 		bit         N0ZMHF;
 	} ZMCTL_t;
+	parameter bit [15:0] ZMCTL_MASK = 16'h0303;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18009A
 	{
 		bit [ 1: 0] UNUSED;
 		bit [ 1: 0] N1LSS;
@@ -404,32 +460,72 @@ package VDP2_PKG;
 		bit         N0LSCX;
 		bit         N0VCSC;
 	} SCRCTL_t;
+	parameter bit [15:0] SCRCTL_MASK = 16'h3F3F;
 	
-	typedef struct packed
-	{
-		bit [12: 0] UNUSED;
-		bit [18:16] NxLSTA;
-	} LSTAxU_t;
-	
-	typedef struct packed
-	{
-		bit [15: 1] NxLSTA;
-		bit         UNUSED;
-	} LSTAxL_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,18009C
 	{
 		bit [12: 0] UNUSED;
 		bit [18:16] VCSTA;
 	} VCSTAU_t;
+	parameter bit [15:0] VCSTAU_MASK = 16'h0007;
 	
-	typedef struct packed
+	typedef struct packed	//RW,18009E
 	{
 		bit [15: 1] VCSTA;
 		bit         UNUSED;
 	} VCSTAL_t;
+	parameter bit [15:0] VCSTAL_MASK = 16'hFFFE;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800A0,1800A4
+	{
+		bit [12: 0] UNUSED;
+		bit [18:16] NxLSTA;
+	} LSTAxU_t;
+	parameter bit [15:0] LSTAxU_MASK = 16'h0007;
+	
+	typedef struct packed	//RW,1800A2,1800A6
+	{
+		bit [15: 1] NxLSTA;
+		bit         UNUSED;
+	} LSTAxL_t;
+	parameter bit [15:0] LSTAxL_MASK = 16'hFFFE;
+	
+	typedef struct packed	//RW,1800A8
+	{
+		bit         LCCLMD;
+		bit [11: 0] UNUSED;
+		bit [18:16] LCTA;
+	} LCTAU_t;
+	parameter bit [15:0] LCTAU_MASK = 16'h8007;
+	
+	typedef struct packed	//RW,1800AA
+	{
+		bit [15: 0] LCTA;
+	} LCTAL_t;
+	parameter bit [15:0] LCTAL_MASK = 16'hFFFF;
+	
+	typedef struct packed	//RW,1800AC
+	{
+		bit         BKCLMD;
+		bit [11: 0] UNUSED;
+		bit [18:16] BKTA;
+	} BKTAU_t;
+	parameter bit [15:0] BKTAU_MASK = 16'h8007;
+	
+	typedef struct packed	//RW,1800AE
+	{
+		bit [15: 0] BKTA;
+	} BKTAL_t;
+	parameter bit [15:0] BKTAL_MASK = 16'hFFFF;
+	
+	typedef struct packed	//RW,1800B0
+	{
+		bit [13: 0] UNUSED;
+		bit [ 1: 0] RPMD;
+	} RPMD_t;
+	parameter bit [15:0] RPMD_MASK = 16'h0003;
+	
+	typedef struct packed	//RW,1800B2
 	{
 		bit [ 4: 0] UNUSED;
 		bit         RBKASTRE;
@@ -440,107 +536,81 @@ package VDP2_PKG;
 		bit         RAYSTRE;
 		bit         RAXSTRE;
 	} RPRCTL_t;
+	parameter bit [15:0] RPRCTL_MASK = 16'h0707;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800B4
+	{
+		bit [ 2: 0] UNUSED;
+		bit         RBKLCE;
+		bit [ 1: 0] RBKMD;
+		bit         RBKDBS;
+		bit         RBKTE;
+		bit [ 2: 0] UNUSED2;
+		bit         RAKLCE;
+		bit [ 1: 0] RAKMD;
+		bit         RAKDBS;
+		bit         RAKTE;
+	} KTCTL_t;
+	parameter bit [15:0] KTCTL_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,1800B6
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] RBKTAOS;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] RAKTAOS;
+	} KTAOF_t;
+	parameter bit [15:0] KTAOF_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800B8,1800BA
+	{
+		bit [15: 0] RxOPN;
+	} OVPNRx_t;
+	parameter bit [15:0] OVPNRx_MASK = 16'hFFFF;
+	
+	typedef struct packed	//RW,1800BC
 	{
 		bit [12: 0] UNUSED;
 		bit [18:16] RPTA;
 	} RPTAU_t;
+	parameter bit [15:0] RPTAU_MASK = 16'h0007;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800BE
 	{
 		bit [15: 1] RPTA;
 		bit         UNUSED;
 	} RPTAL_t;
+	parameter bit [15:0] RPTAL_MASK = 16'hFFFE;
 	
-	typedef struct packed
-	{
-		bit [13: 0] UNUSED;
-		bit [ 1: 0] RPMD;
-	} RPMD_t;
-	
-	typedef struct packed
-	{
-		bit [ 5: 0] UNUSED;
-		bit [ 3: 0] RBKTAOS;
-		bit [ 5: 0] UNUSED2;
-		bit [ 3: 0] RAKTAOS;
-	} KTAOF_t;
-	
-	typedef struct packed
-	{
-		bit         LCCLMD;
-		bit [11: 0] UNUSED;
-		bit [18:16] LCTA;
-	} LCTAU_t;
-	
-	typedef struct packed
-	{
-		bit [15: 0] LCTA;
-	} LCTAL_t;
-	
-	typedef struct packed
-	{
-		bit         BKCLMD;
-		bit [11: 0] UNUSED;
-		bit [18:16] BKTA;
-	} BKTAU_t;
-	
-	typedef struct packed
-	{
-		bit [15: 0] BKTA;
-	} BKTAL_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,1800C0,1800C8
 	{
 		bit [ 5: 0] UNUSED;
 		bit [ 9: 0] WxSX;
 	} WPSXx_t;
+	parameter bit [15:0] WPSXx_MASK = 16'h03FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800C2,1800CA
 	{
 		bit [ 6: 0] UNUSED;
 		bit [ 8: 0] WxSY;
 	} WPSYx_t;
+	parameter bit [15:0] WPSYx_MASK = 16'h01FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800C4,1800CC
 	{
 		bit [ 5: 0] UNUSED;
 		bit [ 9: 0] WxEX;
 	} WPEXx_t;
+	parameter bit [15:0] WPEXx_MASK = 16'h03FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800C6,1800CE
 	{
 		bit [ 6: 0] UNUSED;
 		bit [ 8: 0] WxEY;
 	} WPEYx_t;
+	parameter bit [15:0] WPEYx_MASK = 16'h01FF;
 	
-	typedef struct packed
-	{
-		bit         WxLWE;
-		bit [11: 0] UNUSED;
-		bit [18:16] WxLWTA;
-	} LWTAxU_t;
-	
-	typedef struct packed
-	{
-		bit [15: 1] WxLWTA;
-		bit         UNUSED;
-	} LWTAxL_t;
-	
-	typedef struct packed
-	{
-		bit [ 1: 0] UNUSED;
-		bit [ 1: 0] SPCCCS;
-		bit         UNUSED2;
-		bit [ 2: 0] SPCCN;
-		bit [ 1: 0] UNUSED3;
-		bit         SPCLMD;
-		bit         SPWINEN;
-		bit [ 3: 0] SPTYPE;
-	} SPCTL_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,1800D0
 	{
 		bit         N1LOG;
 		bit         UNUSED;
@@ -559,8 +629,9 @@ package VDP2_PKG;
 		bit         N0W0E;
 		bit         N0W0A;
 	} WCTLA_t;
+	parameter bit [15:0] WCTLA_MASK = 16'hBFBF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800D2
 	{
 		bit         N3LOG;
 		bit         UNUSED;
@@ -579,8 +650,9 @@ package VDP2_PKG;
 		bit         N2W0E;
 		bit         N2W0A;
 	} WCTLB_t;
+	parameter bit [15:0] WCTLB_MASK = 16'hBFBF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800D4
 	{
 		bit         SPLOG;
 		bit         UNUSED;
@@ -599,8 +671,9 @@ package VDP2_PKG;
 		bit         R0W0E;
 		bit         R0W0A;
 	} WCTLC_t;
+	parameter bit [15:0] WCTLC_MASK = 16'hBFBF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800D6
 	{
 		bit         CCLOG;
 		bit         UNUSED;
@@ -617,72 +690,51 @@ package VDP2_PKG;
 		bit         RPW0E;
 		bit         RPW0A;
 	} WCTLD_t;
+	parameter bit [15:0] WCTLD_MASK = 16'hBF8F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800D8,1800DC
 	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] S1PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] S0PRIN;
-	} PRISA_t;
+		bit         WxLWE;
+		bit [11: 0] UNUSED;
+		bit [18:16] WxLWTA;
+	} LWTAxU_t;
+	parameter bit [15:0] LWTAxU_MASK = 16'h8007;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800DA,1800DE
 	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] S3PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] S2PRIN;
-	} PRISB_t;
+		bit [15: 1] WxLWTA;
+		bit         UNUSED;
+	} LWTAxL_t;
+	parameter bit [15:0] LWTAxL_MASK = 16'hFFFE;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800E0
 	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] S5PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] S4PRIN;
-	} PRISC_t;
+		bit [ 1: 0] UNUSED;
+		bit [ 1: 0] SPCCCS;
+		bit         UNUSED2;
+		bit [ 2: 0] SPCCN;
+		bit [ 1: 0] UNUSED3;
+		bit         SPCLMD;
+		bit         SPWINEN;
+		bit [ 3: 0] SPTYPE;
+	} SPCTL_t;
+	parameter bit [15:0] SPCTL_MASK = 16'h373F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800E2
 	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] S7PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] S6PRIN;
-	} PRISD_t;
+		bit [ 6: 0] UNUSED;
+		bit         TPSDSL;
+		bit [ 1: 0] UNUSED2;
+		bit         BKSDEN;
+		bit         R0SDEN;
+		bit         N3SDEN;
+		bit         N2SDEN;
+		bit         N1SDEN;
+		bit         N0SDEN;
+	} SDCTL_t;
+	parameter bit [15:0] SDCTL_MASK = 16'h013F;
 	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] S1CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] S0CCRT;
-	} CCRSA_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] S3CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] S2CCRT;
-	} CCRSB_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] S5CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] S4CCRT;
-	} CCRSC_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] S7CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] S6CCRT;
-	} CCRSD_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,1800E4
 	{
 		bit         UNUSED;
 		bit [ 2: 0] N3CAOS;
@@ -693,64 +745,18 @@ package VDP2_PKG;
 		bit         UNUSED4;
 		bit [ 2: 0] N0CAOS;
 	} CRAOFA_t;
+	parameter bit [15:0] CRAOFA_MASK = 16'h7777;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800E6
 	{
 		bit [ 8: 0] UNUSED;
 		bit [ 2: 0] SPCAOS;
 		bit         UNUSED2;
 		bit [ 2: 0] R0CAOS;
 	} CRAOFB_t;
+	parameter bit [15:0] CRAOFB_MASK = 16'h0077;
 	
-	typedef struct packed
-	{
-		bit [10: 0] UNUSED;
-		bit         R0SFCS;
-		bit         N3SFCS;
-		bit         N2SFCS;
-		bit         N1SFCS;
-		bit         N0SFCS;
-	} SFSEL_t;
-	
-	typedef struct packed
-	{
-		bit [ 7: 0] SFCDB;
-		bit [ 7: 0] SFCDA;
-	} SFCODE_t;
-	
-	typedef struct packed
-	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] N1PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] N0PRIN;
-	} PRINA_t;
-	
-	typedef struct packed
-	{
-		bit [ 4: 0] UNUSED;
-		bit [ 2: 0] N3PRIN;
-		bit [ 4: 0] UNUSED2;
-		bit [ 2: 0] N2PRIN;
-	} PRINB_t;
-	
-	typedef struct packed
-	{
-		bit [12: 0] UNUSED;
-		bit [ 2: 0] R0PRIN;
-	} PRIR_t;
-	
-	typedef struct packed
-	{
-		bit [ 5: 0] UNUSED;
-		bit [ 1: 0] R0SPRM;
-		bit [ 1: 0] N3SPRM;
-		bit [ 1: 0] N2SPRM;
-		bit [ 1: 0] N1SPRM;
-		bit [ 1: 0] N0SPRM;
-	} SFPRMD_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,1800E8
 	{
 		bit [ 9: 0] UNUSED;
 		bit         SPLCEN;
@@ -760,8 +766,20 @@ package VDP2_PKG;
 		bit         N1LCEN;
 		bit         N0LCEN;
 	} LNCLEN_t;
+	parameter bit [15:0] LNCLEN_MASK = 16'h003FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800EA
+	{
+		bit [ 5: 0] UNUSED;
+		bit [ 1: 0] R0SPRM;
+		bit [ 1: 0] N3SPRM;
+		bit [ 1: 0] N2SPRM;
+		bit [ 1: 0] N1SPRM;
+		bit [ 1: 0] N0SPRM;
+	} SFPRMD_t;
+	parameter bit [15:0] SFPRMD_MASK = 16'h03FF;
+	
+	typedef struct packed	//RW,1800EC
 	{
 		bit         BOKEN;
 		bit [ 2: 0] BOKN;
@@ -778,38 +796,9 @@ package VDP2_PKG;
 		bit         N1CCEN;
 		bit         N0CCEN;
 	} CCCTL_t;
+	parameter bit [15:0] CCCTL_MASK = 16'hF77F;
 	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] N1CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] N0CCRT;
-	} CCRNA_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] N3CCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] N2CCRT;
-	} CCRNB_t;
-	
-	typedef struct packed
-	{
-		bit [10: 0] UNUSED;
-		bit [ 4: 0] R0CCRT;
-	} CCRR_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit [ 4: 0] BKCCRT;
-		bit [ 2: 0] UNUSED2;
-		bit [ 4: 0] LCCCRT;
-	} CCRLB_t;
-	
-	typedef struct packed
+	typedef struct packed	//RW,1800EE
 	{
 		bit [ 5: 0] UNUSED;
 		bit [ 1: 0] R0SCCM;
@@ -818,8 +807,140 @@ package VDP2_PKG;
 		bit [ 1: 0] N1SCCM;
 		bit [ 1: 0] N0SCCM;
 	} SFCCMD_t;
+	parameter bit [15:0] SFCCMD_MASK = 16'h03FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,1800F0
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] S1PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] S0PRIN;
+	} PRISA_t;
+	parameter bit [15:0] PRISA_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800F2
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] S3PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] S2PRIN;
+	} PRISB_t;
+	parameter bit [15:0] PRISB_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800F4
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] S5PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] S4PRIN;
+	} PRISC_t;
+	parameter bit [15:0] PRISC_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800F6
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] S7PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] S6PRIN;
+	} PRISD_t;
+	parameter bit [15:0] PRISD_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800F8
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] N1PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] N0PRIN;
+	} PRINA_t;
+	parameter bit [15:0] PRINA_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800FA
+	{
+		bit [ 4: 0] UNUSED;
+		bit [ 2: 0] N3PRIN;
+		bit [ 4: 0] UNUSED2;
+		bit [ 2: 0] N2PRIN;
+	} PRINB_t;
+	parameter bit [15:0] PRINB_MASK = 16'h0707;
+	
+	typedef struct packed	//RW,1800FC
+	{
+		bit [12: 0] UNUSED;
+		bit [ 2: 0] R0PRIN;
+	} PRIR_t;
+	parameter bit [15:0] PRIR_MASK = 16'h0007;
+	
+	typedef struct packed	//RW,180100
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] S1CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] S0CCRT;
+	} CCRSA_t;
+	parameter bit [15:0] CCRSA_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,180102
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] S3CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] S2CCRT;
+	} CCRSB_t;
+	parameter bit [15:0] CCRSB_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,180104
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] S5CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] S4CCRT;
+	} CCRSC_t;
+	parameter bit [15:0] CCRSC_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,180106
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] S7CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] S6CCRT;
+	} CCRSD_t;
+	parameter bit [15:0] CCRSD_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,180108
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] N1CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] N0CCRT;
+	} CCRNA_t;
+	parameter bit [15:0] CCRNA_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,18010A
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] N3CCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] N2CCRT;
+	} CCRNB_t;
+	parameter bit [15:0] CCRNB_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,18010C
+	{
+		bit [10: 0] UNUSED;
+		bit [ 4: 0] R0CCRT;
+	} CCRR_t;
+	parameter bit [15:0] CCRR_MASK = 16'h001F;
+	
+	typedef struct packed	//RW,18010E
+	{
+		bit [ 2: 0] UNUSED;
+		bit [ 4: 0] BKCCRT;
+		bit [ 2: 0] UNUSED2;
+		bit [ 4: 0] LCCCRT;
+	} CCRLB_t;
+	parameter bit [15:0] CCRLB_MASK = 16'h1F1F;
+	
+	typedef struct packed	//RW,180110
 	{
 		bit [ 8: 0] UNUSED;
 		bit         SPCOEN;
@@ -830,8 +951,9 @@ package VDP2_PKG;
 		bit         N1COEN;
 		bit         N0COEN;
 	} CLOFEN_t;
+	parameter bit [15:0] CLOFEN_MASK = 16'h007F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180112
 	{
 		bit [ 8: 0] UNUSED;
 		bit         SPCOSL;
@@ -842,56 +964,34 @@ package VDP2_PKG;
 		bit         N1COSL;
 		bit         N0COSL;
 	} CLOFSL_t;
+	parameter bit [15:0] CLOFSL_MASK = 16'h007F;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180114,18011A
 	{
 		bit [ 6: 0] UNUSED;
 		bit [ 8: 0] COxRD;
 	} COxR_t;
+	parameter bit [15:0] COxR_MASK = 16'h01FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180116,18011C
 	{
 		bit [ 6: 0] UNUSED;
 		bit [ 8: 0] COxGR;
 	} COxG_t;
+	parameter bit [15:0] COxG_MASK = 16'h01FF;
 	
-	typedef struct packed
+	typedef struct packed	//RW,180118,18011E
 	{
 		bit [ 6: 0] UNUSED;
 		bit [ 8: 0] COxBL;
 	} COxB_t;
+	parameter bit [15:0] COxB_MASK = 16'h01FF;
 	
-	typedef struct packed
-	{
-		bit [ 6: 0] UNUSED;
-		bit         TPSDSL;
-		bit [ 1: 0] UNUSED2;
-		bit         BKSDEN;
-		bit         R0SDEN;
-		bit         N3SDEN;
-		bit         N2SDEN;
-		bit         N1SDEN;
-		bit         N0SDEN;
-	} SDCTL_t;
-	
-	typedef struct packed
-	{
-		bit [ 2: 0] UNUSED;
-		bit         RBKLCE;
-		bit [ 1: 0] RBKMD;
-		bit         RBKDBS;
-		bit         RBKTE;
-		bit [ 2: 0] UNUSED2;
-		bit         RAKLCE;
-		bit [ 1: 0] RAKMD;
-		bit         RAKDBS;
-		bit         RAKTE;
-	} KTCTL_t;
-	
-	typedef struct packed
+	typedef struct packed	//18000C,1800FE
 	{
 		bit [15: 0] UNUSED;
 	} RSRV_t;
+	parameter bit [15:0] RSRV_MASK = 16'h0000;
 	
 	typedef struct packed
 	{
@@ -1042,28 +1142,28 @@ package VDP2_PKG;
 	} VDP2Regs_t;
 
 	//VRAM access command value
-	localparam VCP_N0PN 	= 4'h0;	//NBG0 pattern name data read
-	localparam VCP_N1PN 	= 4'h1;	//NBG1 pattern name data read
-	localparam VCP_N2PN 	= 4'h2;	//NBG2 pattern name data read
-	localparam VCP_N3PN 	= 4'h3;	//NBG3 pattern name data read
-	localparam VCP_N0CH 	= 4'h4;	//NBG0 character data read
-	localparam VCP_N1CH 	= 4'h5;	//NBG1 character data read
-	localparam VCP_N2CH 	= 4'h6;	//NBG2 character data read
-	localparam VCP_N3CH 	= 4'h7;	//NBG3 character data read
-	localparam VCP_N0VS 	= 4'hC;	//NBG0 vertical cell scroll data read
-	localparam VCP_N1VS 	= 4'hD;	//NBG1 vertical cell scroll data read
-	localparam VCP_CPU 	= 4'hE;	//CPU read/write
-	localparam VCP_NA 	= 4'hF;	//No access
+	parameter VCP_N0PN 	= 4'h0;	//NBG0 pattern name data read
+	parameter VCP_N1PN 	= 4'h1;	//NBG1 pattern name data read
+	parameter VCP_N2PN 	= 4'h2;	//NBG2 pattern name data read
+	parameter VCP_N3PN 	= 4'h3;	//NBG3 pattern name data read
+	parameter VCP_N0CH 	= 4'h4;	//NBG0 character data read
+	parameter VCP_N1CH 	= 4'h5;	//NBG1 character data read
+	parameter VCP_N2CH 	= 4'h6;	//NBG2 character data read
+	parameter VCP_N3CH 	= 4'h7;	//NBG3 character data read
+	parameter VCP_N0VS 	= 4'hC;	//NBG0 vertical cell scroll data read
+	parameter VCP_N1VS 	= 4'hD;	//NBG1 vertical cell scroll data read
+	parameter VCP_CPU 	= 4'hE;	//CPU read/write
+	parameter VCP_NA 	= 4'hF;	//No access
 	
 	//VRAM access timing
-	localparam T0 	= 3'd0;
-	localparam T1 	= 3'd1;
-	localparam T2 	= 3'd2;
-	localparam T3 	= 3'd3;
-	localparam T4 	= 3'd4;
-	localparam T5 	= 3'd5;
-	localparam T6 	= 3'd6;
-	localparam T7 	= 3'd7;
+	parameter T0 	= 3'd0;
+	parameter T1 	= 3'd1;
+	parameter T2 	= 3'd2;
+	parameter T3 	= 3'd3;
+	parameter T4 	= 3'd4;
+	parameter T5 	= 3'd5;
+	parameter T6 	= 3'd6;
+	parameter T7 	= 3'd7;
 	
 	typedef struct packed
 	{

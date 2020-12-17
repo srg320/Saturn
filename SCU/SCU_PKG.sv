@@ -1,16 +1,18 @@
 package SCU_PKG;
 
 	typedef bit [26:0] DxR_t;	//R/W,25FE0000,25FE0020,25FE0040
-	const bit [31:0] DxR_MASK = 32'h07FFFFFF;
+	parameter bit [31:0] DxR_WMASK = 32'h07FFFFFF;
+	parameter bit [31:0] DxR_RMASK = 32'h07FFFFFF;
 	
 	typedef bit [26:0] DxW_t;	//R/W,25FE0004,25FE0024,25FE0044
-	const bit [31:0] DxW_MASK = 32'h07FFFFFF;
+	parameter bit [31:0] DxW_WMASK = 32'h07FFFFFF;
+	parameter bit [31:0] DxW_RMASK = 32'h07FFFFFF;
 	
-	typedef bit [19:0] D0C_t;	//R/W,25FE0008
-	const bit [31:0] D0C_MASK = 32'h000FFFFF;
-	
-	typedef bit [11:0] D12C_t;	//R/W,25FE0028,25FE0048
-	const bit [31:0] D12C_MASK = 32'h00000FFF;
+	typedef bit [19:0] DxC_t;	//R/W,25FE0008,25FE0028,25FE0048
+	parameter bit [31:0] D0C_WMASK = 32'h000FFFFF;
+	parameter bit [31:0] D0C_RMASK = 32'h000FFFFF;
+	parameter bit [31:0] D12C_WMASK = 32'h00000FFF;
+	parameter bit [31:0] D12C_RMASK = 32'h00000FFF;
 
 	typedef struct packed		//W,25FE000C,25FE002C,25FE004C
 	{
@@ -19,8 +21,9 @@ package SCU_PKG;
 		bit [ 4: 0] UNSIGNED2;
 		bit [ 2: 0] DWA;			//W
 	} DxAD_t;
-	const bit [31:0] DxAD_MASK = 32'h00000107;
-	const bit [31:0] DxAD_INIT = 32'h00000101;
+	parameter bit [31:0] DxAD_WMASK = 32'h00000107;
+	parameter bit [31:0] DxAD_RMASK = 32'h00000000;
+	parameter bit [31:0] DxAD_INIT = 32'h00000101;
 	
 	typedef struct packed		//W,25FE0010,25FE0030,25FE0050
 	{
@@ -29,8 +32,9 @@ package SCU_PKG;
 		bit [ 6: 0] UNSIGNED2;
 		bit         GO;			//W
 	} DxEN_t;
-	const bit [31:0] DxEN_MASK = 32'h00000101;
-	const bit [31:0] DxEN_INIT = 32'h00000000;
+	parameter bit [31:0] DxEN_WMASK = 32'h00000101;
+	parameter bit [31:0] DxEN_RMASK = 32'h00000000;
+	parameter bit [31:0] DxEN_INIT = 32'h00000000;
 	
 	typedef struct packed		//W,25FE0014,25FE0034,25FE0054
 	{
@@ -43,16 +47,18 @@ package SCU_PKG;
 		bit [ 4: 0] UNSIGNED4;
 		bit [ 2: 0] FT;			//W
 	} DxMD_t;
-	const bit [31:0] DxMD_MASK = 32'h01010107;
-	const bit [31:0] DxMD_INIT = 32'h00000007;
+	parameter bit [31:0] DxMD_WMASK = 32'h01010107;
+	parameter bit [31:0] DxMD_RMASK = 32'h00000000;
+	parameter bit [31:0] DxMD_INIT = 32'h00000007;
 
 	typedef struct packed		//W,25FE0060
 	{
 		bit [30: 0] UNSIGNED;
 		bit         STOP;			//W
 	} DSTP_t;
-	const bit [31:0] DSTP_MASK = 32'h00000001;
-	const bit [31:0] DSTP_INIT = 32'h00000000;
+	parameter bit [31:0] DSTP_WMASK = 32'h00000001;
+	parameter bit [31:0] DSTP_RMASK = 32'h00000000;
+	parameter bit [31:0] DSTP_INIT = 32'h00000000;
 	
 	typedef struct packed		//R,25FE0070
 	{
@@ -76,8 +82,9 @@ package SCU_PKG;
 		bit         DDWT;			//R
 		bit         DDMV;			//R
 	} DSTA_t;
-	const bit [31:0] DSTA_MASK = 32'h00733333;
-	const bit [31:0] DSTA_INIT = 32'h00000000;
+	parameter bit [31:0] DSTA_WMASK = 32'h00000000;
+	parameter bit [31:0] DSTA_RMASK = 32'h00733333;
+	parameter bit [31:0] DSTA_INIT = 32'h00000000;
 	
 	typedef struct packed		//R/W,25FE0080
 	{
@@ -97,28 +104,34 @@ package SCU_PKG;
 		bit [ 6: 0] UNSIGNED3;
 		bit [ 7: 0] P;				//R/W
 	} PPAF_t;
-	const bit [31:0] PPAF_MASK = 32'h06FF80FF;
-	const bit [31:0] PPAF_INIT = 32'h00000000;
+	parameter bit [31:0] PPAF_WMASK = 32'h060380FF;
+	parameter bit [31:0] PPAF_RMASK = 32'h00FD80FF;
+	parameter bit [31:0] PPAF_INIT = 32'h00000000;
 	
 	typedef bit [31:0] PPD_t;	//W,25FE0084
-	const bit [31:0] PPD_MASK = 32'hFFFFFFFF;
+	parameter bit [31:0] PPD_WMASK = 32'hFFFFFFFF;
+	parameter bit [31:0] PPD_RMASK = 32'h00000000;
 	
 	typedef struct packed		//W,25FE0088
 	{
 		bit [23: 0] UNSIGNED;
 		bit [ 7: 0] RA;			//W
 	} PDA_t;
-	const bit [31:0] PDA_MASK = 32'h000000FF;
-	const bit [31:0] PDA_INIT = 32'h00000000;
+	parameter bit [31:0] PDA_WMASK = 32'h000000FF;
+	parameter bit [31:0] PDA_RMASK = 32'h00000000;
+	parameter bit [31:0] PDA_INIT = 32'h00000000;
 	
 	typedef bit [31:0] PDD_t;	//W/R,25FE008C
-	const bit [31:0] PDD_MASK = 32'hFFFFFFFF;
+	parameter bit [31:0] PDD_WMASK = 32'hFFFFFFFF;
+	parameter bit [31:0] PDD_RMASK = 32'hFFFFFFFF;
 	
 	typedef bit [9:0] T0C_t;	//W,25FE0090
-	const bit [31:0] T0C_MASK = 32'h000003FF;
+	parameter bit [31:0] T0C_WMASK = 32'h000003FF;
+	parameter bit [31:0] T0C_RMASK = 32'h00000000;
 	
 	typedef bit [8:0] T1S_t;	//W,25FE0094
-	const bit [31:0] T1S_MASK = 32'h000001FF;
+	parameter bit [31:0] T1S_WMASK = 32'h000001FF;
+	parameter bit [31:0] T1S_RMASK = 32'h00000000;
 	
 	typedef struct packed		//W,25FE0098
 	{
@@ -127,8 +140,9 @@ package SCU_PKG;
 		bit [ 6: 0] UNSIGNED3;
 		bit         ENB;			//W
 	} T1MD_t;
-	const bit [31:0] T1MD_MASK = 32'h00000101;
-	const bit [31:0] T1MD_INIT = 32'h00000000;
+	parameter bit [31:0] T1MD_WMASK = 32'h00000101;
+	parameter bit [31:0] T1MD_RMASK = 32'h00000000;
+	parameter bit [31:0] T1MD_INIT = 32'h00000000;
 	
 	typedef struct packed		//W,25FE00A0
 	{
@@ -150,8 +164,9 @@ package SCU_PKG;
 		bit         MS1;			//W
 		bit         MS0;			//W
 	} IMS_t;
-	const bit [31:0] IMS_MASK = 32'h0000BFFF;
-	const bit [31:0] IMS_INIT = 32'h0000BFFF;
+	parameter bit [31:0] IMS_WMASK = 32'h0000BFFF;
+	parameter bit [31:0] IMS_RMASK = 32'h00000000;
+	parameter bit [31:0] IMS_INIT = 32'h0000BFFF;
 	
 	typedef struct packed		//R/W,25FE00A4
 	{
@@ -172,12 +187,14 @@ package SCU_PKG;
 		bit         VBOI;			//R/W
 		bit         VBII;			//R/W
 	} IST_t;
-	const bit [31:0] IST_MASK = 32'hFFFF3FFF;
-	const bit [31:0] IST_INIT = 32'h00000000;
+	parameter bit [31:0] IST_WMASK = 32'hFFFF3FFF;
+	parameter bit [31:0] IST_RMASK = 32'hFFFF3FFF;
+	parameter bit [31:0] IST_INIT = 32'h00000000;
 	
 	typedef bit AIACK_t;		//R/W,25FE00A8
-	const bit [31:0] AIACK_MASK = 32'h00000001;
-	const bit [31:0] AIACK_INIT = 32'h00000000;
+	parameter bit [31:0] AIACK_WMASK = 32'h00000001;
+	parameter bit [31:0] AIACK_RMASK = 32'h00000001;
+	parameter bit [31:0] AIACK_INIT = 32'h00000000;
 	
 	typedef struct packed		//W,25FE00B0
 	{
@@ -200,8 +217,9 @@ package SCU_PKG;
 		bit         UNSIGNED2;
 		bit         A1SZ;			//W
 	} ASR0_t;
-	const bit [31:0] ASR0_MASK = 32'hFFFDFFFD;
-	const bit [31:0] ASR0_INIT = 32'h00000000;
+	parameter bit [31:0] ASR0_WMASK = 32'hFFFDFFFD;
+	parameter bit [31:0] ASR0_RMASK = 32'h00000000;
+	parameter bit [31:0] ASR0_INIT = 32'h00000000;
 	
 	typedef struct packed		//W,25FE00B4
 	{
@@ -223,8 +241,9 @@ package SCU_PKG;
 		bit         UNSIGNED3;
 		bit         A3SZ;			//W
 	} ASR1_t;
-	const bit [31:0] ASR1_MASK = 32'hF00DFFFD;
-	const bit [31:0] ASR1_INIT = 32'h00000000;
+	parameter bit [31:0] ASR1_WMASK = 32'hF00DFFFD;
+	parameter bit [31:0] ASR1_RMASK = 32'h00000000;
+	parameter bit [31:0] ASR1_INIT = 32'h00000000;
 	
 	typedef struct packed		//W,25FE00B8
 	{
@@ -232,15 +251,18 @@ package SCU_PKG;
 		bit         ARFEN;		//W
 		bit [ 3: 0] ARWT;			//W
 	} AREF_t;
-	const bit [31:0] AREF_MASK = 32'h0000001F;
-	const bit [31:0] AREF_INIT = 32'h00000000;
+	parameter bit [31:0] AREF_WMASK = 32'h0000001F;
+	parameter bit [31:0] AREF_RMASK = 32'h00000000;
+	parameter bit [31:0] AREF_INIT = 32'h00000000;
 	
 	typedef bit RSEL_t;			//R/W,25FE00C4
-	const bit [31:0] RSEL_MASK = 32'h00000001;
-	const bit [31:0] RSEL_INIT = 32'h00000000;
+	parameter bit [31:0] RSEL_WMASK = 32'h00000001;
+	parameter bit [31:0] RSEL_RMASK = 32'h00000001;
+	parameter bit        RSEL_INIT = 1'h0;
 	
 	typedef bit [3:0] VER_t;	//R,25FE00C8
-	const bit [31:0] VER_MASK = 32'h0000000F;
-	const bit [31:0] VER_INIT = 32'h00000000;
+	parameter bit [31:0] VER_WMASK = 32'h00000000;
+	parameter bit [31:0] VER_RMASK = 32'h0000000F;
+	parameter bit [31:0] VER_INIT = 32'h00000000;
 	
 endpackage
