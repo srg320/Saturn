@@ -12,7 +12,36 @@ module Saturn (
 	output            RAML_CS_N,
 	output            RAMH_CS_N,
 	output      [3:0] MEM_DQM_N,
-	output            MEM_RD_N
+	output            MEM_RD_N,
+	
+	output     [16:1] RA0_A,
+	output     [15:0] RA0_D,
+	input      [15:0] RA0_Q,
+	output            RA0_WE,
+	
+	output     [16:1] RA1_A,
+	output     [15:0] RA1_D,
+	input      [15:0] RA1_Q,
+	output            RA1_WE,
+	
+//	output     [16:1] RB0_A,
+//	output     [15:0] RB0_D,
+//	input      [15:0] RB0_Q,
+//	output            RB0_WE,
+//	
+//	output     [16:1] RB1_A,
+//	output     [15:0] RB1_D,
+//	input      [15:0] RB1_Q,
+//	output            RB1_WE,
+	
+	output      [7:0] R,
+	output      [7:0] G,
+	output      [7:0] B,
+	output reg        DCLK,
+	output reg        HS_N,
+	output reg        VS_N,
+	output reg        HBL_N,
+	output reg        VBL_N
 );
 
 	bit CE_R, CE_F;
@@ -197,7 +226,7 @@ module Saturn (
 		.DREQ1(1'b1),
 		
 		.FTCI(1'b1),
-		.FTI(1'b1),
+		.FTI(1'b0),
 		
 		.RXD(1'b1),
 		.TXD(),
@@ -254,7 +283,7 @@ module Saturn (
 		.DREQ1(1'b1),
 		
 		.FTCI(1'b1),
-		.FTI(1'b1),
+		.FTI(1'b0),
 		
 		.RXD(1'b1),
 		.TXD(),
@@ -288,13 +317,13 @@ module Saturn (
 	assign CDQM_N   = MSHDQM_N;
 	assign CRD_N    = MSHRD_N;
 	
-	assign ADI      = '0;
+//	assign ADI      = '0;
 	assign AWAIT_N  = 1;
 	assign AIRQ_N   = 1;
 	assign BDI      = '0;
-	assign BRDY1_N  = 1;
+	assign BRDY1_N  = 0;
 	assign IRQ1_N   = 1;
-	assign BRDY2_N  = 1;
+	assign BRDY2_N  = 0;
 	assign IRQV_N   = 1;
 	assign IRQH_N   = 1;
 	assign IRQL_N   = 1;
@@ -490,6 +519,22 @@ module Saturn (
 	);
 	
 	
+//	bit [16:1] RA0_A;
+//	bit [15:0] RA0_D;
+//	bit        RA0_WE;
+//	bit [15:0] RA0_Q;
+//	bit [16:1] RA1_A;
+//	bit [15:0] RA1_D;
+//	bit        RA1_WE;
+//	bit [15:0] RA1_Q;
+	bit [16:1] RB0_A;
+	bit [15:0] RB0_D;
+	bit        RB0_WE;
+	bit [15:0] RB0_Q;
+	bit [16:1] RB1_A;
+	bit [15:0] RB1_D;
+	bit        RB1_WE;
+	bit [15:0] RB1_Q;
 	VDP2 VDP2
 	(
 		.CLK(CLK),
@@ -505,13 +550,55 @@ module Saturn (
 		.CS_N(BCS2_N),
 		.WE_N(&CDQM_N),
 		.RD_N(CRD_N),
+		.RDY_N(),
 		
-		.RA0_A(),
-		.RA0_DI('0),
+		.RA0_A(RA0_A),
+		.RA0_D(RA0_D),
+		.RA0_WE(RA0_WE),
+		.RA0_Q(RA0_Q),
 		
-		.RA1_A(),
-		.RA1_DI('0)
+		.RA1_A(RA1_A),
+		.RA1_D(RA1_D),
+		.RA1_WE(RA1_WE),
+		.RA1_Q(RA1_Q),
+		
+		.RB0_A(RB0_A),
+		.RB0_D(RB0_D),
+		.RB0_WE(RB0_WE),
+		.RB0_Q(RB0_Q),
+		
+		.RB1_A(RB1_A),
+		.RB1_D(RB1_D),
+		.RB1_WE(RB1_WE),
+		.RB1_Q(RB1_Q),
+		
+		.R(R),
+		.G(G),
+		.B(B),
+		.DCLK(DCLK),
+		.VS_N(VS_N),
+		.HS_N(HS_N),
+		.HBL_N(HBL_N),
+		.VBL_N(VBL_N)
 	);
+	
+	
+	//CD
+	
+	always_comb begin
+		ADI = '0;
+		if (!ACS2_N && AA[25:16] == 10'h189) begin
+			case ({AA[15:1],1'b0})
+				16'h0008: ADI = 16'hFFFF;//HIRQ
+				16'h000C: ADI = 16'hFFFF;//HIRQMASK
+				16'h0018: ADI = 16'h0043;//CR1
+				16'h001C: ADI = 16'h4442;//CR2
+				16'h0020: ADI = 16'h4C4F;//CR3
+				16'h0024: ADI = 16'h434B;//CR4
+				default: ADI = '0;
+			endcase
+		end
+	end
 	
 	
 endmodule

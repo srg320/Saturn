@@ -44,7 +44,7 @@ module DCC (
 	output            MWR_N
 );
 
-	assign WAIT_N = 1;
+	assign WAIT_N = WTIN_N;///////////////////////
 	
 	assign BRLS_N = 1;
 	assign BACK_N = 1;

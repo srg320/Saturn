@@ -18,15 +18,15 @@ module SMPC (
 	input             IRQV_N,
 	input             EXL,
 	
-	output            MSHRES_N,
-	output            MSHNMI_N,
-	output            SSHRES_N,
-	output            SSHNMI_N,
-	output            SYSRES_N,
-	output            SNDRES_N,
-	output            CDRES_N,
+	output reg        MSHRES_N,
+	output reg        MSHNMI_N,
+	output reg        SSHRES_N,
+	output reg        SSHNMI_N,
+	output reg        SYSRES_N,
+	output reg        SNDRES_N,
+	output reg        CDRES_N,
 	
-	output            MIRQ_N,
+	output reg        MIRQ_N,
 
 	input       [6:0] P1I,
 	output      [6:0] P1O,

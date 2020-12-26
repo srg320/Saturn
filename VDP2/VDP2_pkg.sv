@@ -38,11 +38,11 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,180006
 	{
-		bit         VRAMSZ;
+		bit         VRAMSZ;	//RW
 		bit [10: 0] UNUSED;
-		bit [ 3: 0] VER;
+		bit [ 3: 0] VER;		//RO
 	} VRSIZE_t;
-	parameter bit [15:0] VRSIZE_MASK = 16'h800F;
+	parameter bit [15:0] VRSIZE_MASK = 16'h8000;
 	
 	typedef struct packed	//RO,180008
 	{
@@ -766,7 +766,7 @@ package VDP2_PKG;
 		bit         N1LCEN;
 		bit         N0LCEN;
 	} LNCLEN_t;
-	parameter bit [15:0] LNCLEN_MASK = 16'h003FF;
+	parameter bit [15:0] LNCLEN_MASK = 16'h03FF;
 	
 	typedef struct packed	//RW,1800EA
 	{
@@ -1142,8 +1142,22 @@ package VDP2_PKG;
 	} VDP2Regs_t;
 
 	//VRAM access command value
-	parameter VCP_N0PN 	= 4'h0;	//NBG0 pattern name data read
-	parameter VCP_N1PN 	= 4'h1;	//NBG1 pattern name data read
+//	typedef enum bit [3:0] {
+//		N0PN = 4'h0,  	//NBG0 pattern name data read
+//		N1PN = 4'h1, 	//NBG1 pattern name data read
+//		N2PN = 4'h2,	//NBG2 pattern name data read
+//		N3PN = 4'h3,	//NBG3 pattern name data read
+//		N0CH = 4'h4,	//NBG0 character data read
+//		N1CH = 4'h5,	//NBG1 character data read
+//		N2CH = 4'h6,	//NBG2 character data read
+//		N3CH = 4'h7,	//NBG3 character data read
+//		N0VS = 4'hC,	//NBG0 vertical cell scroll data read
+//		N1VS = 4'hD,	//NBG1 vertical cell scroll data read
+//		CPU  = 4'hE,	//CPU read/write
+//		NA   = 4'hF 	//No access
+//	} VCP_t;
+	parameter VCP_N0PN 	= 4'h0; 	//NBG0 pattern name data read
+	parameter VCP_N1PN 	= 4'h1; 	//NBG1 pattern name data read
 	parameter VCP_N2PN 	= 4'h2;	//NBG2 pattern name data read
 	parameter VCP_N3PN 	= 4'h3;	//NBG3 pattern name data read
 	parameter VCP_N0CH 	= 4'h4;	//NBG0 character data read
@@ -1153,7 +1167,7 @@ package VDP2_PKG;
 	parameter VCP_N0VS 	= 4'hC;	//NBG0 vertical cell scroll data read
 	parameter VCP_N1VS 	= 4'hD;	//NBG1 vertical cell scroll data read
 	parameter VCP_CPU 	= 4'hE;	//CPU read/write
-	parameter VCP_NA 	= 4'hF;	//No access
+	parameter VCP_NA 	   = 4'hF;	//No access
 	
 	//VRAM access timing
 	parameter T0 	= 3'd0;
@@ -1185,9 +1199,175 @@ package VDP2_PKG;
 		bit [ 3: 0] VCPA1; 
 		bit [ 3: 0] VCPB0; 
 		bit [ 3: 0] VCPB1;
+		bit [ 2: 0] N0CH_CNT;
+		bit [ 2: 0] N1CH_CNT;
+		bit [ 2: 0] N2CH_CNT;
+		bit [ 2: 0] N3CH_CNT;
 	} VRAMAccessState_t;
 	
-	typedef VRAMAccessState_t VRAMAccessPipeline_t [3];
+	typedef VRAMAccessState_t VRAMAccessPipeline_t [4];
 	
+	typedef struct packed
+	{
+		bit [10: 0] INT;
+		bit [ 1: 8] FRAC;
+	} ScrollData_t;
+	parameter SCRLD_NULL	= {11'h000,8'h00};
+	
+	typedef struct packed
+	{
+		bit         P;
+		bit         TP;
+		bit [23: 0] D;
+	} DotData_t;
+	parameter DD_NULL = {1'b0,1'b0,24'h000000};
+	
+	typedef DotData_t CellDotsLine_t [8];
+	typedef DotData_t DotsBuffer_t [16];
+	
+	typedef struct packed
+	{
+		bit         TP;
+		bit [ 7: 0] B;
+		bit [ 7: 0] G;
+		bit [ 7: 0] R;
+	} DotColor_t;
+	parameter DC_BLACK = {1'b0,8'h00,8'h00,8'h00};
+	
+	function bit [18:1] NxPNAddr(input bit [10:0] NxOFFX, input bit [10:0] NxOFFY,
+	                             input bit [8:0] NxMP, input bit [1:0] NxPLSZ, input bit NxCHSZ);
+		bit [18:1] addr;
+		bit  [8:0] map_addr;
+		
+		case (NxPLSZ)
+			2'b00: map_addr = NxMP;
+			2'b01: map_addr = {NxMP[8:1],NxOFFY[9]};
+			2'b10,
+			2'b11: map_addr = {NxMP[8:2],NxOFFY[9],NxOFFX[9]};
+		endcase
+		case (NxCHSZ)
+			1'b0: addr = {map_addr[5:0],NxOFFY[8:3],NxOFFX[8:3]};
+			1'b1: addr = {map_addr[7:0],NxOFFY[8:4],NxOFFX[8:4]};
+		endcase
+	
+		return addr;
+	endfunction
+	
+	function bit [18:1] NxCHAddr(input PatternName_t PNx, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN);
+		bit   [18:1] addr;
+		bit    [2:0] cell_dot_x, cell_dot_y;
+		
+		cell_dot_x = NxCH_CNT/* ^ {3{PNx.HF}}*/;
+		cell_dot_y = NxOFFY[2:0] ^ {3{PNx.VF}};
+		case (NxCHCN)
+			3'b000: addr = {PNx.CHRN[14:0],cell_dot_y};						//4bits/dot, 16 colors
+			3'b001: addr = {PNx.CHRN[13:0],cell_dot_y,cell_dot_x[0]};	//8bits/dot, 256 colors
+			3'b010,
+			3'b011: addr = {PNx.CHRN[12:0],cell_dot_y,cell_dot_x[1:0]};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {PNx.CHRN[11:0],cell_dot_y,cell_dot_x[2:0]};	//32bits/dot, 16M colors
+			default: addr = '0;
+		endcase
+	
+		return addr;
+	endfunction
+	
+	function PatternName_t PNOneWord(input PNCNx_t PNC, input bit CHSZ, input bit [2:0] CHCN, input bit [15:0] DW);
+		PatternName_t res;
+		
+		res = '0;
+		res.VF = DW[11] & ~PNC.NxCNSM; 
+		res.HF = DW[10] & ~PNC.NxCNSM; 
+		res.PR = PNC.NxSPR; 
+		res.CC = PNC.NxSCC;
+		case ({CHSZ,|CHCN})
+			2'b00: begin 
+				res.PALN = {PNC.NxSPLT,DW[15:12]};
+				res.CHRN = {PNC.NxSCN[4:2],(PNC.NxSCN[1:0] & {2{~PNC.NxCNSM}}) | (DW[11:10] & {2{PNC.NxCNSM}}),DW[9:0]};
+			end
+			2'b01: begin 
+				res.PALN = {DW[14:12],4'b0000};
+				res.CHRN = {PNC.NxSCN[4:2],(PNC.NxSCN[1:0] & {2{~PNC.NxCNSM}}) | (DW[11:10] & {2{PNC.NxCNSM}}),DW[9:0]};
+			end
+			2'b10: begin 
+				res.PALN = {PNC.NxSPLT,DW[15:12]};
+				res.CHRN = {PNC.NxSCN[4],(PNC.NxSCN[3:2] & {2{~PNC.NxCNSM}}) | (DW[11:10] & {2{PNC.NxCNSM}}),DW[9:0],PNC.NxSCN[1:0]};
+			end
+			2'b11: begin 
+				res.PALN = {DW[14:12],4'b0000};
+				res.CHRN = {PNC.NxSCN[4],(PNC.NxSCN[3:2] & {2{~PNC.NxCNSM}}) | (DW[11:10] & {2{PNC.NxCNSM}}),DW[9:0],PNC.NxSCN[1:0]};
+			end
+		endcase
+	
+		return res;
+	endfunction
 
+	function DotColor_t Color555ToDC(input bit [15:0] DW);
+		DotColor_t DC;
+
+		DC.TP = DW[15]; 
+		DC.B = {DW[14:10],3'b000}; 
+		DC.G = {DW[9:5],3'b000}; 
+		DC.R = {DW[4:0],3'b000}; 
+	
+		return DC;
+	endfunction
+	
+	function bit [23:0] Color555To888(input bit [15:0] DW);
+		return {DW[14:10],3'b000,DW[9:5],3'b000,DW[4:0],3'b000}; 
+	endfunction
+	
+	
+	typedef struct packed
+	{
+		bit [ 2: 0] UNUSED;
+		bit [12: 0] INT;
+		bit [ 9: 0] FRAC;
+		bit [ 5: 0] UNUSED2;
+	} ScrnStart_t;
+	
+	typedef struct packed
+	{
+		bit [12: 0] UNUSED;
+		bit [ 2: 0] INT;
+		bit [ 9: 0] FRAC;
+		bit [ 5: 0] UNUSED2;
+	} ScrnInc_t;
+	
+	typedef struct packed
+	{
+		bit [11: 0] UNUSED;
+		bit [ 3: 0] INT;
+		bit [ 9: 0] FRAC;
+		bit [ 5: 0] UNUSED2;
+	} MatrParam_t;
+	
+	typedef struct packed
+	{
+		bit [ 1: 0] UNUSED;
+		bit [13: 0] INT;
+	} ScrnCoord_t;
+	
+	typedef struct packed
+	{
+		bit [ 7: 0] UNUSED;
+		bit [ 7: 0] INT;
+		bit [15: 0] FRAC;
+	} Scalling_t;
+
+	typedef struct packed
+	{
+		bit [15: 0] INT;
+		bit [ 9: 0] FRAC;
+		bit [ 5: 0] UNUSED;
+	} TblAddr_t;
+	
+	typedef struct packed
+	{
+		bit [ 5: 0] UNUSED;
+		bit [ 9: 0] INT;
+		bit [ 9: 0] FRAC;
+		bit [ 5: 0] UNUSED2;
+	} AddrInc_t;
+	
+	
 endpackage
