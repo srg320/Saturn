@@ -30,13 +30,25 @@ add wave -noupdate /Saturn_tb/ramh/DATA
 add wave -noupdate /Saturn_tb/ramh/CS
 add wave -noupdate /Saturn_tb/ramh/WREN
 add wave -noupdate /Saturn_tb/Saturn/MSH/core/PIPE.EX
+add wave -noupdate /Saturn_tb/Saturn/MSH/core/PIPE.MA
+add wave -noupdate /Saturn_tb/Saturn/MSH/core/PIPE.WB
+add wave -noupdate /Saturn_tb/Saturn/MSH/core/PIPE.WB2
 add wave -noupdate /Saturn_tb/Saturn/MSH/core/ALU_A
 add wave -noupdate /Saturn_tb/Saturn/MSH/core/ALU_B
 add wave -noupdate /Saturn_tb/Saturn/MSH/core/ALU_RES
 add wave -noupdate -expand /Saturn_tb/Saturn/MSH/core/regfile/GR
 add wave -noupdate /Saturn_tb/Saturn/SCU/DMA_ST
+add wave -noupdate /Saturn_tb/Saturn/SCU/BBUS_ST
+add wave -noupdate /Saturn_tb/Saturn/SCU/BCSS_N
+add wave -noupdate /Saturn_tb/Saturn/SCU/BADDT_N
+add wave -noupdate /Saturn_tb/Saturn/BA
+add wave -noupdate /Saturn_tb/Saturn/BD
+add wave -noupdate /Saturn_tb/Saturn/SCSP_RAM_A
+add wave -noupdate /Saturn_tb/Saturn/SCSP_RAM_D
+add wave -noupdate /Saturn_tb/Saturn/SCSP_RAM_WE
+add wave -noupdate /Saturn_tb/Saturn/SCSP_RAM_Q
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {666935 ns} 0}
+WaveRestoreCursors {{Cursor 1} {187908388 ns} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 150
 configure wave -valuecolwidth 100
@@ -52,4 +64,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits us
 update
-WaveRestoreZoom {666880 ns} {667130 ns}
+WaveRestoreZoom {187908203 ns} {187908459 ns}

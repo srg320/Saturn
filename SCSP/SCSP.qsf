@@ -18,14 +18,14 @@
 #
 # Quartus Prime
 # Version 17.1.1 Internal Build 593 12/11/2017 SJ Standard Edition
-# Date created = 10:02:47  December 11, 2020
+# Date created = 11:18:18  December 28, 2020
 #
 # -------------------------------------------------------------------------- #
 #
 # Notes:
 #
 # 1) The default values for assignments are stored in the file:
-#		Saturn_assignment_defaults.qdf
+#		SCSP_assignment_defaults.qdf
 #    If this file doesn't exist, see file:
 #		assignment_defaults.qdf
 #
@@ -38,28 +38,17 @@
 
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEMA6F31I7
-set_global_assignment -name TOP_LEVEL_ENTITY Saturn
+set_global_assignment -name TOP_LEVEL_ENTITY SCSP
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 17.1.1
-set_global_assignment -name PROJECT_CREATION_TIME_DATE "10:02:47  DECEMBER 11, 2020"
+set_global_assignment -name PROJECT_CREATION_TIME_DATE "11:18:18  DECEMBER 28, 2020"
 set_global_assignment -name LAST_QUARTUS_VERSION "17.1.1 Standard Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP "-40"
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256
-set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
-set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name SYSTEMVERILOG_FILE SCSP.sv
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
-set_global_assignment -name QIP_FILE ../SH2/SH7604.qip
-set_global_assignment -name QIP_FILE SCU/SCU.qip
-set_global_assignment -name SYSTEMVERILOG_FILE Saturn.sv
-set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2_pkg.sv
-set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2_pal.sv
-set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2.sv
-set_global_assignment -name SYSTEMVERILOG_FILE SCSP/SCSP.sv
-set_global_assignment -name SYSTEMVERILOG_FILE DCC.sv
-set_global_assignment -name SYSTEMVERILOG_FILE SMPC.sv
-set_global_assignment -name SYSTEMVERILOG_FILE RAM.sv
-set_global_assignment -name SYSTEMVERILOG_FILE Saturn_tb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE SCSP_pkg.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

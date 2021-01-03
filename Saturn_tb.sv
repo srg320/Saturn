@@ -13,6 +13,11 @@ module Saturn_tb;
 	bit        ROM_CS_N;
 	bit        RAML_CS_N;
 	bit        RAMH_CS_N;
+	
+	bit [18:1] SCSP_RAM_A;
+	bit [15:0] SCSP_RAM_D;
+	bit  [1:0] SCSP_RAM_WE;
+	bit [15:0] SCSP_RAM_Q;
 	 
 	//clock generation
 	always #5 CLK = ~CLK;
@@ -37,7 +42,12 @@ module Saturn_tb;
 		
 		.ROM_CS_N(ROM_CS_N),
 		.RAML_CS_N(RAML_CS_N),
-		.RAMH_CS_N(RAMH_CS_N)
+		.RAMH_CS_N(RAMH_CS_N),
+		
+		.SCSP_RAM_A(SCSP_RAM_A),
+		.SCSP_RAM_D(SCSP_RAM_D),
+		.SCSP_RAM_WE(SCSP_RAM_WE),
+		.SCSP_RAM_Q(SCSP_RAM_Q)
 	);
 	
 	bit [15:0] BIOS_Q;
@@ -54,5 +64,7 @@ module Saturn_tb;
 						 !RAMH_CS_N ? RAMH_Q :
 						 32'hDEEDDEED;
 
+	
+	RAM_tb #(18,16,"") sndram(CLK, SCSP_RAM_A, SCSP_RAM_D, 1'b1, SCSP_RAM_WE, SCSP_RAM_Q);
 
 endmodule

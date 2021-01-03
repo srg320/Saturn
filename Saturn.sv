@@ -14,25 +14,30 @@ module Saturn (
 	output      [3:0] MEM_DQM_N,
 	output            MEM_RD_N,
 	
-	output     [16:1] RA0_A,
-	output     [15:0] RA0_D,
-	input      [15:0] RA0_Q,
-	output            RA0_WE,
+	output     [16:1] VDP2_RA0_A,
+	output     [15:0] VDP2_RA0_D,
+	input      [31:0] VDP2_RA0_Q,
+	output            VDP2_RA0_WE,
 	
-	output     [16:1] RA1_A,
-	output     [15:0] RA1_D,
-	input      [15:0] RA1_Q,
-	output            RA1_WE,
+	output     [16:1] VDP2_RA1_A,
+	output     [15:0] VDP2_RA1_D,
+	input      [31:0] VDP2_RA1_Q,
+	output            VDP2_RA1_WE,
 	
-//	output     [16:1] RB0_A,
-//	output     [15:0] RB0_D,
-//	input      [15:0] RB0_Q,
-//	output            RB0_WE,
-//	
-//	output     [16:1] RB1_A,
-//	output     [15:0] RB1_D,
-//	input      [15:0] RB1_Q,
-//	output            RB1_WE,
+	output     [16:1] VDP2_RB0_A,
+	output     [15:0] VDP2_RB0_D,
+	input      [31:0] VDP2_RB0_Q,
+	output            VDP2_RB0_WE,
+	
+	output     [16:1] VDP2_RB1_A,
+	output     [15:0] VDP2_RB1_D,
+	input      [31:0] VDP2_RB1_Q,
+	output            VDP2_RB1_WE,
+
+	output     [18:1] SCSP_RAM_A,
+	output     [15:0] SCSP_RAM_D,
+	output      [1:0] SCSP_RAM_WE,
+	input      [15:0] SCSP_RAM_Q,
 	
 	output      [7:0] R,
 	output      [7:0] G,
@@ -162,8 +167,11 @@ module Saturn (
 	//SMPC
 	bit   [7:0] SMPC_DO;
 	
-	
+	//VDP2
 	bit  [15:0] VDP2_DO;
+	
+	//SCSP
+	bit  [15:0] SCSP_DO;
 	
 //	always @(posedge CLK or negedge RST_N) begin
 //		if (!RST_N) begin 
@@ -305,7 +313,8 @@ module Saturn (
 	assign CA       = MSHA[24:0];
 	assign CDO      = !MSHCS3_N || !ROMCE_N ? MEM_DI :
                      !SMPCCE_N             ? {4{SMPC_DO}} :
-							!BCS2_N               ? {2{VDP2_DO}} :
+//							!BCS2_N               ? {2{VDP2_DO}} :
+//							!BCSS_N               ? {2{SCSP_DO}} :
 							SCU_DO;
 	assign CDI      = MSHDO;
 	assign CBS_N    = MSHBS_N;
@@ -320,16 +329,18 @@ module Saturn (
 //	assign ADI      = '0;
 	assign AWAIT_N  = 1;
 	assign AIRQ_N   = 1;
-	assign BDI      = '0;
+	assign BDI      = !BCS2_N ? VDP2_DO :
+							!BCSS_N ? SCSP_DO : 16'hDEED;
 	assign BRDY1_N  = 0;
 	assign IRQ1_N   = 1;
 	assign BRDY2_N  = 0;
 	assign IRQV_N   = 1;
 	assign IRQH_N   = 1;
 	assign IRQL_N   = 1;
-	assign BRDYS_N  = 1;
+	assign BRDYS_N  = 0;
 	assign IRQS_N   = 1;
 	
+	bit [20:0] BA;
 	SCU SCU
 	(
 		.CLK(CLK),
@@ -380,6 +391,7 @@ module Saturn (
 		.ATIM1_N(ATIM1_N),
 		.ATIM2_N(ATIM2_N),
 		
+		.BA(BA),
 		.BDI(BDI),
 		.BDO(BDO),
 		.BADDT_N(BADDT_N),
@@ -519,22 +531,22 @@ module Saturn (
 	);
 	
 	
-//	bit [16:1] RA0_A;
-//	bit [15:0] RA0_D;
-//	bit        RA0_WE;
-//	bit [15:0] RA0_Q;
-//	bit [16:1] RA1_A;
-//	bit [15:0] RA1_D;
-//	bit        RA1_WE;
-//	bit [15:0] RA1_Q;
-	bit [16:1] RB0_A;
-	bit [15:0] RB0_D;
-	bit        RB0_WE;
-	bit [15:0] RB0_Q;
-	bit [16:1] RB1_A;
-	bit [15:0] RB1_D;
-	bit        RB1_WE;
-	bit [15:0] RB1_Q;
+	
+//	bit [20:0] BA;
+//	bit [15:0] BD;
+//	always @(posedge CLK or negedge RST_N) begin
+//		if (!RST_N) begin
+//			BA <= '0;
+//		end else if (CE_R) begin
+//			if (!BADDT_N) begin
+//				BA <= CA[20:0];
+//				BD <= CA[1] ? CDI[15:0] : CDI[31:16];
+//			end
+//		end
+//	end
+	bit [15:0] BD;
+	assign BD = BA[1] ? CDI[15:0] : CDI[31:16];
+	
 	VDP2 VDP2
 	(
 		.CLK(CLK),
@@ -544,33 +556,33 @@ module Saturn (
 		
 		.RES_N(SYSRES_N),
 		
-		.A(CA[20:1]),
-		.DI(CDI[15:0]),
+		.A(BA[20:1]),
+		.DI(BD),
 		.DO(VDP2_DO),
 		.CS_N(BCS2_N),
 		.WE_N(&CDQM_N),
 		.RD_N(CRD_N),
 		.RDY_N(),
 		
-		.RA0_A(RA0_A),
-		.RA0_D(RA0_D),
-		.RA0_WE(RA0_WE),
-		.RA0_Q(RA0_Q),
+		.RA0_A(VDP2_RA0_A),
+		.RA0_D(VDP2_RA0_D),
+		.RA0_WE(VDP2_RA0_WE),
+		.RA0_Q(VDP2_RA0_Q),
 		
-		.RA1_A(RA1_A),
-		.RA1_D(RA1_D),
-		.RA1_WE(RA1_WE),
-		.RA1_Q(RA1_Q),
+		.RA1_A(VDP2_RA1_A),
+		.RA1_D(VDP2_RA1_D),
+		.RA1_WE(VDP2_RA1_WE),
+		.RA1_Q(VDP2_RA1_Q),
 		
-		.RB0_A(RB0_A),
-		.RB0_D(RB0_D),
-		.RB0_WE(RB0_WE),
-		.RB0_Q(RB0_Q),
+		.RB0_A(VDP2_RB0_A),
+		.RB0_D(VDP2_RB0_D),
+		.RB0_WE(VDP2_RB0_WE),
+		.RB0_Q(VDP2_RB0_Q),
 		
-		.RB1_A(RB1_A),
-		.RB1_D(RB1_D),
-		.RB1_WE(RB1_WE),
-		.RB1_Q(RB1_Q),
+		.RB1_A(VDP2_RB1_A),
+		.RB1_D(VDP2_RB1_D),
+		.RB1_WE(VDP2_RB1_WE),
+		.RB1_Q(VDP2_RB1_Q),
 		
 		.R(R),
 		.G(G),
@@ -583,8 +595,31 @@ module Saturn (
 	);
 	
 	
-	//CD
+	SCSP SCSP
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		.CE_R(CE_R),
+		.CE_F(CE_F),
+		
+		.RES_N(SYSRES_N),
+		
+		.A(BA[20:0]),
+		.DI(BD),
+		.DO(SCSP_DO),
+		.CS_N(BCSS_N),
+		.WE_N(CDQM_N[1:0]),
+		.RD_N(CRD_N),
+		.RDY_N(),
+		
+		.RAM_A(SCSP_RAM_A),
+		.RAM_D(SCSP_RAM_D),
+		.RAM_WE(SCSP_RAM_WE),
+		.RAM_Q(SCSP_RAM_Q)
+	);
 	
+	
+	//CD
 	always_comb begin
 		ADI = '0;
 		if (!ACS2_N && AA[25:16] == 10'h189) begin

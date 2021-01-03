@@ -63,9 +63,9 @@ package SCU_PKG;
 	typedef struct packed		//R,25FE0070
 	{
 		bit [ 8: 0] UNSIGNED;
-		bit         ACSD;			//R
-		bit         ACSB;			//R
-		bit         ACSA;			//R
+		bit         DACSD;		//R
+		bit         DACSB;		//R
+		bit         DACSA;		//R
 		bit [ 1: 0] UNSIGNED2;
 		bit         D1BK;			//R
 		bit         D0BK;			//R
