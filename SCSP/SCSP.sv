@@ -322,6 +322,8 @@ module SCSP (
 	bit [15:0] SD;	//Slot out data
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
+		bit [ 7:0] TL;
+		bit [ 9:0] TEMP;
 		
 		if (!RST_N) begin
 			OP6_PIPE <= OP_PIPE_RESET;
@@ -329,8 +331,10 @@ module SCSP (
 		end
 		else begin
 			S = OP4_PIPE.SLOT;
+			TL = SCR[S].SCR3.TL;
 			if (CYCLE_CE) begin
-				SD <= ($signed(OP4_WD) * OP4_STATE[S].EVOL) >> 10;
+				TEMP = EnvVolCalc(OP4_STATE[S].EVOL, TL);
+				SD <= ($signed(OP4_WD) * TEMP) >> 10;
 				OP6_PIPE <= OP5_PIPE;
 			end
 		end

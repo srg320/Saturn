@@ -344,4 +344,28 @@ package SCSP_PKG;
 		return P;
 	endfunction
 	
+	function bit [9:0] EnvVolCalc(bit [9:0] ENV, bit [7:0] TL);
+		bit [9:0] RES;
+		bit [9:0] T0,T1,T2,T3,T4,T5,T6,T7;
+		D2 = ENV>>1;	//ENV / 2 
+		D4 = ENV>>2;	//ENV / 4 
+		D8 = ENV>>3;	//ENV / 8 
+		D16 = ENV>>4;	//ENV / 16 
+		D32 = ENV>>5;	//ENV / 32 
+		D64 = ENV>>6;	//ENV / 64
+		D128 = ENV>>7;	//ENV / 128 
+		D256 = ENV>>8;	//ENV / 256 
+		
+		RES = ENV - ((TL[7] ?                           D256 : 10'd0) + 
+		             (TL[6] ?          D16                   : 10'd0) + 
+						 (TL[5] ?    D4                          : 10'd0) + 
+						 (TL[4] ? D2                             : 10'd0) + 
+		             (TL[3] ? D2+   D8+D16+    D64           : 10'd0) + 
+						 (TL[2] ? D2+D4+   D16+    D64+D128+D256 : 10'd0) + 
+						 (TL[1] ? D2+D4+D8+    D32+    D128+D256 : 10'd0) + 
+						 (TL[0] ? D2+D4+D8+D16+    D64+     D256 : 10'd0));
+		
+		return RES;
+	endfunction
+	
 endpackage
