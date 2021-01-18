@@ -662,4 +662,7 @@ module SCSP (
 	assign DO = SCU_REG_SEL ? REG_Q : MEM_Q;
 	assign RDY_N = 0;
 	
+	assign SCIPL_N = '1;
+	assign SCDO = MEM_Q;
+	
 endmodule

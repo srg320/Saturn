@@ -346,7 +346,7 @@ package SCSP_PKG;
 	
 	function bit [9:0] EnvVolCalc(bit [9:0] ENV, bit [7:0] TL);
 		bit [9:0] RES;
-		bit [9:0] T0,T1,T2,T3,T4,T5,T6,T7;
+		bit [9:0] D2,D4,D8,D16,D32,D64,D128,D256;
 		D2 = ENV>>1;	//ENV / 2 
 		D4 = ENV>>2;	//ENV / 4 
 		D8 = ENV>>3;	//ENV / 8 

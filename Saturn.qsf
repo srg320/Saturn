@@ -52,11 +52,13 @@ set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name QIP_FILE ../SH2/SH7604.qip
+set_global_assignment -name QIP_FILE FX68K/fx68k.qip
 set_global_assignment -name QIP_FILE SCU/SCU.qip
 set_global_assignment -name SYSTEMVERILOG_FILE Saturn.sv
 set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2_pal.sv
 set_global_assignment -name SYSTEMVERILOG_FILE VDP2/VDP2.sv
+set_global_assignment -name SYSTEMVERILOG_FILE SCSP/SCSP_pkg.sv
 set_global_assignment -name SYSTEMVERILOG_FILE SCSP/SCSP.sv
 set_global_assignment -name SYSTEMVERILOG_FILE DCC.sv
 set_global_assignment -name SYSTEMVERILOG_FILE SMPC.sv
