@@ -373,7 +373,7 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,180072,180082
 	{
-		bit [ 1: 8] NxSCXD;
+		bit [ 7: 0] NxSCXD;
 		bit [ 7: 0] UNUSED;
 	} SCXDNx_t;
 	parameter bit [15:0] SCXDNx_MASK = 16'hFF00;
@@ -387,7 +387,7 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,180076,180086
 	{
-		bit [ 1: 8] NxSCYD;
+		bit [ 7: 0] NxSCYD;
 		bit [ 7: 0] UNUSED;
 	} SCYDNx_t;
 	parameter bit [15:0] SCYDNx_MASK = 16'hFF00;
@@ -401,8 +401,8 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,18007A,18008A
 	{
-		bit  [1:8] NxZMXD;
-		bit  [7:0] UNUSED;
+		bit [ 7: 0] NxZMXD;
+		bit [ 7: 0] UNUSED;
 	} ZMXDNx_t;
 	parameter bit [15:0] ZMXDNx_MASK = 16'hFF00;
 	
@@ -415,7 +415,7 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,18007E,18008E
 	{
-		bit [ 1: 8] NxZMYD;
+		bit [ 7: 0] NxZMYD;
 		bit [ 7: 0] UNUSED;
 	} ZMYDNx_t;
 	parameter bit [15:0] ZMYDNx_MASK = 16'hFF00;
@@ -1193,12 +1193,26 @@ package VDP2_PKG;
 	
 	typedef struct packed
 	{
+		bit         PN; 
+		bit         CH; 
+		bit         VS; 
+		bit         CPU; 
+		bit         NA; 
+	} VRAMAccess_t;
+	
+	typedef struct packed
+	{
 		bit [ 8: 0] H_CNT; 
 		bit [ 8: 0] V_CNT;
 		bit [ 3: 0] VCPA0; 
 		bit [ 3: 0] VCPA1; 
 		bit [ 3: 0] VCPB0; 
 		bit [ 3: 0] VCPB1;
+		bit         LSC0;
+//		VRAMAccess_t N0VA;
+//		VRAMAccess_t N1VA;
+//		VRAMAccess_t N2VA;
+//		VRAMAccess_t N3VA;
 		bit [ 2: 0] N0CH_CNT;
 		bit [ 2: 0] N1CH_CNT;
 		bit [ 2: 0] N2CH_CNT;
@@ -1210,9 +1224,16 @@ package VDP2_PKG;
 	typedef struct packed
 	{
 		bit [10: 0] INT;
-		bit [ 1: 8] FRAC;
+		bit [ 7: 0] FRAC;
 	} ScrollData_t;
 	parameter SCRLD_NULL	= {11'h000,8'h00};
+	
+	typedef struct packed
+	{
+		bit [ 2: 0] INT;
+		bit [ 7: 0] FRAC;
+	} CoordInc_t;
+	parameter CRDI_NULL	= {3'h0,8'h00};
 	
 	typedef struct packed
 	{
@@ -1253,18 +1274,28 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [18:1] NxCHAddr(input PatternName_t PNx, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN);
-		bit   [18:1] addr;
+	function bit [19:1] NxCHAddr(input PatternName_t PNx, input bit [2:0] NxCH_CNT, input bit NxOFFX3, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit NxCHSZ);
+		bit   [19:1] addr;
+		bit   [19:1] char_offs;
+		bit    [4:0] cell_offs;
 		bit    [2:0] cell_dot_x, cell_dot_y;
 		
+		/*case (NxCHSZ)
+			1'b0: char_offs = {PNx.CHRN[14:0],4'b0000};
+			1'b1: char_offs = {PNx.CHRN[12:0],6'b000000};
+		endcase*/
 		cell_dot_x = NxCH_CNT/* ^ {3{PNx.HF}}*/;
 		cell_dot_y = NxOFFY[2:0] ^ {3{PNx.VF}};
+		case (NxCHSZ)
+			1'b0: cell_offs = { 2'b00,                            NxOFFY[2:0] ^ {3{PNx.VF}} };
+			1'b1: cell_offs = { NxOFFY[3]^PNx.VF,NxOFFX3^PNx.HF,NxOFFY[2:0] ^ {3{PNx.VF}} };
+		endcase
 		case (NxCHCN)
-			3'b000: addr = {PNx.CHRN[14:0],cell_dot_y};						//4bits/dot, 16 colors
-			3'b001: addr = {PNx.CHRN[13:0],cell_dot_y,cell_dot_x[0]};	//8bits/dot, 256 colors
+			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {PNx.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],NxCH_CNT[0],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {PNx.CHRN[12:0],cell_dot_y,cell_dot_x[1:0]};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {PNx.CHRN[11:0],cell_dot_y,cell_dot_x[2:0]};	//32bits/dot, 16M colors
+			3'b011: addr = {PNx.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],NxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {PNx.CHRN[14:0],4'b0000} + {10'b000000000,   cell_offs[4:0],NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	

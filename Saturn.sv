@@ -166,6 +166,7 @@ module Saturn (
 	
 	//SMPC
 	bit   [7:0] SMPC_DO;
+	bit         SNDRES_N;
 	
 	//VDP2
 	bit  [15:0] VDP2_DO;
@@ -173,18 +174,6 @@ module Saturn (
 	//SCSP
 	bit  [15:0] SCSP_DO;
 	
-//	always @(posedge CLK or negedge RST_N) begin
-//		if (!RST_N) begin 
-//			SYSRES_N <= 0;
-//			MSHRES_N <= 0;
-//			SSHRES_N <= 0;
-//		end
-//		else begin
-//			SYSRES_N <= 1;
-//			MSHRES_N <= 1;
-//			SSHRES_N <= 1;
-//		end
-//	end
 	
 	SH7604 MSH
 	(
@@ -334,8 +323,6 @@ module Saturn (
 	assign BRDY1_N  = 0;
 	assign IRQ1_N   = 1;
 	assign BRDY2_N  = 0;
-	assign IRQV_N   = 1;
-	assign IRQH_N   = 1;
 	assign IRQL_N   = 1;
 	assign BRDYS_N  = 0;
 	assign IRQS_N   = 1;
@@ -509,7 +496,7 @@ module Saturn (
 		
 		.SRES_N(SRES_N),
 		
-		.IRQV_N(1'b1),
+		.IRQV_N(IRQV_N),
 		.EXL(1'b0),
 		
 		.MSHRES_N(MSHRES_N),
@@ -519,7 +506,7 @@ module Saturn (
 		.SSHNMI_N(SSHNMI_N),
 		
 		.SYSRES_N(SYSRES_N),
-		.SNDRES_N(),
+		.SNDRES_N(SNDRES_N),
 		.CDRES_N(),
 		
 		.MIRQ_N(MIRQ_N),
@@ -563,6 +550,9 @@ module Saturn (
 		.WE_N(&CDQM_N),
 		.RD_N(CRD_N),
 		.RDY_N(),
+		
+		.VINT_N(IRQV_N),
+		.HINT_N(IRQH_N),
 		
 		.RA0_A(VDP2_RA0_A),
 		.RA0_D(VDP2_RA0_D),
@@ -612,11 +602,12 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE(CE_R),
 		
 		.RES_N(SYSRES_N),
 		
+		.CE_R(CE_R),
+		.CE_F(CE_F),
 		.A(BA[20:0]),
 		.DI(BD),
 		.DO(SCSP_DO),
@@ -647,11 +638,11 @@ module Saturn (
 	
 	fx68k M68K
 	(
-		.clk(MCLK),
-		.extReset(reset),
-		.pwrUp(hard_reset),
-		.enPhi1(M68K_CLKENp),
-		.enPhi2(M68K_CLKENn),
+		.clk(CLK),
+		.extReset(~SNDRES_N),
+		.pwrUp(~RST_N),
+		.enPhi1(SCCE_R),
+		.enPhi2(SCCE_F),
 
 		.eab(SCA),
 		.iEdb(SCDO),
