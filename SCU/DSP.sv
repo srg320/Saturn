@@ -1,26 +1,28 @@
 module SCU_DSP (
 	input             CLK,
 	input             RST_N,
+	input             CE,
+	
 	input             CE_R,
 	input             CE_F,
-	
 	input       [1:0] A,
 	input      [31:0] DI,
 	output reg [31:0] DO,
-	input             CS_N,
-	input       [3:0] WR_N,
-	input             RD_N,
+	input       [3:0] WE,
+	input             RE,
 	
-	output reg [26:0] DMA_A,
+	output reg [26:2] DMA_A,
 	input      [31:0] DMA_DI,
 	output     [31:0] DMA_DO,
 	output            DMA_WE,
 	output reg        DMA_REQ,
 	input             DMA_ACK,
 	
-	output            IRQ
-	
+	output            IRQ,
+	output DecInst_t  DBG_DECI,
+	output     [47:0] DBG_Q
 );
+	
 	import SCUDSP_PKG::*;
 
 	//Registers
@@ -61,16 +63,15 @@ module SCU_DSP (
 	bit [31:0] PRG_RAM_Q;
 	
 	bit  [7:0] DATA_TRANS_ADDR;
+	bit        PRG_TRANS_AS;
+	bit        PRG_TRANS_WE;
 	bit  [7:0] PRG_TRANS_ADDR;
+	bit        DATA_TRANS_WE;
+	bit        DATA_TRANS_RE;
 	
 	wire RUN = EX || ES;
 	wire DMA_RUN = T0 && DMA_ACK;
 
-	//PRG RAM
-	assign PRG_RAM_ADDR = RUN ? PC : PRG_TRANS_ADDR;
-	assign PRG_RAM_D = DI;
-	assign PRG_RAM_WE = !RUN && A == 2'b01 & ~CS_N & ~WR_N;
-	DSP_SPRAM #(8,32,"","prg.txt") PRG_RAM(CLK, PRG_RAM_ADDR, PRG_RAM_D, PRG_RAM_WE & CE_R, PRG_RAM_Q);
 	
 	reg [31:0] IC;
 	DecInst_t DECI;
@@ -78,13 +79,14 @@ module SCU_DSP (
 		if (!RST_N) begin
 			IC <= '0;
 		end
-		else if (RUN && CE_R) begin
+		else if (RUN && CE) begin
 			IC <= PRG_RAM_Q;
 		end
 	end
 	
 	wire COND = IC[24] ? ((IC[22]&T0) | (IC[21]&C) | (IC[20]&S) | (IC[19]&Z)) : ((~IC[22]|~T0) & (~IC[21]|~C) & (~IC[20]|~S) & (~IC[19]|~Z));
 	assign DECI = Decode(IC, COND);
+	assign DBG_DECI = DECI;
 	
 	DMAInst_t  DMAI;
 	
@@ -110,6 +112,8 @@ module SCU_DSP (
 		endcase
 	end
 	
+	assign DBG_Q = ALU_Q;
+	
 	always @(posedge CLK or negedge RST_N) begin
 		bit S31, S47, ZL, ZH;
 		
@@ -119,35 +123,33 @@ module SCU_DSP (
 			C <= 0;
 			V <= 0;
 		end
-		else if (CE_R) begin
-			if (RUN) begin
-				S31 = ALU_Q[31];
-				S47 = ALU_Q[47];
-				ZL = ~|ALU_Q.L;
-				ZH = ~|ALU_Q.H;
-				if (DECI.ALU) begin
-					case (IC[29:26])
-						4'b0001: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b0010: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b0011: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b0100: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b0101: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b0110: begin S = S47; Z = ZL&ZH; C = ALU_C; end
-						4'b1000: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b1001: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b1010: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b1011: begin S = S31; Z = ZL;    C = ALU_C; end
-						4'b1111: begin S = S31; Z = ZL;    C = ALU_C; end
-						default:;
-					endcase
-					V <= 0;//TODO
-				end
+		else if (RUN && CE) begin
+			S31 = ALU_Q[31];
+			S47 = ALU_Q[47];
+			ZL = ~|ALU_Q.L;
+			ZH = ~|ALU_Q.H;
+			if (DECI.ALU) begin
+				case (IC[29:26])
+					4'b0001: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b0010: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b0011: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b0100: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b0101: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b0110: begin S <= S47; Z <= ZL&ZH; C <= ALU_C; end
+					4'b1000: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b1001: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b1010: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b1011: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					4'b1111: begin S <= S31; Z <= ZL;    C <= ALU_C; end
+					default:;
+				endcase
+				V <= 0;//TODO
 			end
-			else begin
-				if (A == 2'b00 && !CS_N && !RD_N) begin
-					V <= 0;
-				end
-			end
+//			else begin
+//				if (A == 2'b00 && RE) begin
+//					V <= 0;
+//				end
+//			end
 		end
 	end
 	
@@ -161,7 +163,7 @@ module SCU_DSP (
 	always_comb begin
 		bit [31:0] IMM;
 		
-		IMM = ImmSext(IC, DECI.IMMT);
+		IMM = ImmSext(IC, DECI.D1BUS.IMMT);
 		
 		case (DECI.XBUS.RAMS)
 			2'b00: XBUS = DATA_RAM_Q[0];
@@ -216,7 +218,7 @@ module SCU_DSP (
 			P <= 48'h55AA55AA55AA;
 			// synopsys translate_on
 		end
-		else if (RUN && CE_R) begin
+		else if (RUN && CE) begin
 			//X set
 			if (DECI.XBUS.RXW) begin
 				RX <= XBUS;
@@ -264,22 +266,22 @@ module SCU_DSP (
 			CT3 <= 6'h33;
 			// synopsys translate_on
 		end
-		else if (CE_R) begin
-			if (RUN) begin
-				if (DECI.XBUS.CTI[0] || DECI.YBUS.CTI[0] || DECI.D1BUS.CTI[0] || DECI.DMA.CTI[0]) CT0 <= CT0 + 6'd1;
-				if (DECI.D1BUS.CTW[0]) CT0 <= D1BUS[5:0];
+		else begin
+			if (RUN && CE) begin
+				if ((DECI.XBUS.CTI[0] || DECI.YBUS.CTI[0] || DECI.D1BUS.CTI[0] || DECI.DMA.CTI[0]) && (!DMAI.RAMW[0] || !T0)) CT0 <= CT0 + 6'd1;
+				if (DECI.D1BUS.CTW[0] && (!DMAI.RAMW[0] || !T0)) CT0 <= D1BUS[5:0];
 				
-				if (DECI.XBUS.CTI[1] || DECI.YBUS.CTI[1] || DECI.D1BUS.CTI[1] || DECI.DMA.CTI[1]) CT1 <= CT1 + 6'd1;
-				if (DECI.D1BUS.CTW[1]) CT1 <= D1BUS[5:0];
+				if ((DECI.XBUS.CTI[1] || DECI.YBUS.CTI[1] || DECI.D1BUS.CTI[1] || DECI.DMA.CTI[1]) && (!DMAI.RAMW[1] || !T0)) CT1 <= CT1 + 6'd1;
+				if (DECI.D1BUS.CTW[1] && (!DMAI.RAMW[1] || !T0)) CT1 <= D1BUS[5:0];
 				
-				if (DECI.XBUS.CTI[2] || DECI.YBUS.CTI[2] || DECI.D1BUS.CTI[2] || DECI.DMA.CTI[2]) CT2 <= CT2 + 6'd1;
-				if (DECI.D1BUS.CTW[2]) CT2 <= D1BUS[5:0];
+				if ((DECI.XBUS.CTI[2] || DECI.YBUS.CTI[2] || DECI.D1BUS.CTI[2] || DECI.DMA.CTI[2]) && (!DMAI.RAMW[2] || !T0)) CT2 <= CT2 + 6'd1;
+				if (DECI.D1BUS.CTW[2] && (!DMAI.RAMW[2] || !T0)) CT2 <= D1BUS[5:0];
 				
-				if (DECI.XBUS.CTI[3] || DECI.YBUS.CTI[3] || DECI.D1BUS.CTI[3] || DECI.DMA.CTI[3]) CT3 <= CT3 + 6'd1;
-				if (DECI.D1BUS.CTW[3]) CT3 <= D1BUS[5:0];
+				if ((DECI.XBUS.CTI[3] || DECI.YBUS.CTI[3] || DECI.D1BUS.CTI[3] || DECI.DMA.CTI[3]) && (!DMAI.RAMW[3] || !T0)) CT3 <= CT3 + 6'd1;
+				if (DECI.D1BUS.CTW[3] && (!DMAI.RAMW[3] || !T0)) CT3 <= D1BUS[5:0];
 			end
 			
-			if (DMA_RUN) begin
+			if (DMA_RUN && CE_R) begin
 				if (DMAI.RAMW[0]) CT0 <= CT0 + 6'd1;
 				if (DMAI.RAMW[1]) CT1 <= CT1 + 6'd1;
 				if (DMAI.RAMW[2]) CT2 <= CT2 + 6'd1;
@@ -294,7 +296,7 @@ module SCU_DSP (
 			LOP <= '0;
 			TOP <= '0;
 		end
-		else if (CE_R) begin
+		else if (CE) begin
 			if (RUN) begin
 				PC <= PC + 8'd1;
 				if (DECI.D1BUS.PCW) begin
@@ -319,10 +321,8 @@ module SCU_DSP (
 					TOP <= D1BUS[7:0];
 				end
 			end
-			else begin
-				if (A == 2'b00 && !CS_N && !(&WR_N) && LE) begin
-					PC <= DI[7:0];
-				end
+			else if (PRG_TRANS_AS && LE && CE_R) begin
+				PC <= DI[7:0];
 			end
 		end
 	end
@@ -337,11 +337,10 @@ module SCU_DSP (
 			T0 <= 0;
 			DMAI <= '{1'b0, 1'b0, 4'b0000, 1'b0, 2'b00, 3'b000, 1'b0, 2'b00, 4'b0000, 1'b0};
 			DMA_A <= '0;
-			DMA_REQ = 0;
+			DMA_REQ <= 0;
 		end
-		else if (CE_R) begin
-			DMA_REQ = 0;
-			if (RUN) begin
+		else begin
+			if (RUN && CE) begin
 				if (DECI.D1BUS.RA0W) begin
 					RA0 <= D1BUS;
 				end
@@ -366,21 +365,25 @@ module SCU_DSP (
 					T0 <= 1;
 					TN0 <= CNT_VAL;
 					DMAI <= DECI.DMA;
-					DMA_A <= !DECI.DMA.DIR ? {RA0[24:0],2'b00} : {WA0[24:0],2'b00};
-					DMA_REQ = 1;
+					DMA_A <= !DECI.DMA.DIR ? RA0[24:0] : WA0[24:0];
+					DMA_REQ <= 1;
 				end
 			end
 			
-			if (DMA_RUN) begin
-				DMA_A <= DMA_A + DMAAddrAdd(DMAI.ADDI);
-				if (!DMAI.DIR && !DMAI.HOLD) RA0 <= RA0 + DMAAddrAdd(DMAI.ADDI);
-				if (DMAI.DIR && !DMAI.HOLD) WA0 <= WA0 + DMAAddrAdd(DMAI.ADDI);
-				if (!TN0) begin
-					T0 <= 0;
-				end
-				else begin
+			if (CE_R) begin
+				if (DMA_REQ) DMA_REQ <= 0;
+				
+				if (DMA_RUN) begin
+					DMA_A <= DMA_A + DMAAddrAdd(DMAI.ADDI, DMAI.DIR);
+					if (!DMAI.DIR && !DMAI.HOLD) RA0 <= RA0 + DMAAddrAdd(DMAI.ADDI, DMAI.DIR);
+					if (DMAI.DIR && !DMAI.HOLD) WA0 <= WA0 + DMAAddrAdd(DMAI.ADDI, DMAI.DIR);
 					TN0 <= TN0 - 8'd1;
-					DMA_REQ = 1;
+					if (TN0 - 8'd1 == 8'd0) begin
+						T0 <= 0;
+					end
+					else begin
+						DMA_REQ <= 1;
+					end
 				end
 			end
 		end
@@ -394,23 +397,23 @@ module SCU_DSP (
 	//DATA RAM
 	assign DATA_RAM_ADDR[0] = RUN || DMA_RUN ? CT0 : DATA_TRANS_ADDR[5:0];
 	assign DATA_RAM_D[0] = DMA_RUN ? D0BUSI : RUN ? D1BUS : DI;
-	assign DATA_RAM_WE[0] = DMA_RUN ? DMAI.RAMW[0] : RUN ? DECI.D1BUS.RAMW[0] : A == 2'b11 & ~CS_N & ~WR_N && DATA_TRANS_ADDR[7:6] == 2'b00;
-	DSP_SPRAM #(6,32) DATA_RAM0(CLK, DATA_RAM_ADDR[0], DATA_RAM_D[0], DATA_RAM_WE[0] & CE_R, DATA_RAM_Q[0]);
+	assign DATA_RAM_WE[0] = DMA_RUN ? DMAI.RAMW[0] & CE_R : RUN ? DECI.D1BUS.RAMW[0] & CE : DATA_TRANS_WE && DATA_TRANS_ADDR[7:6] == 2'b00 & CE_R;
+	DSP_SPRAM #(6,32) DATA_RAM0(CLK, DATA_RAM_ADDR[0], DATA_RAM_D[0], DATA_RAM_WE[0], DATA_RAM_Q[0]);
 	
 	assign DATA_RAM_ADDR[1] = RUN || DMA_RUN ? CT1 : DATA_TRANS_ADDR[5:0];
 	assign DATA_RAM_D[1] = DMA_RUN ? D0BUSI : RUN ? D1BUS : DI;
-	assign DATA_RAM_WE[1] = DMA_RUN ? DMAI.RAMW[1] : RUN ? DECI.D1BUS.RAMW[1] : A == 2'b11 & ~CS_N & ~WR_N && DATA_TRANS_ADDR[7:6] == 2'b01;
-	DSP_SPRAM #(6,32) DATA_RAM1(CLK, DATA_RAM_ADDR[1], DATA_RAM_D[1], DATA_RAM_WE[1] & CE_R, DATA_RAM_Q[1]);
+	assign DATA_RAM_WE[1] = DMA_RUN ? DMAI.RAMW[1] & CE_R  : RUN ? DECI.D1BUS.RAMW[1] & CE : DATA_TRANS_WE && DATA_TRANS_ADDR[7:6] == 2'b01 & CE_R ;
+	DSP_SPRAM #(6,32) DATA_RAM1(CLK, DATA_RAM_ADDR[1], DATA_RAM_D[1], DATA_RAM_WE[1], DATA_RAM_Q[1]);
 	
 	assign DATA_RAM_ADDR[2] = RUN || DMA_RUN ? CT2 : DATA_TRANS_ADDR[5:0];
 	assign DATA_RAM_D[2] = DMA_RUN ? D0BUSI : RUN ? D1BUS : DI;
-	assign DATA_RAM_WE[2] = DMA_RUN ? DMAI.RAMW[2] : RUN ? DECI.D1BUS.RAMW[2] : A == 2'b11 & ~CS_N & ~WR_N && DATA_TRANS_ADDR[7:6] == 2'b10;
-	DSP_SPRAM #(6,32) DATA_RAM2(CLK, DATA_RAM_ADDR[2], DATA_RAM_D[2], DATA_RAM_WE[2] & CE_R, DATA_RAM_Q[2]);
+	assign DATA_RAM_WE[2] = DMA_RUN ? DMAI.RAMW[2] & CE_R  : RUN ? DECI.D1BUS.RAMW[2] & CE : DATA_TRANS_WE && DATA_TRANS_ADDR[7:6] == 2'b10 & CE_R ;
+	DSP_SPRAM #(6,32) DATA_RAM2(CLK, DATA_RAM_ADDR[2], DATA_RAM_D[2], DATA_RAM_WE[2], DATA_RAM_Q[2]);
 	
 	assign DATA_RAM_ADDR[3] = RUN || DMA_RUN ? CT3 : DATA_TRANS_ADDR[5:0];
 	assign DATA_RAM_D[3] = DMA_RUN ? D0BUSI : RUN ? D1BUS : DI;
-	assign DATA_RAM_WE[3] = DMA_RUN ? DMAI.RAMW[3] : RUN ? DECI.D1BUS.RAMW[3] : A == 2'b11 & ~CS_N & ~WR_N && DATA_TRANS_ADDR[7:6] == 2'b11;
-	DSP_SPRAM #(6,32) DATA_RAM3(CLK, DATA_RAM_ADDR[3], DATA_RAM_D[3], DATA_RAM_WE[3] & CE_R, DATA_RAM_Q[3]);
+	assign DATA_RAM_WE[3] = DMA_RUN ? DMAI.RAMW[3] & CE_R  : RUN ? DECI.D1BUS.RAMW[3] & CE : DATA_TRANS_WE && DATA_TRANS_ADDR[7:6] == 2'b11 & CE_R ;
+	DSP_SPRAM #(6,32) DATA_RAM3(CLK, DATA_RAM_ADDR[3], DATA_RAM_D[3], DATA_RAM_WE[3], DATA_RAM_Q[3]);
 	
 	//Control port
 	always @(posedge CLK or negedge RST_N) begin
@@ -422,10 +425,19 @@ module SCU_DSP (
 			LE <= 0;
 			E <= 0;
 			PRG_TRANS_ADDR <= '0;
+			PRG_TRANS_AS <= 0;
+			PRG_TRANS_WE <= 0;
 			DATA_TRANS_ADDR <= '0;
-		end
-		else begin
-			if (!CS_N && !(&WR_N) && CE_R) begin
+			DATA_TRANS_WE <= 0;
+			DATA_TRANS_RE <= 0;
+		end else if (CE_R) begin
+			PRG_TRANS_AS <= 0;
+			PRG_TRANS_WE <= 0;
+			DATA_TRANS_WE <= 0;
+			if (PRG_TRANS_WE) PRG_TRANS_ADDR <= PRG_TRANS_ADDR + 8'd1;
+			if (DATA_TRANS_WE) DATA_TRANS_ADDR <= DATA_TRANS_ADDR + 8'd1;
+			
+			if (WE) begin
 				case (A)
 					2'b00: begin
 						EX <= DI[16];
@@ -442,21 +454,36 @@ module SCU_DSP (
 						if (!EX && DI[17]) begin
 							ES <= 1;
 						end
+						PRG_TRANS_AS <= 1;
 					end
 					2'b01: begin
-						PRG_TRANS_ADDR <= PRG_TRANS_ADDR + 8'd1;
+//						PRG_TRANS_ADDR <= PRG_TRANS_ADDR + 8'd1;
+						PRG_TRANS_WE <= 1;
 					end
 					2'b10: begin
 						DATA_TRANS_ADDR <= DI[7:0];
 					end
 					2'b11: begin
-						DATA_TRANS_ADDR <= DATA_TRANS_ADDR + 8'd1;
+//						DATA_TRANS_ADDR <= DATA_TRANS_ADDR + 8'd1;
+						DATA_TRANS_WE <= 1;
 					end
 					default:;
 				endcase
 			end
 			
-			if (!CS_N && !RD_N && CE_F) begin
+			if (RUN && CE) begin
+				if (ES) ES <= 0;
+				
+				if (DECI.CTL.END) begin
+					EX <= 0;
+					E <= DECI.CTL.EI;
+				end
+			end
+		end else if (CE_F) begin
+			DATA_TRANS_RE <= 0;
+			if (DATA_TRANS_RE) DATA_TRANS_ADDR <= DATA_TRANS_ADDR + 8'd1;
+			
+			if (RE) begin
 				case (A)
 					2'b00: DO <= {8'h00,T0,S,Z,C,V,E,1'b0,EX,8'h00,PC};
 					2'b01: DO <= '0;
@@ -468,21 +495,11 @@ module SCU_DSP (
 							2'b10: DO <= DATA_RAM_Q[2];
 							2'b11: DO <= DATA_RAM_Q[3];
 						endcase
+						DATA_TRANS_RE <= 1;
 					end
 					default: DO <= '0;
 				endcase
-			end
-			
-			if (CE_R) begin
-				if (RUN) begin
-					if (ES) ES <= 0;
-					
-					if (DECI.CTL.END) begin
-						EX <= 0;
-						E <= DECI.CTL.EI;
-					end
-				end
-				if (A == 2'b00 && !CS_N && !RD_N) begin
+				if (A == 2'b00) begin
 					E <= 0;
 				end
 			end
@@ -490,6 +507,12 @@ module SCU_DSP (
 	end
 	
 	assign IRQ = E;
+	
+	//PRG RAM
+	assign PRG_RAM_ADDR = RUN ? PC : PRG_TRANS_ADDR;
+	assign PRG_RAM_D = DI;
+	assign PRG_RAM_WE = !RUN && PRG_TRANS_WE;
+	DSP_SPRAM #(8,32," ","prg.txt") PRG_RAM(CLK, PRG_RAM_ADDR, PRG_RAM_D, PRG_RAM_WE & CE_R, PRG_RAM_Q);
 
 	
 endmodule

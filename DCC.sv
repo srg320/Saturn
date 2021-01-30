@@ -56,7 +56,7 @@ module DCC (
 	assign SMPCCE_N = ~(A[24:19] == 6'b000010) | CS0_N;
 	assign SRAMCE_N = ~(A[24:19] == 6'b000011) | CS0_N;
 	assign MOE_N = RD_N;
-	assign MWR_N = WE_N[1];
+	assign MWR_N = WE_N[0];
 	
 	
 	assign DCE_N = ~(A[24:21] == 4'b0001) | CS0_N;

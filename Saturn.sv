@@ -13,26 +13,31 @@ module Saturn (
 	output            RAMH_CS_N,
 	output      [3:0] MEM_DQM_N,
 	output            MEM_RD_N,
+	input             MEM_WAIT_N,
 	
 	output     [16:1] VDP2_RA0_A,
 	output     [15:0] VDP2_RA0_D,
 	input      [31:0] VDP2_RA0_Q,
 	output            VDP2_RA0_WE,
+	output            VDP2_RA0_RD,
 	
 	output     [16:1] VDP2_RA1_A,
 	output     [15:0] VDP2_RA1_D,
 	input      [31:0] VDP2_RA1_Q,
 	output            VDP2_RA1_WE,
+	output            VDP2_RA1_RD,
 	
 	output     [16:1] VDP2_RB0_A,
 	output     [15:0] VDP2_RB0_D,
 	input      [31:0] VDP2_RB0_Q,
 	output            VDP2_RB0_WE,
+	output            VDP2_RB0_RD,
 	
 	output     [16:1] VDP2_RB1_A,
 	output     [15:0] VDP2_RB1_D,
 	input      [31:0] VDP2_RB1_Q,
 	output            VDP2_RB1_WE,
+	output            VDP2_RB1_RD,
 
 	output     [18:1] SCSP_RAM_A,
 	output     [15:0] SCSP_RAM_D,
@@ -46,7 +51,9 @@ module Saturn (
 	output reg        HS_N,
 	output reg        VS_N,
 	output reg        HBL_N,
-	output reg        VBL_N
+	output reg        VBL_N,
+	
+	output      [7:0] DBG_WAIT_CNT
 );
 
 	bit CE_R, CE_F;
@@ -71,7 +78,10 @@ module Saturn (
 	bit         CRD_N;
 	bit         CWAIT_N;
 	bit         CWATIN_N;
+	bit         CIVECF_N;
 	bit   [3:0] CIRL_N;
+	bit         CBREQ_N;
+	bit         CBACK_N;
 	
 	bit  [24:0] ECA;
 	bit  [31:0] ECDI;
@@ -132,6 +142,7 @@ module Saturn (
 	bit   [3:0] MSHDQM_N;
 	bit         MSHRD_N;
 	bit         MSHWAIT_N;
+	bit         MSHIVECF_N;
 	bit   [3:0] MSHIRL_N;
 	bit         MSHRES_N;
 	bit         MSHNMI_N;
@@ -151,6 +162,7 @@ module Saturn (
 	bit   [3:0] SSHDQM_N;
 	bit         SSHRD_N;
 	bit         SSHWAIT_N;
+	bit         SSHIVECF_N;
 	bit   [3:0] SSHIRL_N;
 	bit         SSHRES_N;
 	bit         SSHNMI_N;
@@ -183,7 +195,7 @@ module Saturn (
 		.CE_F(CE_F),
 		
 		.RES_N(MSHRES_N),
-		.NMI_N(MSHNMI_N),
+		.NMI_N(1'b1/*MSHNMI_N*/),
 		
 		.IRL_N(MSHIRL_N),
 		
@@ -198,6 +210,7 @@ module Saturn (
 		.RD_WR_N(MSHRD_WR_N),
 		.WE_N(MSHDQM_N),
 		.RD_N(MSHRD_N),
+		.IVECF_N(MSHIVECF_N),
 		
 		.EA(SSHA),
 		.EDI(SSHDI),
@@ -212,12 +225,14 @@ module Saturn (
 		.ERD_N(SSHRD_N),
 		.ECE_N(1'b1),
 		.EOE_N(1'b1),
-		.EIVECF_N(1'b1),
+		.EIVECF_N(SSHIVECF_N),
 		
 		.WAIT_N(MSHWAIT_N),
 		.IVECF_N(),
-		.BRLS_N(MSHBRLS_N),
-		.BGR_N(MSHBGR_N),
+//		.BRLS_N(MSHBRLS_N),
+//		.BGR_N(MSHBGR_N),
+		.BRLS_N(CBREQ_N),
+		.BGR_N(CBACK_N),
 		
 		.DREQ0(1'b1),
 		.DREQ1(1'b1),
@@ -236,7 +251,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(RST_N),
+		.RST_N(1'b0/*RST_N*/),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -256,6 +271,7 @@ module Saturn (
 		.RD_WR_N(SSHRD_WR_N),
 		.WE_N(SSHDQM_N),
 		.RD_N(SSHRD_N),
+		.IVECF_N(SSHIVECF_N),
 		
 		.EA({2'b00,ECA}),
 		.EDI(ECDI),
@@ -296,12 +312,12 @@ module Saturn (
 	assign MSHBRLS_N = SSHBREQ_N;
 
 	assign MSHDI     = CDO;
-	assign MSHWAIT_N = CWAIT_N;
-	assign SSHWAIT_N = CWAIT_N;
+	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N));
+	assign SSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N));
 	
 	assign CA       = MSHA[24:0];
-	assign CDO      = !MSHCS3_N || !ROMCE_N ? MEM_DI :
-                     !SMPCCE_N             ? {4{SMPC_DO}} :
+	assign CDO      = !MSHCS3_N || !DRAMCE_N || !ROMCE_N ? MEM_DI :
+                     !SMPCCE_N                          ? {4{SMPC_DO}} :
 //							!BCS2_N               ? {2{VDP2_DO}} :
 //							!BCSS_N               ? {2{SCSP_DO}} :
 							SCU_DO;
@@ -314,7 +330,9 @@ module Saturn (
 	assign CRD_WR_N = MSHRD_WR_N;
 	assign CDQM_N   = MSHDQM_N;
 	assign CRD_N    = MSHRD_N;
+	assign CIVECF_N = MSHIVECF_N;
 	
+	assign ECWAIT_N = MEM_WAIT_N;
 //	assign ADI      = '0;
 	assign AWAIT_N  = 1;
 	assign AIRQ_N   = 1;
@@ -347,10 +365,10 @@ module Saturn (
 		.CDQM_N(CDQM_N),
 		.CRD_N(CRD_N),
 		.CWAIT_N(CWATIN_N),
-		.CIVECF_N(1'b1),
+		.CIVECF_N(CIVECF_N),
 		.CIRL_N(CIRL_N),
-		.CBREQ_N(),
-		.CBACK_N(1'b1),
+		.CBREQ_N(CBREQ_N),
+		.CBACK_N(CBACK_N),
 		
 		.ECA(ECA),
 		.ECDI(ECDI),
@@ -456,6 +474,17 @@ module Saturn (
 	assign RAMH_CS_N = MSHCS3_N;
 	
 	
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			DBG_WAIT_CNT <= '0;
+		end else if (CE_R) begin
+			DBG_WAIT_CNT <= DBG_WAIT_CNT + 8'd1;
+			if (CRD_N && CDQM_N[0] && CDQM_N[1] && CDQM_N[2] && CDQM_N[3]) begin
+				DBG_WAIT_CNT <= 8'd0;
+			end
+		end
+	end
+	
 	bit SMPC_CE;
 	bit MRES_N;
 	always @(posedge CLK or negedge RST_N) begin
@@ -557,21 +586,25 @@ module Saturn (
 		.RA0_A(VDP2_RA0_A),
 		.RA0_D(VDP2_RA0_D),
 		.RA0_WE(VDP2_RA0_WE),
+		.RA0_RD(VDP2_RA0_RD),
 		.RA0_Q(VDP2_RA0_Q),
 		
 		.RA1_A(VDP2_RA1_A),
 		.RA1_D(VDP2_RA1_D),
 		.RA1_WE(VDP2_RA1_WE),
+		.RA1_RD(VDP2_RA1_RD),
 		.RA1_Q(VDP2_RA1_Q),
 		
 		.RB0_A(VDP2_RB0_A),
 		.RB0_D(VDP2_RB0_D),
 		.RB0_WE(VDP2_RB0_WE),
+		.RB0_RD(VDP2_RB0_RD),
 		.RB0_Q(VDP2_RB0_Q),
 		
 		.RB1_A(VDP2_RB1_A),
 		.RB1_D(VDP2_RB1_D),
 		.RB1_WE(VDP2_RB1_WE),
+		.RB1_RD(VDP2_RB1_RD),
 		.RB1_Q(VDP2_RB1_Q),
 		
 		.R(R),
@@ -639,7 +672,7 @@ module Saturn (
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(~SNDRES_N),
+		.extReset(1/*~SNDRES_N*/),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),
@@ -674,16 +707,44 @@ module Saturn (
 	
 	
 	//CD
+	bit [15:0] AD;
+	assign AD = AA[1] ? CDI[15:0] : CDI[31:16];
+	
+	bit [15:0] HIRQ;
+	bit [15:0] HIRQMASK;
+	bit [15:0] CR[4];
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			HIRQ <= 16'hFFFF;
+			HIRQMASK <= 16'hFFFF;
+			CR <= '{16'h0043,16'h4442,16'h4C4F,16'h434B};//'{16'hFFFF,16'hFFFF,16'hFFFF,16'hFFFF}
+		end else if (CE_R) begin
+			if (!ACS2_N && AA[25:16] == 10'h189 && (!AWRL_N || !AWRU_N)) begin
+				case ({AA[15:1],1'b0})
+//					16'h0008: HIRQ <= HIRQ & AD;//HIRQ
+					16'h000C: HIRQMASK <= AD;	//HIRQMASK
+//					16'h0018: CR[0] <= AD;	//CR1
+//					16'h001C: CR[1] <= AD;	//CR2
+//					16'h0020: CR[2] <= AD;	//CR3
+//					16'h0024: CR[3] <= AD;	//CR4
+					default: ;
+				endcase
+			end
+		end
+	end
+
 	always_comb begin
 		ADI = '0;
-		if (!ACS2_N && AA[25:16] == 10'h189) begin
+		if (!ACS1_N) begin
+			ADI = 16'hFFFF;
+		end else if (!ACS2_N && AA[25:16] == 10'h189) begin
 			case ({AA[15:1],1'b0})
-				16'h0008: ADI = 16'hFFFF;//HIRQ
-				16'h000C: ADI = 16'hFFFF;//HIRQMASK
-				16'h0018: ADI = 16'h0043;//CR1
-				16'h001C: ADI = 16'h4442;//CR2
-				16'h0020: ADI = 16'h4C4F;//CR3
-				16'h0024: ADI = 16'h434B;//CR4
+				16'h0008: ADI = HIRQ;		//HIRQ
+				16'h000C: ADI = HIRQMASK;	//HIRQMASK
+				16'h0018: ADI = CR[0];		//CR1
+				16'h001C: ADI = CR[1];		//CR2
+				16'h0020: ADI = CR[2];		//CR3
+				16'h0024: ADI = CR[3];		//CR4
 				default: ADI = '0;
 			endcase
 		end

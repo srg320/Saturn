@@ -1196,8 +1196,8 @@ package VDP2_PKG;
 		bit         PN; 
 		bit         CH; 
 		bit         VS; 
+		bit         LS; 
 		bit         CPU; 
-		bit         NA; 
 	} VRAMAccess_t;
 	
 	typedef struct packed
@@ -1208,11 +1208,11 @@ package VDP2_PKG;
 		bit [ 3: 0] VCPA1; 
 		bit [ 3: 0] VCPB0; 
 		bit [ 3: 0] VCPB1;
-		bit         LSC0;
-//		VRAMAccess_t N0VA;
-//		VRAMAccess_t N1VA;
-//		VRAMAccess_t N2VA;
-//		VRAMAccess_t N3VA;
+		bit         LS0;
+		VRAMAccess_t A0VA;
+		VRAMAccess_t A1VA;
+		VRAMAccess_t B0VA;
+		VRAMAccess_t B1VA;
 		bit [ 2: 0] N0CH_CNT;
 		bit [ 2: 0] N1CH_CNT;
 		bit [ 2: 0] N2CH_CNT;
@@ -1276,26 +1276,37 @@ package VDP2_PKG;
 	
 	function bit [19:1] NxCHAddr(input PatternName_t PNx, input bit [2:0] NxCH_CNT, input bit NxOFFX3, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit NxCHSZ);
 		bit   [19:1] addr;
-		bit   [19:1] char_offs;
 		bit    [4:0] cell_offs;
-		bit    [2:0] cell_dot_x, cell_dot_y;
+//		bit    [2:0] cell_dot_x, cell_dot_y;
 		
-		/*case (NxCHSZ)
-			1'b0: char_offs = {PNx.CHRN[14:0],4'b0000};
-			1'b1: char_offs = {PNx.CHRN[12:0],6'b000000};
-		endcase*/
-		cell_dot_x = NxCH_CNT/* ^ {3{PNx.HF}}*/;
-		cell_dot_y = NxOFFY[2:0] ^ {3{PNx.VF}};
+//		cell_dot_x = NxCH_CNT/* ^ {3{PNx.HF}}*/;
+//		cell_dot_y = NxOFFY[2:0] ^ {3{PNx.VF}};
 		case (NxCHSZ)
 			1'b0: cell_offs = { 2'b00,                            NxOFFY[2:0] ^ {3{PNx.VF}} };
 			1'b1: cell_offs = { NxOFFY[3]^PNx.VF,NxOFFX3^PNx.HF,NxOFFY[2:0] ^ {3{PNx.VF}} };
 		endcase
 		case (NxCHCN)
-			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};	//4bits/dot, 16 colors
+			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};					//4bits/dot, 16 colors
 			3'b001: addr = {PNx.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],NxCH_CNT[0],1'b0};	//8bits/dot, 256 colors
 			3'b010,
 			3'b011: addr = {PNx.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],NxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
 			3'b100: addr = {PNx.CHRN[14:0],4'b0000} + {10'b000000000,   cell_offs[4:0],NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			default: addr = '0;
+		endcase
+	
+		return addr;
+	endfunction
+	
+	function bit [19:1] NxBMAddr(input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit [1:0] NxBMSZ);
+		bit   [19:1] addr;
+		bit    [4:0] cell_offs;
+
+		case (NxCHCN)
+			3'b000: addr = {3'b000,NxOFFY[7:0],NxOFFX[8:3],1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {2'b00, NxOFFY[7:0],NxOFFX[8:2],1'b0};	//8bits/dot, 256 colors
+			3'b010,
+			3'b011: addr = {1'b0,  NxOFFY[7:0],NxOFFX[8:1],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {       NxOFFY[7:0],NxOFFX[8:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	

@@ -1,3 +1,5 @@
+`timescale 1 ns / 1 ns
+
 module Saturn_tb;
 
 	import SCU_PKG::*;
@@ -39,6 +41,7 @@ module Saturn_tb;
 		.MEM_DO(MEM_DO),
 		.MEM_DQM_N(MEM_DQM_N),
 		.MEM_RD_N(MEM_RD_N),
+		.MEM_WAIT_N(1),
 		
 		.ROM_CS_N(ROM_CS_N),
 		.RAML_CS_N(RAML_CS_N),

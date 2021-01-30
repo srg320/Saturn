@@ -24,7 +24,7 @@ module SCSP (
 	input             SCAS_N,
 	input             SCLDS_N,
 	input             SCUDS_N,
-	output            SCDTACK_N,
+	output reg        SCDTACK_N,
 	input       [2:0] SCFC,
 	input             SCAVEC_N,
 	output      [2:0] SCIPL_N,
@@ -98,6 +98,23 @@ module SCSP (
 	always @(posedge CLK) if (CYCLE_CE) CYCLE_NUM <= CYCLE_NUM + 7'd1;
 	
 	wire DMA_REG_SEL = 0;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			DMA_A = '0;
+			DMA_DAT <= '0;
+			DMA_WR <= '0;
+			REG_RD <= 0;
+			DMA_ACCESS <= 0;
+		end
+		else if (CE) begin
+			DMA_A = '0;
+			DMA_DAT <= '0;
+			DMA_WR <= '0;
+			REG_RD <= 0;
+			DMA_ACCESS <= 0;
+		end
+	end
+	
 	wire SCU_REG_SEL = A[20] & ~CS_N;	//25B00000-25BFFFFF
 	wire M68K_REG_SEL = SCA[23:20] == 4'h1 & !SCAS_N && (!SCLDS_N || !SCUDS_N);	//100000-1FFFFF
 	always_comb begin
@@ -123,26 +140,7 @@ module SCSP (
 		end
 	end
 	wire REG_SEL = DMA_REG_SEL | SCU_REG_SEL | M68K_REG_SEL;
-	
-	//KEY ON/OFF
-//	wire KYONEX_SET = REG_SEL & REG_A ==? 11'b00?????0000 & REG_D[12];
-//	bit KEYON[32];
-//	always @(posedge CLK or negedge RST_N) begin
-//		bit KYONEX;
-//		
-//		if (!RST_N) begin
-//			KEYON <= '{32{0}};
-//			KYONEX <= '0;
-//		end
-//		else if (CE) begin
-//			if (!KYONEX && KYONEX_SET) begin
-//				KYONEX <= 1;
-//			end else if (KYONEX && CYCLE_CE) begin
-//				for (int i=0; i<32; i++) KEYON[i] <= SCR[i].SCR0.KB;
-//				KYONEX <= 0;
-//			end
-//		end
-//	end
+
 	
 	OPPipe_t    OP2_PIPE;
 	OPPipe_t    OP3_PIPE;
@@ -405,6 +403,7 @@ module SCSP (
 				
 				default:;
 			endcase
+			SCDTACK_N <= 1;////////////
 		end
 	end
 	

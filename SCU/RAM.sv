@@ -2,8 +2,8 @@ module DSP_DPRAM
 #(
 	parameter addr_width = 8,
 	parameter data_width = 8,
-	parameter mem_init_file = "",
-	parameter mem_sim_file = ""
+	parameter mem_init_file = " ",
+	parameter mem_sim_file = " "
 )
 (
 	input                   CLK,
@@ -111,8 +111,8 @@ module DSP_SPRAM
 #(
 	parameter addr_width = 8,
 	parameter data_width = 8,
-	parameter mem_init_file = "",
-	parameter mem_sim_file = ""
+	parameter mem_init_file = " ",
+	parameter mem_sim_file = " "
 )
 (
 	input                   CLK,
@@ -123,7 +123,7 @@ module DSP_SPRAM
 	output [data_width-1:0] Q
 );
 
-	DSP_DPRAM
+	/*DSP_DPRAM
 	#(
 		.addr_width(addr_width),
 		.data_width(data_width),
@@ -141,6 +141,16 @@ module DSP_SPRAM
 		.DATA_B(DATA),
 		.WREN_B(WREN),
 		.Q_B(Q)
+	);*/
+	
+	spram #(addr_width,data_width,mem_init_file) spram
+	(
+		.clock(CLK),
+		.address(ADDR),
+		.data(DATA),
+		.wren(WREN),
+		.q(Q)
 	);
+
 	
 endmodule

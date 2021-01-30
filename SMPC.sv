@@ -31,7 +31,9 @@ module SMPC (
 	input       [6:0] P1I,
 	output      [6:0] P1O,
 	input       [6:0] P2I,
-	output      [6:0] P2O
+	output      [6:0] P2O,
+	
+	output      [6:0] TEMP
 );
 
 	//Registers
@@ -99,84 +101,84 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 		end
-		else begin
-			if (!MRES_N) begin
-				MSHRES_N <= 1;
-				MSHNMI_N <= 1;
-				SSHRES_N <= 0;
-				SSHNMI_N <= 1;
-				SYSRES_N <= 1;
-				SNDRES_N <= 0;
-				CDRES_N <= 0;
-				MIRQ_N <= 1;
-				SR <= '0;
-				RESD <= 1;
-			end else if (CE) begin
-				RW_N_OLD <= RW_N;
-				if (!RW_N && RW_N_OLD && !CS_N) begin
-					case ({A,1'b1})
-						7'h01: IREG[0] <= DI;
-						7'h03: IREG[1] <= DI;
-						7'h05: IREG[2] <= DI;
-						7'h07: IREG[3] <= DI;
-						7'h09: IREG[4] <= DI;
-						7'h0B: IREG[5] <= DI;
-						7'h0D: IREG[6] <= DI;
-						7'h1F: COMREG <= DI;
-						7'h63: SF <= DI[0];
-						7'h75: PDR1 <= DI[6:0];
-						7'h77: PDR2 <= DI[6:0];
-						7'h79: DDR1 <= DI[6:0];
-						7'h7B: DDR2 <= DI[6:0];
-						7'h7D: IOSEL <= DI[1:0];
-						7'h7F: EXLE <= DI[1:0];
-						default:;
-					endcase
-				end 
+		else if (!MRES_N) begin
+			MSHRES_N <= 1;
+			MSHNMI_N <= 1;
+			SSHRES_N <= 0;
+			SSHNMI_N <= 1;
+			SYSRES_N <= 1;
+			SNDRES_N <= 0;
+			CDRES_N <= 0;
+			MIRQ_N <= 1;
+			SR <= '0;
+			RESD <= 1;
+		end else begin
+			RW_N_OLD <= RW_N;
+			if (!RW_N && RW_N_OLD && !CS_N) begin
+				case ({A,1'b1})
+					7'h01: IREG[0] <= DI;
+					7'h03: IREG[1] <= DI;
+					7'h05: IREG[2] <= DI;
+					7'h07: IREG[3] <= DI;
+					7'h09: IREG[4] <= DI;
+					7'h0B: IREG[5] <= DI;
+					7'h0D: IREG[6] <= DI;
+					7'h1F: COMREG <= DI;
+					7'h63: SF <= DI[0];
+					7'h75: PDR1 <= DI[6:0];
+					7'h77: PDR2 <= DI[6:0];
+					7'h79: DDR1 <= DI[6:0];
+					7'h7B: DDR2 <= DI[6:0];
+					7'h7D: IOSEL <= DI[1:0];
+					7'h7F: EXLE <= DI[1:0];
+					default:;
+				endcase
+			end 
+			
+			CS_N_OLD <= CS_N;
+			if (!CS_N && CS_N_OLD && RW_N) begin
+				case ({A,1'b1})
+					7'h21: REG_DO <= OREG[0];
+					7'h23: REG_DO <= OREG[1];
+					7'h25: REG_DO <= OREG[2];
+					7'h27: REG_DO <= OREG[3];
+					7'h29: REG_DO <= OREG[4];
+					7'h2B: REG_DO <= OREG[5];
+					7'h2D: REG_DO <= OREG[6];
+					7'h2F: REG_DO <= OREG[7];
+					7'h31: REG_DO <= OREG[8];
+					7'h33: REG_DO <= OREG[9];
+					7'h35: REG_DO <= OREG[10];
+					7'h37: REG_DO <= OREG[11];
+					7'h39: REG_DO <= OREG[12];
+					7'h3B: REG_DO <= OREG[13];
+					7'h3D: REG_DO <= OREG[14];
+					7'h3F: REG_DO <= OREG[15];
+					7'h41: REG_DO <= OREG[16];
+					7'h43: REG_DO <= OREG[17];
+					7'h45: REG_DO <= OREG[18];
+					7'h47: REG_DO <= OREG[19];
+					7'h49: REG_DO <= OREG[20];
+					7'h4B: REG_DO <= OREG[21];
+					7'h4D: REG_DO <= OREG[22];
+					7'h4F: REG_DO <= OREG[23];
+					7'h51: REG_DO <= OREG[24];
+					7'h53: REG_DO <= OREG[25];
+					7'h55: REG_DO <= OREG[26];
+					7'h57: REG_DO <= OREG[27];
+					7'h59: REG_DO <= OREG[28];
+					7'h5B: REG_DO <= OREG[29];
+					7'h5D: REG_DO <= OREG[30];
+					7'h5F: REG_DO <= OREG[31];
+					7'h61: REG_DO <= SR;
+					7'h63: REG_DO <= {7'b0000000,SF};
+					7'h75: REG_DO <= {1'b0,PDR1};
+					7'h77: REG_DO <= {1'b0,PDR2};
+					default: REG_DO <= '0;
+				endcase
+			end
 				
-				CS_N_OLD <= CS_N;
-				if (!CS_N && CS_N_OLD && RW_N) begin
-					case ({A,1'b1})
-						7'h21: REG_DO <= OREG[0];
-						7'h23: REG_DO <= OREG[1];
-						7'h25: REG_DO <= OREG[2];
-						7'h27: REG_DO <= OREG[3];
-						7'h29: REG_DO <= OREG[4];
-						7'h2B: REG_DO <= OREG[5];
-						7'h2D: REG_DO <= OREG[6];
-						7'h2F: REG_DO <= OREG[7];
-						7'h31: REG_DO <= OREG[8];
-						7'h33: REG_DO <= OREG[9];
-						7'h35: REG_DO <= OREG[10];
-						7'h37: REG_DO <= OREG[11];
-						7'h39: REG_DO <= OREG[12];
-						7'h3B: REG_DO <= OREG[13];
-						7'h3D: REG_DO <= OREG[14];
-						7'h3F: REG_DO <= OREG[15];
-						7'h41: REG_DO <= OREG[16];
-						7'h43: REG_DO <= OREG[17];
-						7'h45: REG_DO <= OREG[18];
-						7'h47: REG_DO <= OREG[19];
-						7'h49: REG_DO <= OREG[20];
-						7'h4B: REG_DO <= OREG[21];
-						7'h4D: REG_DO <= OREG[22];
-						7'h4F: REG_DO <= OREG[23];
-						7'h51: REG_DO <= OREG[24];
-						7'h53: REG_DO <= OREG[25];
-						7'h55: REG_DO <= OREG[26];
-						7'h57: REG_DO <= OREG[27];
-						7'h59: REG_DO <= OREG[28];
-						7'h5B: REG_DO <= OREG[29];
-						7'h5D: REG_DO <= OREG[30];
-						7'h5F: REG_DO <= OREG[31];
-						7'h61: REG_DO <= SR;
-						7'h63: REG_DO <= {7'b0000000,SF};
-						7'h75: REG_DO <= {1'b0,PDR1};
-						7'h77: REG_DO <= {1'b0,PDR2};
-						default: REG_DO <= '0;
-					endcase
-				end
-				
+			if (CE) begin
 				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
 				
 				if (!SRES_N && !RESD && !SRES_EXEC) begin
@@ -359,7 +361,7 @@ module SMPC (
 							end
 							
 							8'h10: begin		//INTBACK
-								OREG[0] <= {1'b0,RESD,6'b000000};
+								OREG[0] <= {1'b1,RESD,6'b000000};
 								OREG[1] <= 8'h20;
 								OREG[2] <= 8'h20;
 								OREG[3] <= 8'h01;
@@ -412,5 +414,9 @@ module SMPC (
 	end
 	
 	assign DO = REG_DO;
+	
+	assign P1O = '0;
+	assign P2O = '0;
+	assign TEMP = DDR1^DDR2^IOSEL^EXLE;
 
 endmodule
