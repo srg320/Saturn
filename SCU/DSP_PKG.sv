@@ -239,6 +239,7 @@ package SCUDSP_PKG;
 	function bit [6:0] DMAAddrAdd(input bit [2:0] mode, input bit dir);
 		bit [6:0] res;
 		
+		res = 7'd0;
 		if (!dir) begin
 			case (mode)
 				3'b000: res = 7'd0>>1;

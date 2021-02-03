@@ -113,6 +113,7 @@ module Saturn (
 	bit  [15:0] BDO;
 	bit         BADDT_N;
 	bit         BDTEN_N;
+	bit   [1:0] BWE_N;
 	bit         BCS1_N;
 	bit         BRDY1_N;
 	bit         IRQ1_N;
@@ -251,7 +252,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(1'b0/*RST_N*/),
+		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -318,8 +319,6 @@ module Saturn (
 	assign CA       = MSHA[24:0];
 	assign CDO      = !MSHCS3_N || !DRAMCE_N || !ROMCE_N ? MEM_DI :
                      !SMPCCE_N                          ? {4{SMPC_DO}} :
-//							!BCS2_N               ? {2{VDP2_DO}} :
-//							!BCSS_N               ? {2{SCSP_DO}} :
 							SCU_DO;
 	assign CDI      = MSHDO;
 	assign CBS_N    = MSHBS_N;
@@ -333,16 +332,13 @@ module Saturn (
 	assign CIVECF_N = MSHIVECF_N;
 	
 	assign ECWAIT_N = MEM_WAIT_N;
-//	assign ADI      = '0;
 	assign AWAIT_N  = 1;
 	assign AIRQ_N   = 1;
 	assign BDI      = !BCS2_N ? VDP2_DO :
 							!BCSS_N ? SCSP_DO : 16'hDEED;
 	assign BRDY1_N  = 0;
 	assign IRQ1_N   = 1;
-	assign BRDY2_N  = 0;
 	assign IRQL_N   = 1;
-	assign BRDYS_N  = 0;
 	assign IRQS_N   = 1;
 	
 	bit [20:0] BA;
@@ -401,6 +397,7 @@ module Saturn (
 		.BDO(BDO),
 		.BADDT_N(BADDT_N),
 		.BDTEN_N(BDTEN_N),
+		.BWE_N(BWE_N),
 		.BCS1_N(BCS1_N),
 		.BRDY1_N(BRDY1_N),
 		.IRQ1_N(IRQ1_N),
@@ -464,11 +461,10 @@ module Saturn (
 		.MWR_N(MWR_N)
 	);
 	
-	assign MEM_A     = MSHA[24:0];
-	assign MEM_DO    = MSHDO;
-	assign MEM_DQM_N = MSHDQM_N;
-	assign MEM_RD_N  = MSHRD_N;
-	
+	assign MEM_A     = CA[24:0];
+	assign MEM_DO    = CDI;
+	assign MEM_DQM_N = CDQM_N;
+	assign MEM_RD_N  = CRD_N;
 	assign ROM_CS_N  = ROMCE_N;
 	assign RAML_CS_N = DRAMCE_N;
 	assign RAMH_CS_N = MSHCS3_N;
@@ -546,23 +542,7 @@ module Saturn (
 		.P2O()
 	);
 	
-	
-	
-//	bit [20:0] BA;
-//	bit [15:0] BD;
-//	always @(posedge CLK or negedge RST_N) begin
-//		if (!RST_N) begin
-//			BA <= '0;
-//		end else if (CE_R) begin
-//			if (!BADDT_N) begin
-//				BA <= CA[20:0];
-//				BD <= CA[1] ? CDI[15:0] : CDI[31:16];
-//			end
-//		end
-//	end
-	bit [15:0] BD;
-	assign BD = BA[1] ? CDI[15:0] : CDI[31:16];
-	
+
 	VDP2 VDP2
 	(
 		.CLK(CLK),
@@ -572,13 +552,13 @@ module Saturn (
 		
 		.RES_N(SYSRES_N),
 		
-		.A(BA[20:1]),
-		.DI(BD),
+		.DI(BDO),
 		.DO(VDP2_DO),
 		.CS_N(BCS2_N),
-		.WE_N(&CDQM_N),
-		.RD_N(CRD_N),
-		.RDY_N(),
+		.AD_N(BADDT_N),
+		.DTEN_N(BDTEN_N),
+		.WE_N(BWE_N),
+		.RDY_N(BRDY2_N),
 		
 		.VINT_N(IRQV_N),
 		.HINT_N(IRQH_N),
@@ -641,13 +621,13 @@ module Saturn (
 		
 		.CE_R(CE_R),
 		.CE_F(CE_F),
-		.A(BA[20:0]),
-		.DI(BD),
+		.DI(BDO),
 		.DO(SCSP_DO),
 		.CS_N(BCSS_N),
-		.WE_N(CDQM_N[1:0]),
-		.RD_N(CRD_N),
-		.RDY_N(),
+		.AD_N(BADDT_N),
+		.DTEN_N(BDTEN_N),
+		.WE_N(BWE_N),
+		.RDY_N(BRDYS_N),
 		
 		.SCCE_R(SCCE_R),
 		.SCCE_F(SCCE_F),
@@ -672,7 +652,7 @@ module Saturn (
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(1/*~SNDRES_N*/),
+		.extReset(~SNDRES_N),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),
