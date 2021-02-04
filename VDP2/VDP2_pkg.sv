@@ -969,21 +969,21 @@ package VDP2_PKG;
 	typedef struct packed	//RW,180114,18011A
 	{
 		bit [ 6: 0] UNUSED;
-		bit [ 8: 0] COxRD;
+		bit [ 8: 0] CORD;
 	} COxR_t;
 	parameter bit [15:0] COxR_MASK = 16'h01FF;
 	
 	typedef struct packed	//RW,180116,18011C
 	{
 		bit [ 6: 0] UNUSED;
-		bit [ 8: 0] COxGR;
+		bit [ 8: 0] COGR;
 	} COxG_t;
 	parameter bit [15:0] COxG_MASK = 16'h01FF;
 	
 	typedef struct packed	//RW,180118,18011E
 	{
 		bit [ 6: 0] UNUSED;
-		bit [ 8: 0] COxBL;
+		bit [ 8: 0] COBL;
 	} COxB_t;
 	parameter bit [15:0] COxB_MASK = 16'h01FF;
 	
@@ -1161,6 +1161,12 @@ package VDP2_PKG;
 		bit         LSCY;
 		bit         TPON;
 		bit         ON;
+		bit [ 2: 0] CAOS;
+		bit [ 2: 0] PRIN;
+		bit         COEN;
+		bit         COSL;
+		bit         CCEN;
+		bit [ 4: 0] CCRT;
 	} VDP2NSRegs_t;
 	typedef VDP2NSRegs_t VDP2NSxRegs_t [4];
 	
@@ -1255,24 +1261,40 @@ package VDP2_PKG;
 		S[2].ON = REGS.BGON.N2ON;
 		S[3].ON = REGS.BGON.N3ON;
 		
+		S[0].CAOS = REGS.CRAOFA.N0CAOS;
+		S[1].CAOS = REGS.CRAOFA.N1CAOS;
+		S[2].CAOS = REGS.CRAOFA.N2CAOS;
+		S[3].CAOS = REGS.CRAOFA.N3CAOS;
+		
+		S[0].PRIN = REGS.PRINA.N0PRIN;
+		S[1].PRIN = REGS.PRINA.N1PRIN;
+		S[2].PRIN = REGS.PRINB.N2PRIN;
+		S[3].PRIN = REGS.PRINB.N3PRIN;
+		
+		S[0].COEN = REGS.CLOFEN.N0COEN;
+		S[1].COEN = REGS.CLOFEN.N1COEN;
+		S[2].COEN = REGS.CLOFEN.N2COEN;
+		S[3].COEN = REGS.CLOFEN.N3COEN;
+		
+		S[0].COSL = REGS.CLOFSL.N0COSL;
+		S[1].COSL = REGS.CLOFSL.N1COSL;
+		S[2].COSL = REGS.CLOFSL.N2COSL;
+		S[3].COSL = REGS.CLOFSL.N3COSL;
+		
+		S[0].CCEN = REGS.CCCTL.N0CCEN;
+		S[1].CCEN = REGS.CCCTL.N1CCEN;
+		S[2].CCEN = REGS.CCCTL.N2CCEN;
+		S[3].CCEN = REGS.CCCTL.N3CCEN;
+		
+		S[0].CCRT = REGS.CCRNA.N0CCRT;
+		S[1].CCRT = REGS.CCRNA.N1CCRT;
+		S[2].CCRT = REGS.CCRNB.N2CCRT;
+		S[3].CCRT = REGS.CCRNB.N3CCRT;
+		
 		return S;
 	endfunction
 
 	//VRAM access command value
-//	typedef enum bit [3:0] {
-//		N0PN = 4'h0,  	//NBG0 pattern name data read
-//		N1PN = 4'h1, 	//NBG1 pattern name data read
-//		N2PN = 4'h2,	//NBG2 pattern name data read
-//		N3PN = 4'h3,	//NBG3 pattern name data read
-//		N0CH = 4'h4,	//NBG0 character data read
-//		N1CH = 4'h5,	//NBG1 character data read
-//		N2CH = 4'h6,	//NBG2 character data read
-//		N3CH = 4'h7,	//NBG3 character data read
-//		N0VS = 4'hC,	//NBG0 vertical cell scroll data read
-//		N1VS = 4'hD,	//NBG1 vertical cell scroll data read
-//		CPU  = 4'hE,	//CPU read/write
-//		NA   = 4'hF 	//No access
-//	} VCP_t;
 	parameter VCP_N0PN 	= 4'h0; 	//NBG0 pattern name data read
 	parameter VCP_N1PN 	= 4'h1; 	//NBG1 pattern name data read
 	parameter VCP_N2PN 	= 4'h2;	//NBG2 pattern name data read
@@ -1362,24 +1384,24 @@ package VDP2_PKG;
 		NxCHS_t     NxCHS;
 		NxCHCNT_t   NxCH_CNT;
 		bit [ 1: 0] NxVS;
-		NxPND_t     NxPND;
-		NxCHD_t     NxCHD;
 	} BGState_t;
 	typedef BGState_t BGPipeline_t [4];
+	typedef NxPND_t PNPipe_t [4];
+	typedef NxCHD_t CHPipe_t [4];
 	
 	typedef struct packed
 	{
 		bit [10: 0] INT;
 		bit [ 7: 0] FRAC;
 	} ScrollData_t;
-	parameter SCRLD_NULL	= {11'h000,8'h00};
+	parameter ScrollData_t SCRLD_NULL	= {11'h000,8'h00};
 	
 	typedef struct packed
 	{
 		bit [ 2: 0] INT;
 		bit [ 7: 0] FRAC;
 	} CoordInc_t;
-	parameter CRDI_NULL	= {3'h0,8'h00};
+	parameter CoordInc_t CRDI_NULL	= {3'h0,8'h00};
 	
 	typedef struct packed
 	{
@@ -1387,10 +1409,19 @@ package VDP2_PKG;
 		bit         TP;
 		bit [23: 0] D;
 	} DotData_t;
-	parameter DD_NULL = {1'b0,1'b0,24'h000000};
+	parameter DotData_t DD_NULL = {1'b0,1'b0,24'h000000};
 	
 	typedef DotData_t CellDotsLine_t [8];
 	typedef DotData_t DotsBuffer_t [16];
+	
+	typedef struct packed
+	{
+		bit         P;
+		bit         TP;
+		bit [23: 0] D;
+		bit [ 1: 0] S;
+	} ScreenDot_t;
+	parameter ScreenDot_t SD_NULL = {1'b0,1'b0,24'h000000,2'b00};
 	
 	typedef struct packed
 	{
@@ -1399,7 +1430,15 @@ package VDP2_PKG;
 		bit [ 7: 0] G;
 		bit [ 7: 0] R;
 	} DotColor_t;
-	parameter DC_BLACK = {1'b0,8'h00,8'h00,8'h00};
+	parameter DotColor_t DC_NULL = {1'b0,8'h00,8'h00,8'h00};
+	
+	typedef struct packed
+	{
+		bit [ 7: 0] B;
+		bit [ 7: 0] G;
+		bit [ 7: 0] R;
+	} Color_t;
+	parameter Color_t C_NULL = {8'h00,8'h00,8'h00};
 	
 	function bit [19:1] NxPNAddr(input bit [10:0] NxOFFX, input bit [10:0] NxOFFY,
 	                             input bit [8:6] NxMP, input bit [5:0] NxMPA, input bit [5:0] NxMPB, input bit [5:0] NxMPC, input bit [5:0] NxMPD, 
@@ -1510,10 +1549,40 @@ package VDP2_PKG;
 		return DC;
 	endfunction
 	
-	function bit [23:0] Color555To888(input bit [15:0] DW);
+	function Color_t Color555To888(input bit [15:0] DW);
 		return {DW[14:10],3'b000,DW[9:5],3'b000,DW[4:0],3'b000}; 
 	endfunction
 	
+	function bit [7:0] ColorCalcRatio(input bit [7:0] CA, input bit [7:0] CB, input bit [4:0] RA, input bit [4:0] RB);
+		bit [7:0] CR;
+		bit [13:0] S;
+		
+		S = (CA * RA) + (CB * RB);
+		return (S[12:5] | {8{S[13]}}); 
+	endfunction
+	
+	function Color_t ColorCalc(input Color_t CT, input Color_t CS, input bit [4:0] CCRT, input bit CCEN, input bit CCMD);
+		Color_t CC;
+		Color_t TEMP;
+		
+		TEMP.R = ColorCalcRatio(CT.R, CS[ 7: 0], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
+		TEMP.G = ColorCalcRatio(CT.G, CS[15: 8], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
+		TEMP.B = ColorCalcRatio(CT.B, CS[23:16], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
+		CC = !CCEN ? CT : TEMP; 
+		
+		return CC;
+	endfunction
+	
+	function bit [7:0] ColorOffset(input bit [7:0] C, input bit [8:0] COAx, input bit [8:0] COBx, input bit COEN, input bit COSL);
+		bit [7:0] CO;
+		bit [8:0] CAS, CBS;
+
+		CAS = $signed({1'b0,C}) + $signed(COAx);
+		CBS = $signed({1'b0,C}) + $signed(COBx);
+		CO = !COEN ? C : !COSL ? CAS[7:0] & ~{8{COAx[8]&CAS[8]}} | {8{~COAx[8]&CAS[8]}} : CBS[7:0] & ~{8{COBx[8]&CBS[8]}} | {8{~COBx[8]&CBS[8]}}; 
+		
+		return CO;
+	endfunction
 	
 	typedef struct packed
 	{
