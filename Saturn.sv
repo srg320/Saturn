@@ -15,6 +15,25 @@ module Saturn (
 	output            MEM_RD_N,
 	input             MEM_WAIT_N,
 	
+	output     [18:1] VDP1_VRAM_A,
+	output     [15:0] VDP1_VRAM_D,
+	input      [15:0] VDP1_VRAM_Q,
+	output      [1:0] VDP1_VRAM_WE,
+	output            VDP1_VRAM_RD,
+	input             VDP1_VRAM_RDY,
+	
+	output     [17:1] VDP1_FB0_A,
+	output     [15:0] VDP1_FB0_D,
+	input      [15:0] VDP1_FB0_Q,
+	output            VDP1_FB0_WE,
+	output            VDP1_FB0_RD,
+	
+	output     [17:1] VDP1_FB1_A,
+	output     [15:0] VDP1_FB1_D,
+	input      [15:0] VDP1_FB1_Q,
+	output            VDP1_FB1_WE,
+	output            VDP1_FB1_RD,
+	
 	output     [16:1] VDP2_RA0_A,
 	output     [15:0] VDP2_RA0_D,
 	input      [31:0] VDP2_RA0_Q,
@@ -181,6 +200,9 @@ module Saturn (
 	bit   [7:0] SMPC_DO;
 	bit         SNDRES_N;
 	
+	//VDP1
+	bit  [15:0] VDP1_DO;
+	
 	//VDP2
 	bit  [15:0] VDP2_DO;
 	
@@ -252,7 +274,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(RST_N),
+		.RST_N(0/*RST_N*/),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -334,10 +356,9 @@ module Saturn (
 	assign ECWAIT_N = MEM_WAIT_N;
 	assign AWAIT_N  = 1;
 	assign AIRQ_N   = 1;
-	assign BDI      = !BCS2_N ? VDP2_DO :
-							!BCSS_N ? SCSP_DO : 16'hDEED;
-	assign BRDY1_N  = 0;
-	assign IRQ1_N   = 1;
+	assign BDI      = !BCS1_N ? VDP1_DO :
+	                  !BCS2_N ? VDP2_DO :
+							!BCSS_N ? SCSP_DO : 16'h0000;
 	assign IRQL_N   = 1;
 	assign IRQS_N   = 1;
 	
@@ -543,6 +564,49 @@ module Saturn (
 	);
 	
 
+	VDP1 VDP1
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		.CE_R(CE_R),
+		.CE_F(CE_F),
+		
+		.RES_N(SYSRES_N),
+		
+		.DI(BDO),
+		.DO(VDP1_DO),
+		.CS_N(BCS1_N),
+		.AD_N(BADDT_N),
+		.DTEN_N(BDTEN_N),
+		.WE_N(BWE_N),
+		.RDY_N(BRDY1_N),
+		
+		.IRQ_N(IRQ1_N), 
+		
+		.VTIM_N(IRQV_N),
+		.HTIM_N(IRQH_N),
+		.VOUT(),
+		
+		.VRAM_A(VDP1_VRAM_A),
+		.VRAM_D(VDP1_VRAM_D),
+		.VRAM_WE(VDP1_VRAM_WE),
+		.VRAM_RD(VDP1_VRAM_RD),
+		.VRAM_Q(VDP1_VRAM_Q),
+		.VRAM_RDY(VDP1_VRAM_RDY),
+		
+		.FB0_A(VDP1_FB0_A),
+		.FB0_D(VDP1_FB0_D),
+		.FB0_WE(VDP1_FB0_WE),
+		.FB0_RD(VDP1_FB0_RD),
+		.FB0_Q(VDP1_FB0_Q),
+		
+		.FB1_A(VDP1_FB1_A),
+		.FB1_D(VDP1_FB1_D),
+		.FB1_WE(VDP1_FB1_WE),
+		.FB1_RD(VDP1_FB1_RD),
+		.FB1_Q(VDP1_FB1_Q)
+	);
+	
 	VDP2 VDP2
 	(
 		.CLK(CLK),
@@ -652,7 +716,7 @@ module Saturn (
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(~SNDRES_N),
+		.extReset(1/*~SNDRES_N*/),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),

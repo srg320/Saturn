@@ -123,25 +123,25 @@ module DSP_SPRAM
 	output [data_width-1:0] Q
 );
 
-	/*DSP_DPRAM
-	#(
-		.addr_width(addr_width),
-		.data_width(data_width),
-		.mem_init_file(mem_init_file),
-		.mem_sim_file(mem_sim_file)
-	)
-	dpram
-	(
-		.CLK(CLK),
-		.ADDR_A(ADDR),
-		.DATA_A(DATA),
-		.WREN_A(1'b0),
-		.Q_A(),
-		.ADDR_B(ADDR),
-		.DATA_B(DATA),
-		.WREN_B(WREN),
-		.Q_B(Q)
-	);*/
+//	DSP_DPRAM
+//	#(
+//		.addr_width(addr_width),
+//		.data_width(data_width),
+//		.mem_init_file(mem_init_file),
+//		.mem_sim_file(mem_sim_file)
+//	)
+//	dpram
+//	(
+//		.CLK(CLK),
+//		.ADDR_A(ADDR),
+//		.DATA_A(DATA),
+//		.WREN_A(1'b0),
+//		.Q_A(),
+//		.ADDR_B(ADDR),
+//		.DATA_B(DATA),
+//		.WREN_B(WREN),
+//		.Q_B(Q)
+//	);
 	
 	spram #(addr_width,data_width,mem_init_file) spram
 	(

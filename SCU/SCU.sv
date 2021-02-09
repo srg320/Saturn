@@ -531,7 +531,7 @@ module SCU (
 				end
 				
 				DS_DMA_WRITE : begin
-					if (DAD[DMA_CH].DWA) DMA_WA[DMA_CH] <= DMA_WA[DMA_CH] + (27'd1 << DAD[DMA_CH].DWA);
+					if (DAD[DMA_CH].DWA) DMA_WA[DMA_CH] <= DMA_WA[DMA_CH] + (27'd2 << DAD[DMA_CH].DWA);
 					DMA_TN[DMA_CH][19:0] <= DMA_TN[DMA_CH][19:0] - 20'd4;
 					if (!DMA_TN[DMA_CH][19:0]) begin
 						if (!DMD[DMA_CH].MOD || DMA_TN[DMA_CH][31]) begin
@@ -1178,7 +1178,7 @@ module SCU (
 			4'hB: IVEC = 8'h44;
 			4'hA: IVEC = 8'h45;
 			4'h9: IVEC = 8'h46;
-			4'h8: IVEC = SM_INT      ? 8'h47 : 8'h48;
+			4'h8: IVEC = /*SM_INT      ?*/ 8'h47 /*: 8'h48*/;
 			4'h7: IVEC = EXT_INT[0]  ? 8'h50 : 
 			             EXT_INT[1]  ? 8'h51 : 
 							 EXT_INT[2]  ? 8'h52 : 8'h53;
