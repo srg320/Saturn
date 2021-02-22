@@ -37,25 +37,25 @@ module Saturn (
 	output     [16:1] VDP2_RA0_A,
 	output     [15:0] VDP2_RA0_D,
 	input      [31:0] VDP2_RA0_Q,
-	output            VDP2_RA0_WE,
+	output      [1:0] VDP2_RA0_WE,
 	output            VDP2_RA0_RD,
 	
 	output     [16:1] VDP2_RA1_A,
 	output     [15:0] VDP2_RA1_D,
 	input      [31:0] VDP2_RA1_Q,
-	output            VDP2_RA1_WE,
+	output      [1:0] VDP2_RA1_WE,
 	output            VDP2_RA1_RD,
 	
 	output     [16:1] VDP2_RB0_A,
 	output     [15:0] VDP2_RB0_D,
 	input      [31:0] VDP2_RB0_Q,
-	output            VDP2_RB0_WE,
+	output      [1:0] VDP2_RB0_WE,
 	output            VDP2_RB0_RD,
 	
 	output     [16:1] VDP2_RB1_A,
 	output     [15:0] VDP2_RB1_D,
 	input      [31:0] VDP2_RB1_Q,
-	output            VDP2_RB1_WE,
+	output      [1:0] VDP2_RB1_WE,
 	output            VDP2_RB1_RD,
 
 	output     [18:1] SCSP_RAM_A,
@@ -71,6 +71,10 @@ module Saturn (
 	output reg        VS_N,
 	output reg        HBL_N,
 	output reg        VBL_N,
+	
+	input      [15:0] JOY1,
+	
+	input       [4:0] SCRN_EN,
 	
 	output      [7:0] DBG_WAIT_CNT
 );
@@ -413,7 +417,6 @@ module Saturn (
 		.ATIM1_N(ATIM1_N),
 		.ATIM2_N(ATIM2_N),
 		
-		.BA(BA),
 		.BDI(BDI),
 		.BDO(BDO),
 		.BADDT_N(BADDT_N),
@@ -560,7 +563,9 @@ module Saturn (
 		.P1I(7'h00),
 		.P1O(),
 		.P2I(7'h00),
-		.P2O()
+		.P2O(),
+		
+		.JOY1(JOY1)
 	);
 	
 
@@ -658,7 +663,9 @@ module Saturn (
 		.VS_N(VS_N),
 		.HS_N(HS_N),
 		.HBL_N(HBL_N),
-		.VBL_N(VBL_N)
+		.VBL_N(VBL_N),
+		
+		.SCRN_EN(SCRN_EN)
 	);
 	
 	

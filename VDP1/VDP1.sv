@@ -79,7 +79,7 @@ module VDP1 (
 	bit        VRAM_DONE;
 	bit        VRAM_ACCESS_PEND;
 	
-	typedef enum {
+	typedef enum bit [2:0] {
 		CMDS_IDLE,  
 		CMDS_READ, 
 		CMDS_EXEC,
@@ -215,6 +215,7 @@ module VDP1 (
 	always @(posedge CLK or negedge RST_N) begin
 		bit       VRAM_SEL_OLD;
 		bit       CMD_READ_PEND;
+		bit        VTIM_N_OLD;
 		
 		if (!RST_N) begin
 			VRAM_ST <= VS_IDLE;
@@ -230,12 +231,12 @@ module VDP1 (
 		else if (CE_R) begin
 			VRAM_SEL_OLD <= CPU_VRAM_SEL;
 			if (CPU_VRAM_SEL && !VRAM_SEL_OLD) VRAM_ACCESS_PEND <= 1;
-			if (CMD_READ) CMD_READ_PEND <= 1;
+			if (CMD_READ && !CMD_READ_PEND) CMD_READ_PEND <= 1;
 			
 			case (VRAM_ST)
 				VS_IDLE: begin
 					if (VRAM_ACCESS_PEND) begin
-						VRAM_ACCESS_PEND <= 0;
+//						VRAM_ACCESS_PEND <= 0;
 						VRAM_A <= A[18:1];
 						VRAM_D <= DI;
 						VRAM_WE <= ~WE_N;
@@ -256,6 +257,7 @@ module VDP1 (
 						VRAM_DO <= VRAM_Q;
 						VRAM_WE <= '0;
 						VRAM_RD <= 0;
+						VRAM_ACCESS_PEND <= 0;
 						VRAM_ST <= VS_IDLE;
 					end
 				end
@@ -302,6 +304,12 @@ module VDP1 (
 					VRAM_ST <= VS_IDLE;
 				end
 			endcase
+			
+			VTIM_N_OLD <= VTIM_N;
+			if (VTIM_N && !VTIM_N_OLD) begin
+				CMD_READ_PEND <= '0;
+				VRAM_ST <= VS_IDLE;
+			end
 		end
 	end
 
@@ -326,7 +334,7 @@ module VDP1 (
 
 
 	//Registers
-	wire REG_SEL = A[20:19] == 2'b10 && !DTEN_N && !AD_N && !CS_N;
+	wire REG_SEL = (A[20:19] == 2'b10) & ~DTEN_N & ~AD_N & ~CS_N;
 	
 	assign MODR = {4'h0,3'b000,PTMR.PTM[1],FBCR.EOS,FBCR.DIE,FBCR.DIL,FBCR.FCM,TVMR.VBE,TVMR.TVM};
 	
@@ -347,12 +355,8 @@ module VDP1 (
 		end else if (!RES_N) begin
 				
 		end else begin
-			if (!CS_N && !DTEN_N && CE_R) begin
-				if (AD_N) begin
-					A <= {A[4:0],DI};
-				end else begin
-				
-				end
+			if (!CS_N && DTEN_N && AD_N && CE_R) begin
+				A <= {A[4:0],DI};
 			end
 			
 			if (REG_SEL) begin

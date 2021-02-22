@@ -33,6 +33,8 @@ module SMPC (
 	input       [6:0] P2I,
 	output      [6:0] P2O,
 	
+	input      [15:0] JOY1,
+	
 	output      [6:0] TEMP
 );
 
@@ -51,6 +53,7 @@ module SMPC (
 	
 	bit         DOTSEL;
 	bit         RESD;
+	bit         STE;
 	
 	bit   [7:0] SMEM[4];
 	
@@ -74,6 +77,9 @@ module SMPC (
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
 		bit        COMREG_SET;
+		bit        LAST_CONT;
+		bit        BR, CONT;
+		bit        PDL;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -97,6 +103,7 @@ module SMPC (
 			CDRES_N <= 0;
 			MIRQ_N <= 1;
 			RESD <= 1;
+			STE <= 0;
 			
 			REG_DO <= '0;
 			RW_N_OLD <= 1;
@@ -105,6 +112,10 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 			INTBACK_EXEC <= 0;
+			LAST_CONT <= 0;
+			PDL <= 0;
+			BR <= 0;
+			CONT <= 0;
 		end
 		else if (!MRES_N) begin
 			MSHRES_N <= 1;
@@ -121,7 +132,19 @@ module SMPC (
 			RW_N_OLD <= RW_N;
 			if (!RW_N && RW_N_OLD && !CS_N) begin
 				case ({A,1'b1})
-					7'h01: IREG[0] <= DI;
+					7'h01: begin 
+						if (INTBACK_EXEC) begin
+							if (DI[6]) begin
+								BR <= 1;
+								INTBACK_EXEC <= 0;
+								SF <= 0;
+								SR[7:5] <= 3'b000;
+							end else if (DI[7]) begin
+								CONT <= 1;
+							end
+						end else
+							IREG[0] <= DI;
+					end
 					7'h03: IREG[1] <= DI;
 					7'h05: IREG[2] <= DI;
 					7'h07: IREG[3] <= DI;
@@ -198,7 +221,7 @@ module SMPC (
 					SSHNMI_N <= 1;
 				end
 				
-				SR[SR_RESB] <= ~SRES_N;
+				SR[4:0] <= {~SRES_N,IREG[1][7:4]};
 				
 				if (IRQV_N && !IRQV_N_OLD) MIRQ_N <= 1;
 				
@@ -272,13 +295,15 @@ module SMPC (
 							end
 							
 							8'h10: begin		//INTBACK
-								if (!IREG[0][5:1] && IREG[2] == 8'hF0)  begin
-									WAIT_CNT <= 20'd1200;
-									COMM_ST <= CS_WAIT;
+								if (IREG[2] == 8'hF0)  begin
+//									if (IREG[0][7] != LAST_CONT || !INTBACK_EXEC) begin
+										LAST_CONT <= IREG[0][7];
+										WAIT_CNT <= 20'd200;
+										COMM_ST <= CS_WAIT;
+//									end
 								end else begin
 									COMM_ST <= CS_END;
 								end
-								INTBACK_EXEC <= 0;
 							end
 							
 							8'h16: begin		//SETTIME
@@ -372,32 +397,61 @@ module SMPC (
 							end
 							
 							8'h10: begin		//INTBACK
-								OREG[0] <= {1'b1,RESD,6'b000000};
-								OREG[1] <= 8'h20;
-								OREG[2] <= 8'h21;
-								OREG[3] <= 8'h01;
-								OREG[4] <= 8'h01;
-								OREG[5] <= 8'h12;
-								OREG[6] <= 8'h34;
-								OREG[7] <= 8'h56;
-								OREG[8] <= 8'h00;
-								OREG[9] <= {4'b0000,AC};
-								OREG[10] <= {1'b0,DOTSEL,2'b11,~MSHNMI_N,1'b1,~SYSRES_N,~SNDRES_N};
-								OREG[11] <= {1'b0,~CDRES_N,6'b000000};
-								OREG[12] <= SMEM[0];
-								OREG[13] <= SMEM[1];
-								OREG[14] <= SMEM[2];
-								OREG[15] <= SMEM[3];
-								OREG[31] <= 8'h00;
-								MIRQ_N <= 0;
-								if (IREG[1][3] && !IREG[0][6]) begin
+								if (!INTBACK_EXEC /*&& IREG[0][0]*/) begin
+									OREG[0] <= {STE,RESD,6'b000000};
+									OREG[1] <= 8'h20;
+									OREG[2] <= 8'h21;
+									OREG[3] <= 8'h01;
+									OREG[4] <= 8'h01;
+									OREG[5] <= 8'h12;
+									OREG[6] <= 8'h34;
+									OREG[7] <= 8'h56;
+									OREG[8] <= 8'h00;
+									OREG[9] <= {4'b0000,AC};
+									OREG[10] <= {1'b0,DOTSEL,2'b11,~MSHNMI_N,1'b1,~SYSRES_N,~SNDRES_N};
+									OREG[11] <= {1'b0,~CDRES_N,6'b000000};
+									OREG[12] <= SMEM[0];
+									OREG[13] <= SMEM[1];
+									OREG[14] <= SMEM[2];
+									OREG[15] <= SMEM[3];
+									SR[7:5] <= {2'b01,IREG[1][3]};
+									if (IREG[1][3]) begin
+										INTBACK_EXEC <= 1;
+										SF <= 1;
+									end
+									PDL <= 1;
+								end else /*if (INTBACK_EXEC || IREG[1][3])*/ begin
+									OREG[0] <= 8'hF1;
+									OREG[1] <= 8'h02;
+									OREG[2] <= JOY1[15:8];
+									OREG[3] <= JOY1[7:0];
+									OREG[4] <= 8'hF0;
+									OREG[5] <= 8'h00;
+									OREG[6] <= 8'h00;
+									OREG[7] <= 8'h00;
+									OREG[8] <= 8'h00;
+									OREG[9] <= 8'h00;
+									OREG[10] <= 8'h00;
+									OREG[11] <= 8'h00;
+									OREG[12] <= 8'h00;
+									OREG[13] <= 8'h00;
+									OREG[14] <= 8'h00;
+									OREG[15] <= 8'h00;
+									SR[7:5] <= {1'b1,1'b1,1'b0};
 									SF <= 1;
+									PDL <= ~INTBACK_EXEC;
 									INTBACK_EXEC <= 1;
+//									if (BR) begin
+//										INTBACK_EXEC <= 0;
+//										SF <= 0;
+//										BR <= 0;
+//									end
 								end
+								MIRQ_N <= 0;
 							end
 							
 							8'h16: begin		//SETTIME
-								
+								STE <= 1;
 							end
 							
 							8'h17: begin		//SETSMEM

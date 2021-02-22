@@ -1432,9 +1432,9 @@ package VDP2_PKG;
 	
 	typedef struct
 	{
-		bit [ 8: 0] H_CNT; 
-//		bit [ 8: 0] V_CNT;
-		bit         LS0;
+		bit [10: 0] N2X; 
+		bit [11: 0] R0X; 
+		bit [11: 0] R0Y;
 		bit [ 3: 0] NxA0PN;
 		bit [ 3: 0] NxA1PN;
 		bit [ 3: 0] NxB0PN;
@@ -1463,6 +1463,9 @@ package VDP2_PKG;
 		bit [ 1: 0] RxA1CO;
 		bit [ 1: 0] RxB0CO;
 		bit [ 1: 0] RxB1CO;
+		bit         LS;
+		bit         RPA;
+		bit   [6:2] RPA_POS;
 		bit [16: 1] VRAMA0_A; 
 		bit [16: 1] VRAMA1_A; 
 		bit [16: 1] VRAMB0_A; 
@@ -1581,16 +1584,13 @@ package VDP2_PKG;
 	endfunction
 	
 	
-	function bit [19:1] NxCHAddr(input PN_t PNx, input bit [2:0] NxCH_CNT, input bit NxOFFX3, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit NxCHSZ);
+	function bit [19:1] NxCHAddr(input PN_t PNx, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit NxCHSZ);
 		bit   [19:1] addr;
 		bit    [4:0] cell_offs;
-//		bit    [2:0] cell_dot_x, cell_dot_y;
-		
-//		cell_dot_x = NxCH_CNT/* ^ {3{PNx.HF}}*/;
-//		cell_dot_y = NxOFFY[2:0] ^ {3{PNx.VF}};
+
 		case (NxCHSZ)
 			1'b0: cell_offs = { 2'b00,                            NxOFFY[2:0] ^ {3{PNx.VF}} };
-			1'b1: cell_offs = { NxOFFY[3]^PNx.VF,NxOFFX3^PNx.HF,NxOFFY[2:0] ^ {3{PNx.VF}} };
+			1'b1: cell_offs = { NxOFFY[3]^PNx.VF,NxOFFX[3]^PNx.HF,NxOFFY[2:0] ^ {3{PNx.VF}} };
 		endcase
 		case (NxCHCN)
 			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};					//4bits/dot, 16 colors
@@ -1616,6 +1616,14 @@ package VDP2_PKG;
 			3'b100: addr = {          NxOFFY[7:0],NxOFFX[8:3],NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
+	
+		return addr;
+	endfunction
+	
+	function bit [19:1] NxLSAddr(input bit [8:0] SCRY, input bit [18:1] NxLSTA, input bit NxLSCX, input bit NxLSCY, input bit NxLZMX);
+		bit [19:1] addr;
+		
+		addr = {NxLSTA,1'b0} + {9'h000,SCRY,1'b0};
 	
 		return addr;
 	endfunction
@@ -1813,6 +1821,17 @@ package VDP2_PKG;
 	} RotCoord_t;
 	parameter ScrnStart_t ROCRD_NULL = {2'h0,14'h0000,10'h000,6'h00};
 	
+	function bit [29:0] MultFF(input bit [29:0] a, input bit [29:0] b);
+		bit [59:0] temp;
+		temp = $signed(a) * $signed(b);
+		return {temp[59],temp[44:16]};
+	endfunction
+	
+	function bit [29:0] MultFI(input bit [29:0] a, input bit [29:16] b);
+		bit [43:0] temp;
+		temp = $signed(a) * $signed(b);
+		return {temp[43],temp[28:0]};
+	endfunction
 	
 	function bit [19:1] RxPNAddr(input bit [11:0] OFFX, input bit [11:0] OFFY,
 	                             input bit [8:6] RxMP, input bit [5:0] RxMPA, input bit [5:0] RxMPB, input bit [5:0] RxMPC, input bit [5:0] RxMPD, 
@@ -1858,20 +1877,20 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] RxCHAddr(input PN_t PNx, input bit [2:0] RxCH_CNT, input bit RxOFFX3, input bit [10:0] OFFY, input bit [2:0] RxCHCN, input bit RxCHSZ);
+	function bit [19:1] RxCHAddr(input PN_t PNx, input bit [11:0] RxOFFX, input bit [11:0] RxOFFY, input bit [2:0] RxCHCN, input bit RxCHSZ);
 		bit   [19:1] addr;
 		bit    [4:0] cell_offs;
 
 		case (RxCHSZ)
-			1'b0: cell_offs = { 2'b00,                        OFFY[2:0] ^ {3{PNx.VF}} };
-			1'b1: cell_offs = { OFFY[3]^PNx.VF,RxOFFX3^PNx.HF,OFFY[2:0] ^ {3{PNx.VF}} };
+			1'b0: cell_offs = { 2'b00,                            RxOFFY[2:0] ^ {3{PNx.VF}} };
+			1'b1: cell_offs = { RxOFFY[3]^PNx.VF,RxOFFX[3]^PNx.HF,RxOFFY[2:0] ^ {3{PNx.VF}} };
 		endcase
 		case (RxCHCN)
 			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};					//4bits/dot, 16 colors
-			3'b001: addr = {PNx.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],RxCH_CNT[2:2],1'b0};	//8bits/dot, 256 colors
+			3'b001: addr = {PNx.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],RxOFFX[2:2],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {PNx.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],RxCH_CNT[2:1],1'b0};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {PNx.CHRN[14:0],4'b0000} + {10'b000000000,   cell_offs[4:0],RxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			3'b011: addr = {PNx.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],RxOFFX[2:1],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {PNx.CHRN[14:0],4'b0000} + {10'b000000000,   cell_offs[4:0],RxOFFX[2:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	
