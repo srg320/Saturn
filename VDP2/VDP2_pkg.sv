@@ -394,8 +394,8 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,180078,180088
 	{
-		bit [11: 0] UNUSED;
-		bit [ 3: 0] NxZMXI;
+		bit [12: 0] UNUSED;
+		bit [ 2: 0] NxZMXI;
 	} ZMXINx_t;
 	parameter bit [15:0] ZMXINx_MASK = 16'h0007;
 	
@@ -408,8 +408,8 @@ package VDP2_PKG;
 	
 	typedef struct packed	//RW,18007C,18008C
 	{
-		bit [11: 0] UNUSED;
-		bit [ 3: 0] NxZMYI;
+		bit [12: 0] UNUSED;
+		bit [ 2: 0] NxZMYI;
 	} ZMYINx_t;
 	parameter bit [15:0] ZMYINx_MASK = 16'h0007;
 	
@@ -1155,11 +1155,17 @@ package VDP2_PKG;
 		bit [ 5: 0] MPB;
 		bit [ 5: 0] MPC;
 		bit [ 5: 0] MPD;
+		bit [18: 0] SCX;
+		bit [18: 0] SCY;
+		bit [10: 0] ZMX;
+		bit [10: 0] ZMY;
 		bit [18: 1] LSTA;
-		bit         VCSC;
-		bit [18: 1] VCSTA;
 		bit         LSCX;
 		bit         LSCY;
+		bit         LZMX;
+		bit         VCSC;
+		bit [18: 1] VCSTA;
+		bit [ 1: 0] LSS;
 		bit         TPON;
 		bit         ON;
 		bit [ 2: 0] CAOS;
@@ -1251,6 +1257,26 @@ package VDP2_PKG;
 		S[2].MPD = REGS.MPCDN2.NxMPD;
 		S[3].MPD = REGS.MPCDN3.NxMPD;
 		
+		S[0].SCX = {REGS.SCXIN0.NxSCXI,REGS.SCXDN0.NxSCXD};
+		S[1].SCX = {REGS.SCXIN1.NxSCXI,REGS.SCXDN1.NxSCXD};
+		S[2].SCX = {REGS.SCXN2.NxSCX,8'h00};
+		S[3].SCX = {REGS.SCXN3.NxSCX,8'h00};
+		
+		S[0].SCY = {REGS.SCYIN0.NxSCYI,REGS.SCYDN0.NxSCYD};
+		S[1].SCY = {REGS.SCYIN1.NxSCYI,REGS.SCYDN1.NxSCYD};
+		S[2].SCY = {REGS.SCYN2.NxSCY,8'h00};
+		S[3].SCY = {REGS.SCYN3.NxSCY,8'h00};
+		
+		S[0].ZMX = {REGS.ZMXIN0.NxZMXI,REGS.ZMXDN0.NxZMXD};
+		S[1].ZMX = {REGS.ZMXIN1.NxZMXI,REGS.ZMXDN1.NxZMXD};
+		S[2].ZMX = '0;
+		S[3].ZMX = '0;
+		
+		S[0].ZMY = {REGS.ZMYIN0.NxZMYI,REGS.ZMYDN0.NxZMYD};
+		S[1].ZMY = {REGS.ZMYIN1.NxZMYI,REGS.ZMYDN1.NxZMYD};
+		S[2].ZMY = '0;
+		S[3].ZMY = '0;
+		
 		S[0].LSTA = {REGS.LSTA0U.LSTA,REGS.LSTA0L.LSTA};
 		S[1].LSTA = {REGS.LSTA1U.LSTA,REGS.LSTA1L.LSTA};
 		S[2].LSTA = '0;
@@ -1275,6 +1301,16 @@ package VDP2_PKG;
 		S[1].LSCY = REGS.SCRCTL.N1LSCY;
 		S[2].LSCY = '0;
 		S[3].LSCY = '0;
+		
+		S[0].LSS = REGS.SCRCTL.N0LSS;
+		S[1].LSS = REGS.SCRCTL.N1LSS;
+		S[2].LSS = '0;
+		S[3].LSS = '0;
+		
+		S[0].LZMX = REGS.SCRCTL.N0LZMX;
+		S[1].LZMX = REGS.SCRCTL.N1LZMX;
+		S[2].LZMX = '0;
+		S[3].LZMX = '0;
 		
 		S[0].TPON = REGS.BGON.N0TPON;
 		S[1].TPON = REGS.BGON.N1TPON;
@@ -1423,6 +1459,7 @@ package VDP2_PKG;
 		bit [ 0: 0] Rx;
 	} RVRAMAccess_t;
 	
+	typedef bit [10: 0] NxDispCoord_t[4];
 	typedef bit [ 1: 0] NxPNS_t[4];
 	typedef bit [ 1: 0] NxCHS_t[4];
 	typedef bit [ 2: 0] NxCHCNT_t[4];
@@ -1432,7 +1469,8 @@ package VDP2_PKG;
 	
 	typedef struct
 	{
-		bit [10: 0] N2X; 
+		NxDispCoord_t NxX; 
+		NxDispCoord_t NxY; 
 		bit [11: 0] R0X; 
 		bit [11: 0] R0Y;
 		bit [ 3: 0] NxA0PN;
@@ -1447,10 +1485,10 @@ package VDP2_PKG;
 		bit [ 1: 0] NxA1VS;
 		bit [ 1: 0] NxB0VS;
 		bit [ 1: 0] NxB1VS;
-		bit [ 3: 0] NxA0CPU;
-		bit [ 3: 0] NxA1CPU;
-		bit [ 3: 0] NxB0CPU;
-		bit [ 3: 0] NxB1CPU;
+		bit         NxA0CPU;
+		bit         NxA1CPU;
+		bit         NxB0CPU;
+		bit         NxB1CPU;
 		bit [ 1: 0] RxA0PN;
 		bit [ 1: 0] RxA1PN;
 		bit [ 1: 0] RxB0PN;
@@ -1464,8 +1502,11 @@ package VDP2_PKG;
 		bit [ 1: 0] RxB0CO;
 		bit [ 1: 0] RxB1CO;
 		bit         LS;
+		bit   [5:0] LS_POS;
 		bit         RPA;
 		bit   [6:2] RPA_POS;
+		bit         BS;
+		bit         LN;
 		bit [16: 1] VRAMA0_A; 
 		bit [16: 1] VRAMA1_A; 
 		bit [16: 1] VRAMB0_A; 
@@ -1535,7 +1576,7 @@ package VDP2_PKG;
 		bit [23: 0] D;
 		bit [ 2: 0] S;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {1'b0,1'b0,24'h000000,2'b00};
+	parameter ScreenDot_t SD_NULL = {1'b0,1'b0,24'h000000,3'b101};
 	
 	typedef struct packed
 	{
@@ -1620,12 +1661,23 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] NxLSAddr(input bit [8:0] SCRY, input bit [18:1] NxLSTA, input bit NxLSCX, input bit NxLSCY, input bit NxLZMX);
+	function bit [19:1] NxLSAddr(input bit [18:1] NxLSTA, input bit [19:2] LS_OFFS);
 		bit [19:1] addr;
 		
-		addr = {NxLSTA,1'b0} + {9'h000,SCRY,1'b0};
-	
+		addr = {NxLSTA,1'b0} + {LS_OFFS,1'b0};
 		return addr;
+	endfunction
+	
+	function bit [2:0] NxLSSMask(input bit [1:0] NxLSS);
+		bit [19:1] mask;
+		
+		case (NxLSS)
+			2'b00: mask = 3'b000;
+			2'b01: mask = 3'b001;
+			2'b10: mask = 3'b011;
+			2'b11: mask = 3'b111;
+		endcase
+		return mask;
 	endfunction
 	
 	function PN_t PNOneWord(input PNCNx_t PNC, input bit CHSZ, input bit [2:0] CHCN, input bit [15:0] DW);
