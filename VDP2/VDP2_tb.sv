@@ -31,7 +31,6 @@ module VDP2_tb;
 		
 		.RES_N(1'b1),
 		
-		.A('0),
 		.DI('0),
 		.DO(),
 		.CS_N(1'b1),

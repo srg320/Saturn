@@ -193,5 +193,105 @@ package VDP1_PKG;
 	} Size_t;
 	parameter Size_t SIZE_NULL = {11'h000,11'h000};
 	
+	function bit [18:1] SprAddr(input bit [9:0] X, input bit [8:0] Y, input CMDSIZE_t CMDSIZE, input bit [1:0] DIR, input CMDSRCA_t CMDSRCA, input bit [2:0] CM);
+		bit [18:1] ADDR;
+		bit  [9:0] offs_x;
+		bit  [8:0] offs_y;
+		bit [14:0] offs;
+		
+		offs_x = !DIR[0] ? X : {CMDSIZE.SX,3'b000} - X - 9'd1;
+		offs_y = !DIR[1] ? Y : CMDSIZE.SY - Y - 8'd1;
+		offs = (offs_y * CMDSIZE.SX);
+		case (CM)
+			3'b000,
+			3'b001:  ADDR = {CMDSRCA,2'b00} + {2'b00,offs,1'b0}   + offs_x[9:2];
+			3'b010,
+			3'b011,
+			3'b100:  ADDR = {CMDSRCA,2'b00} + {1'b0, offs,2'b00}  + offs_x[9:1];
+			default: ADDR = {CMDSRCA,2'b00} + {      offs,3'b000} + offs_x[9:0];
+		endcase
+		return ADDR;
+	endfunction
+	
+	function bit [15:0] GetPattern(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
+		bit [15:0] P;
+		
+		case (CM)
+			3'b000,
+			3'b001: begin
+				case (OFFSX)
+					2'b00: P = {12'h000,DATA[15:12]};
+					2'b01: P = {12'h000,DATA[11:8]};
+					2'b10: P = {12'h000,DATA[7:4]};
+					2'b11: P = {12'h000,DATA[3:0]};
+				endcase
+			end
+			3'b010,
+			3'b011,
+			3'b100: begin
+				case (OFFSX[0])
+					1'b0: P = {8'h00,DATA[15:8]};
+					1'b1: P = {8'h00,DATA[7:0]};
+				endcase
+			end
+			default: P = DATA;
+		endcase
+
+		return P;
+	endfunction
+	
+	function bit [14:0] ColorHalf(input bit [14:0] A);
+		bit [4:0] AR,AG,AB;
+		bit [4:0] HR,HG,HB;
+		
+		{AB,AG,AR} = A;
+		
+		HR = {1'b0,AR[4:1]};
+		HG = {1'b0,AG[4:1]};
+		HB = {1'b0,AB[4:1]};
+		return {HB,HG,HR};
+	endfunction
+	
+	function bit [14:0] ColorAdd(input bit [14:0] A, input bit [14:0] B);
+		bit [4:0] AR,AG,AB;
+		bit [4:0] BR,BG,BB;
+		bit [4:0] SR,SG,SB;
+		
+		{AB,AG,AR} = A;
+		{BB,BG,BR} = B;
+		
+		SR = AR + BR;
+		SG = AG + BG;
+		SB = AB + BB;
+		return {SB,SG,SR};
+	endfunction
+	
+	function bit [15:0] ColorCalc(input bit [15:0] ORIG, input bit [15:0] BACK, input bit [2:0] CCB);
+		bit [15:0] CC;
+		bit [14:0] ORIG_HALF,ORIG_ONE;
+		bit [14:0] BACK_HALF,BACK_ONE;
+		bit [14:0] A,B;
+		bit        MSB;
+		
+		ORIG_HALF = ColorHalf(ORIG[14:0]);
+		ORIG_ONE = ORIG[14:0];
+		BACK_HALF = ColorHalf(BACK[14:0]);
+		BACK_ONE = BACK[14:0];
+		
+		case (CCB)
+			3'b000: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end
+			3'b001: begin A = '0;                              B = BACK[15] ? BACK_HALF : BACK_ONE; MSB = BACK[15]; end
+			3'b010: begin A = ORIG_HALF;                       B = '0;                              MSB = ORIG[15]; end
+			3'b011: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15]; end
+			3'b100: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end//TODO Gouraud
+			3'b101: begin A = '0;                              B = BACK_ONE;                        MSB = BACK[15]; end
+			3'b110: begin A = ORIG_HALF;                       B = '0;                              MSB = ORIG[15]; end//TODO Gouraud
+			3'b111: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15]; end//TODO Gouraud
+		endcase
+		
+		CC = {MSB,ColorAdd(A,B)};		
+		return CC;
+	endfunction
+
 	
 endpackage

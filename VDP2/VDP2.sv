@@ -19,6 +19,10 @@ module VDP2 (
 	output            VINT_N,
 	output            HINT_N,
 	
+	output            HTIM_N,
+	output            VTIM_N,
+	input      [15:0] FBD,
+	
 	output     [16:1] RA0_A,
 	output     [15:0] RA0_D,
 	input      [31:0] RA0_Q,
@@ -52,13 +56,14 @@ module VDP2 (
 	output reg        HBL_N,
 	output reg        VBL_N,
 	
-	input       [4:0] SCRN_EN,
+	input       [5:0] SCRN_EN,
 	
 	output VRAMAccessState_t VA_PIPE0,
 	output NVRAMAccess_t NBG_A0VA_DBG,
 	output RxCHD_t CH_PIPE0,
 	output RxCHD_t CH_PIPE1,
 	output RxCHD_t CH_PIPE2,
+	output DotData_t SDOT_DBG,
 	output DotData_t R0DOT_DBG,
 	output DotData_t N0DOT_DBG,
 	output DotData_t N1DOT_DBG,
@@ -133,18 +138,11 @@ module VDP2 (
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			DOTCLK_DIV <= '0;
-//			DOT_CE <= 0;
 		end
 		else begin
-//			DOT_CE <= 0;
-//			DOTH_CE <= 0;
-			
 			DOTCLK_DIV <= DOTCLK_DIV + 3'd1;
-//			if (DOTCLK_DIV == 7) DOT_CE <= 1;
-//			if (DOTCLK_DIV == 3) DOTH_CE <= 1;
 		end
 	end
-	
 	assign DOT_CE = (DOTCLK_DIV == 7);
 	assign DOTH_CE = (DOTCLK_DIV == 3);
 	
@@ -176,12 +174,14 @@ module VDP2 (
 					V_CNT <= '0;
 				end
 			end
+			
 			if (H_CNT == HS_START-1) begin
 				HS_N <= 0;
-			end else if (HS_END-1) begin
+			end else if (H_CNT == HS_END-1) begin
 				HS_N <= 1;
 			end
-			if (H_CNT == HBL_START-1+20) begin
+			
+			if (H_CNT == HBL_START-1+32) begin
 				HBLANK <= 1;
 				if (V_CNT == VS_START-1) begin
 					VS_N <= 0;
@@ -194,13 +194,27 @@ module VDP2 (
 					VBLANK <= 0;
 					ODD <= ~ODD;
 				end
-			end else if (H_CNT == 20-1) begin
+			end else if (H_CNT == 32-1) begin
 				HBLANK <= 0;
 			end
 		end
 	end
 	assign VBL_N = ~VBLANK;
 	assign HBL_N = ~HBLANK;
+	
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			HTIM_N <= 1;
+		end
+		else if (DOT_CE) begin
+			if (H_CNT == 9'h1A1) begin
+				HTIM_N <= 0;
+			end else if (H_CNT == 9'h020-1) begin
+				HTIM_N <= 1;
+			end
+		end
+	end
+	assign VTIM_N = ~VBLANK;
 	
 	
 	bit BG_FETCH;
@@ -218,7 +232,7 @@ module VDP2 (
 		else if (DOT_CE) begin
 			if (H_CNT == HRES-1 && !VBLANK) begin
 				BG_FETCH <= 1;
-			end else if (H_CNT == HBL_START-1) begin
+			end else if (H_CNT == 9'h140-1) begin
 				BG_FETCH <= 0;
 			end
 			
@@ -1444,17 +1458,20 @@ module VDP2 (
 	wire [3:0] N1DOTN = {1'b0,SCRX[2:0]} + {1'b0,SCX[1].INT[2:0]};
 	wire [3:0] N2DOTN = {1'b0,SCRX[2:0]} + {1'b0,SCX[2].INT[2:0]};
 	wire [3:0] N3DOTN = {1'b0,SCRX[2:0]} + {1'b0,SCX[3].INT[2:0]};
-	ScreenDot_t DOT_FST[2], DOT_SEC[2], DOT_THD[2], DOT_FTH[2];
-	DotData_t R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
+	ScreenDot_t DOT_FST, DOT_SEC, DOT_THD, DOT_FTH;
+	DotData_t SDOT, R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
 	always @(posedge CLK or negedge RST_N) begin
 		ScreenDot_t FST, SEC, THD, FTH;
 		bit  [2:0]  FST_PRI, SEC_PRI, THD_PRI, FTH_PRI;
 		
 		if (!RST_N) begin
-			DOT_FST <= '{2{SD_NULL}};
-			DOT_SEC <= '{2{SD_NULL}};
-			DOT_THD <= '{2{SD_NULL}};
-			DOT_FTH <= '{2{SD_NULL}};
+			DOT_FST <= SD_NULL;
+			DOT_SEC <= SD_NULL;
+			DOT_THD <= SD_NULL;
+			DOT_FTH <= SD_NULL;
+		end
+		else if (DOTH_CE) begin
+			SDOT <= FBD[15] ? {1'b0,|FBD,Color555To888(FBD)} : {1'b1,|FBD,8'h00,FBD};
 		end
 		else if (DOT_CE) begin
 			R0DOT = R0DB[R0DOTN];
@@ -1468,14 +1485,22 @@ module VDP2 (
 			THD = {1'b0,1'b1,BACK_COL,3'b101}; THD_PRI = 3'd0;
 			FTH = {1'b0,1'b1,BACK_COL,3'b101}; FTH_PRI = 3'd0;
 			if (REGS.TVMD.DISP) begin
-				if (R0DOT.TP && RSxREG[0].PRIN && RSxREG[0].ON && SCRN_EN[4]) begin
+				if (SDOT.TP && REGS.PRISA.S0PRIN && SCRN_EN[5]) begin
+					FST = {SDOT,3'd5}; FST_PRI = REGS.PRISA.S0PRIN;
+				end
+				
+				if (R0DOT.TP && RSxREG[0].PRIN && RSxREG[0].PRIN > FST_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
 					FST = {R0DOT,3'd4}; FST_PRI = RSxREG[0].PRIN;
+				end else if (R0DOT.TP && RSxREG[0].PRIN && RSxREG[0].PRIN > SEC_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
+					SEC = {R0DOT,3'd4}; SEC_PRI = RSxREG[0].PRIN;
 				end
 				
 				if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > FST_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
 					FST = {N0DOT,3'd0}; FST_PRI = NSxREG[0].PRIN;
 				end else if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > SEC_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
 					SEC = {N0DOT,3'd0}; SEC_PRI = NSxREG[0].PRIN;
+				end else if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > THD_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
+					THD = {N0DOT,3'd0}; THD_PRI = NSxREG[0].PRIN;
 				end
 				
 				if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > FST_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
@@ -1484,6 +1509,8 @@ module VDP2 (
 					SEC = {N1DOT,3'd1}; SEC_PRI = NSxREG[1].PRIN;
 				end else if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > THD_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
 					THD = {N1DOT,3'd1}; THD_PRI = NSxREG[1].PRIN;
+				end else if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > FTH_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
+					FTH = {N1DOT,3'd1}; FTH_PRI = NSxREG[1].PRIN;
 				end
 				
 				if (N2DOT.TP && NSxREG[2].PRIN && NSxREG[2].PRIN > FST_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
@@ -1507,50 +1534,54 @@ module VDP2 (
 				end
 			end
 			
-			DOT_FST[0] <= FST;
-			DOT_SEC[0] <= SEC;
-			DOT_THD[0] <= THD;
-			DOT_FTH[0] <= FTH;
-			DOT_FST[1] <= DOT_FST[0];
-			DOT_SEC[1] <= DOT_SEC[0];
-			DOT_THD[1] <= DOT_THD[0];
-			DOT_FTH[1] <= DOT_THD[0];
+			DOT_FST <= FST;
+			DOT_SEC <= SEC;
+			DOT_THD <= THD;
+			DOT_FTH <= FTH;
 		end
 	end
 	
+	assign SDOT_DBG = SDOT;
 	assign R0DOT_DBG = R0DOT;
 	assign N0DOT_DBG = N0DOT;
 	assign N1DOT_DBG = N1DOT;
 	assign N2DOT_DBG = N2DOT;
 	assign N3DOT_DBG = N3DOT;
-	assign DOT_FST_DBG = DOT_FST[0];
-	assign DOT_SEC_DBG = DOT_SEC[0];
-	assign DOT_THD_DBG = DOT_THD[0];
+	assign DOT_FST_DBG = DOT_FST;
+	assign DOT_SEC_DBG = DOT_SEC;
+	assign DOT_THD_DBG = DOT_THD;
 	
 	
 	bit [10:0] PAL_N;
+	always_comb begin
+		ScreenDot_t DOT;
+		bit  [2:0] CAOS;
+		
+		case (DOTCLK_DIV[2:1])
+			2'b00: DOT = DOT_FST;
+			2'b01: DOT = DOT_SEC;
+			2'b10: DOT = DOT_THD;
+			2'b11: DOT = DOT_FTH;
+		endcase
+		case (DOT.S)
+			3'b000: CAOS = NSxREG[0].CAOS;
+			3'b001: CAOS = NSxREG[1].CAOS;
+			3'b010: CAOS = NSxREG[2].CAOS;
+			3'b011: CAOS = NSxREG[3].CAOS;
+			3'b100: CAOS = REGS.CRAOFB.R0CAOS;
+			3'b101: CAOS = REGS.CRAOFB.SPCAOS;
+			default:CAOS = '0;
+		endcase
+		PAL_N = {CAOS,8'b00000000} + DOT.D[10:0];
+	end
+	
+	
+	Color_t PAL_COL_FST, PAL_COL_SEC, PAL_COL_THD, PAL_COL_FTH;
+	Color_t    CF, CS;
 	bit        COEN;
 	bit        COSL;
 	bit  [4:0] CCRT;
 	bit        CCEN;
-	always_comb begin
-		case (DOTCLK_DIV[2:1])
-			2'b00: PAL_N = {!DOT_FST[0].S[2] ? NSxREG[DOT_FST[0].S].CAOS : REGS.CRAOFB.R0CAOS,8'b00000000} + DOT_FST[0].D[10:0];
-			2'b01: PAL_N = {!DOT_SEC[0].S[2] ? NSxREG[DOT_SEC[0].S].CAOS : REGS.CRAOFB.R0CAOS,8'b00000000} + DOT_SEC[0].D[10:0];
-			2'b10: PAL_N = {!DOT_THD[0].S[2] ? NSxREG[DOT_THD[0].S].CAOS : REGS.CRAOFB.R0CAOS,8'b00000000} + DOT_THD[0].D[10:0];
-			2'b11: PAL_N = {!DOT_FTH[0].S[2] ? NSxREG[DOT_FTH[0].S].CAOS : REGS.CRAOFB.R0CAOS,8'b00000000} + DOT_FTH[0].D[10:0];
-		endcase
-		
-		COEN = NSxREG[DOT_FST[1].S].COEN;
-		COSL = NSxREG[DOT_FST[1].S].COSL;
-		CCEN = NSxREG[DOT_FST[1].S].CCEN;
-		CCRT = NSxREG[DOT_FST[1].S].CCRT;
-	end
-	assign CCEN_DBG = CCEN;
-	assign CCRT_DBG = CCRT;
-	
-	
-	Color_t PAL_COL_FST, PAL_COL_SEC, PAL_COL_THD, PAL_COL_FTH;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [23:0] PAL;
 		Color_t PAL_COL_FST_TEMP, PAL_COL_SEC_TEMP, PAL_COL_THD_TEMP;
@@ -1577,25 +1608,36 @@ module VDP2 (
 				PAL_COL_FST <= PAL_COL_FST_TEMP;
 				PAL_COL_SEC <= PAL_COL_SEC_TEMP;
 				PAL_COL_THD <= PAL_COL_THD_TEMP;
+				case (DOT_FST.S)
+					3'b000: begin COEN <= NSxREG[0].COEN; COSL <= NSxREG[0].COSL; CCEN <= NSxREG[0].CCEN; CCRT <= NSxREG[0].CCRT; end
+					3'b001: begin COEN <= NSxREG[1].COEN; COSL <= NSxREG[1].COSL; CCEN <= NSxREG[1].CCEN; CCRT <= NSxREG[1].CCRT; end
+					3'b010: begin COEN <= NSxREG[2].COEN; COSL <= NSxREG[2].COSL; CCEN <= NSxREG[2].CCEN; CCRT <= NSxREG[2].CCRT; end
+					3'b011: begin COEN <= NSxREG[3].COEN; COSL <= NSxREG[3].COSL; CCEN <= NSxREG[3].CCEN; CCRT <= NSxREG[3].CCRT; end
+					3'b100: begin COEN <= RSxREG[0].COEN; COSL <= RSxREG[0].COSL; CCEN <= RSxREG[0].CCEN; CCRT <= RSxREG[0].CCRT; end
+					3'b101: begin COEN <= REGS.CLOFEN.SPCOEN; COSL <= REGS.CLOFSL.SPCOSL; CCEN <= REGS.CCCTL.SPCCEN; CCRT <= REGS.CCRSA.S0CCRT; end
+					default:begin COEN <= 0; COSL <= 0; CCEN <= 0; CCRT <= '0; end
+				endcase
+				CF <= !DOT_FST.P ? DOT_FST.D : PAL_COL_FST_TEMP;
+				CS <= !DOT_SEC.P ? DOT_SEC.D : PAL_COL_SEC_TEMP;
 			end
 		end
 	end
+	assign CCEN_DBG = CCEN;
+	assign CCRT_DBG = CCRT;
 	
 	DotColor_t DCOL;
 	always @(posedge CLK or negedge RST_N) begin
-		Color_t CF, CS, CC;
+		Color_t CC;
 		
 		if (!RST_N) begin
 			DCOL <= DC_NULL;
 		end
 		else if (DOT_CE) begin
-			CF = !DOT_FST[1].P ? DOT_FST[1].D : PAL_COL_FST;
-			CS = !DOT_SEC[1].P ? DOT_SEC[1].D : PAL_COL_SEC;
 			CC = ColorCalc(CF, CS, CCRT, CCEN, REGS.CCCTL.CCMD);
 			DCOL.B <= ColorOffset(CC.B, REGS.COAB.COBL, REGS.COBB.COBL, COEN, COSL); 
 			DCOL.G <= ColorOffset(CC.G, REGS.COAG.COGR, REGS.COBG.COGR, COEN, COSL); 
 			DCOL.R <= ColorOffset(CC.R, REGS.COAR.CORD, REGS.COBR.CORD, COEN, COSL); 
-			DCOL.TP <= DOT_FST[1].TP;
+//			DCOL.TP <= DOT_FST[1].TP;
 		end
 	end
 

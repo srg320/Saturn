@@ -74,7 +74,7 @@ module Saturn (
 	
 	input      [15:0] JOY1,
 	
-	input       [4:0] SCRN_EN,
+	input       [5:0] SCRN_EN,
 	
 	output      [7:0] DBG_WAIT_CNT
 );
@@ -206,9 +206,12 @@ module Saturn (
 	
 	//VDP1
 	bit  [15:0] VDP1_DO;
+	bit  [15:0] VOUT;
 	
 	//VDP2
 	bit  [15:0] VDP2_DO;
+	bit         HTIM_N;
+	bit         VTIM_N;
 	
 	//SCSP
 	bit  [15:0] SCSP_DO;
@@ -588,9 +591,10 @@ module Saturn (
 		
 		.IRQ_N(IRQ1_N), 
 		
-		.VTIM_N(IRQV_N),
-		.HTIM_N(IRQH_N),
-		.VOUT(),
+		.DCLK(DCLK),
+		.VTIM_N(VTIM_N),
+		.HTIM_N(HTIM_N),
+		.VOUT(VOUT),
 		
 		.VRAM_A(VDP1_VRAM_A),
 		.VRAM_D(VDP1_VRAM_D),
@@ -631,6 +635,10 @@ module Saturn (
 		
 		.VINT_N(IRQV_N),
 		.HINT_N(IRQH_N),
+		
+		.HTIM_N(HTIM_N),
+		.VTIM_N(VTIM_N),
+		.FBD(VOUT),
 		
 		.RA0_A(VDP2_RA0_A),
 		.RA0_D(VDP2_RA0_D),
