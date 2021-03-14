@@ -1,7 +1,7 @@
 module COL_TBL (
 	input         CLK,
-	input	  [3:0] WRADDR,
-	input	 [15:0] DATA,
+	input	  [3:1] WRADDR,
+	input	 [31:0] DATA,
 	input	        WREN,
 	input	  [3:0] RDADDR,
 	output [15:0] Q);
@@ -12,10 +12,10 @@ module COL_TBL (
 	
 `ifdef SIM
 	
-	reg [15:0] MEM [16];
+	reg [31:0] MEM [8];
 
 	initial begin
-		MEM = '{16{'0}};
+		MEM = '{8{'0}};
 	end
 	
 	always @(posedge CLK) begin
@@ -24,18 +24,18 @@ module COL_TBL (
 		end
 	end
 		
-	assign Q = MEM[RDADDR];
+	assign Q = !RDADDR[0] ? MEM[RDADDR][31:16] : MEM[RDADDR][15:0];
 	
 `else
 
-	wire [15:0] sub_wire0;
+	wire [15:0] sub_wire0,sub_wire1;
 
-	altdpram	altdpram_component (
-				.data (DATA),
+	altdpram	altdpram0 (
+				.data (DATA[31:16]),
 				.inclock (CLK),
 				.outclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
+				.rdaddress (RDADDR[3:1]),
+				.wraddress (WRADDR[3:1]),
 				.wren (WREN),
 				.q (sub_wire0),
 				.aclr (1'b0),
@@ -47,27 +47,64 @@ module COL_TBL (
 				//.sclr (1'b0),
 				.wraddressstall (1'b0));
 	defparam
-		altdpram_component.indata_aclr = "OFF",
-		altdpram_component.indata_reg = "INCLOCK",
-		altdpram_component.intended_device_family = "Cyclone V",
-		altdpram_component.lpm_type = "altdpram",
-		altdpram_component.outdata_aclr = "OFF",
-		altdpram_component.outdata_reg = "UNREGISTERED",
-		altdpram_component.ram_block_type = "MLAB",
-		altdpram_component.rdaddress_aclr = "OFF",
-		altdpram_component.rdaddress_reg = "UNREGISTERED",
-		altdpram_component.rdcontrol_aclr = "OFF",
-		altdpram_component.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component.width = 16,
-		altdpram_component.widthad = 4,
-		altdpram_component.width_byteena = 1,
-		altdpram_component.wraddress_aclr = "OFF",
-		altdpram_component.wraddress_reg = "INCLOCK",
-		altdpram_component.wrcontrol_aclr = "OFF",
-		altdpram_component.wrcontrol_reg = "INCLOCK";
+		altdpram0.indata_aclr = "OFF",
+		altdpram0.indata_reg = "INCLOCK",
+		altdpram0.intended_device_family = "Cyclone V",
+		altdpram0.lpm_type = "altdpram",
+		altdpram0.outdata_aclr = "OFF",
+		altdpram0.outdata_reg = "UNREGISTERED",
+		altdpram0.ram_block_type = "MLAB",
+		altdpram0.rdaddress_aclr = "OFF",
+		altdpram0.rdaddress_reg = "UNREGISTERED",
+		altdpram0.rdcontrol_aclr = "OFF",
+		altdpram0.rdcontrol_reg = "UNREGISTERED",
+		altdpram0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram0.width = 16,
+		altdpram0.widthad = 3,
+		altdpram0.width_byteena = 1,
+		altdpram0.wraddress_aclr = "OFF",
+		altdpram0.wraddress_reg = "INCLOCK",
+		altdpram0.wrcontrol_aclr = "OFF",
+		altdpram0.wrcontrol_reg = "INCLOCK";
 	
-	assign Q = sub_wire0[15:0];
+	altdpram	altdpram1 (
+				.data (DATA[15:0]),
+				.inclock (CLK),
+				.outclock (CLK),
+				.rdaddress (RDADDR[3:1]),
+				.wraddress (WRADDR[3:1]),
+				.wren (WREN),
+				.q (sub_wire1),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.outclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+				//.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram1.indata_aclr = "OFF",
+		altdpram1.indata_reg = "INCLOCK",
+		altdpram1.intended_device_family = "Cyclone V",
+		altdpram1.lpm_type = "altdpram",
+		altdpram1.outdata_aclr = "OFF",
+		altdpram1.outdata_reg = "UNREGISTERED",
+		altdpram1.ram_block_type = "MLAB",
+		altdpram1.rdaddress_aclr = "OFF",
+		altdpram1.rdaddress_reg = "UNREGISTERED",
+		altdpram1.rdcontrol_aclr = "OFF",
+		altdpram1.rdcontrol_reg = "UNREGISTERED",
+		altdpram1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram1.width = 16,
+		altdpram1.widthad = 3,
+		altdpram1.width_byteena = 1,
+		altdpram1.wraddress_aclr = "OFF",
+		altdpram1.wraddress_reg = "INCLOCK",
+		altdpram1.wrcontrol_aclr = "OFF",
+		altdpram1.wrcontrol_reg = "INCLOCK";
+		
+	assign Q = !RDADDR[0] ? sub_wire0 : sub_wire1;
 	
 `endif
 

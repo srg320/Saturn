@@ -39,7 +39,9 @@ module SCSP (
 	output     [18:1] RAM_A,
 	output     [15:0] RAM_D,
 	input      [15:0] RAM_Q,
-	output      [1:0] RAM_WE
+	output      [1:0] RAM_WE,
+	output            RAM_RD,
+	input             RAM_RDY
 );
 	import SCSP_PKG::*;
 	
@@ -75,10 +77,10 @@ module SCSP (
 	bit        DMA_WR;
 	
 	typedef enum bit [4:0] {
-		MS_IDLE = 5'b00001,  
-		MS_ACCESS = 5'b00010, 
-		MS_END  = 5'b00100,
-		MS_WAIT = 5'b01000
+		MS_IDLE     = 5'b00001,  
+		MS_WAIT     = 5'b00010, 
+		MS_SCU_WAIT = 5'b00100, 
+		MS_END      = 5'b01000
 	} MemState_t;
 	MemState_t MEM_ST;
 	
@@ -86,6 +88,7 @@ module SCSP (
 	bit [15:0] MEM_D;
 	bit [15:0] MEM_Q;
 	bit  [1:0] MEM_WE;
+	bit        MEM_RD;
 	
 	bit [11:1] REG_A;
 	bit [15:0] REG_D;
@@ -368,52 +371,75 @@ module SCSP (
 	
 	//RAM access
 	wire SCU_RAM_SEL = ~A[20] & ~DTEN_N & ~AD_N & ~CS_N;	//25A00000-25AFFFFF
-	bit MEM_RDY;
+//	bit MEM_RDY;
+	bit SCU_RAM_PEND;
 	always @(posedge CLK or negedge RST_N) begin
+		bit SCU_RAM_SEL_OLD;
+		
 		if (!RST_N) begin
 			MEM_ST <= MS_IDLE;
 			MEM_A <= '0;
 			MEM_D <= '0;
 			MEM_WE <= '0;
+			MEM_RD <= 0;
 			SCDTACK_N <= 1;
-			MEM_RDY <= 1;
+			SCU_RAM_PEND <= 0;
 		end
 		else begin
+			SCU_RAM_SEL_OLD <= SCU_RAM_SEL;
+			if (SCU_RAM_SEL && !SCU_RAM_SEL_OLD && !SCU_RAM_PEND) SCU_RAM_PEND <= 1;
+			
 			case (MEM_ST)
 				MS_IDLE: begin
-					if (WD_READ) begin
+					/*if (WD_READ) begin
 						MEM_A <= ADP[18:1];
 						MEM_D <= '0;
 						MEM_WE <= '0;
+						MEM_RD <= 1;
 						MEM_ST <= MS_WAIT;
 					end else if (DMA_ACCESS) begin
 						MEM_A <= DMA_A;
 						MEM_D <= DMA_DAT;
 						MEM_WE <= {2{DMA_WR}};
+						MEM_RD <= ~DMA_WR;
 						MEM_ST <= MS_WAIT;
-					end else if (SCU_RAM_SEL) begin
+					end else*/ if (SCU_RAM_PEND) begin
 						MEM_A <= A[18:1];
 						MEM_D <= DI;
 						MEM_WE <= ~WE_N;
-						MEM_ST <= MS_WAIT;
-						MEM_RDY <= 0;
+						MEM_RD <= &WE_N;
+						MEM_ST <= MS_SCU_WAIT;
 					end else if (SCA[20] & !SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N) begin
 						MEM_A <= SCA[18:1];
 						MEM_D <= SCDI;
 						MEM_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
+						MEM_RD <= SCRW_N;
 						MEM_ST <= MS_WAIT;
 					end
 				end
 				
 				MS_WAIT: begin
-					MEM_ST <= MS_ACCESS;
+					if (RAM_RDY) begin
+						MEM_Q <= RAM_Q;
+						MEM_WE <= '0;
+						MEM_RD <= 0;
+						MEM_ST <= MS_END;
+					end
 				end
 				
-				MS_ACCESS: begin
-					MEM_Q <= RAM_Q;
-					MEM_WE <= '0;
+				MS_SCU_WAIT: begin
+					if (RAM_RDY) begin
+						MEM_Q <= RAM_Q;
+						MEM_WE <= '0;
+						MEM_RD <= 0;
+						SCU_RAM_PEND <= 0;
+						MEM_ST <= MS_END;
+						if (MEM_A == 18'h00700>>1) MEM_Q[15:8] <= '0;
+					end
+				end
+				
+				MS_END: begin
 					MEM_ST <= MS_IDLE;
-					MEM_RDY <= 1;
 				end
 				
 				default:;
@@ -425,6 +451,7 @@ module SCSP (
 	assign RAM_A = MEM_A;
 	assign RAM_D = MEM_D;
 	assign RAM_WE = MEM_WE;
+	assign RAM_RD = MEM_RD;
 	
 	//Registers
 	bit [20:0] A;
@@ -677,7 +704,7 @@ module SCSP (
 	end
 	
 	assign DO = SCU_REG_SEL ? REG_Q : MEM_Q;
-	assign RDY_N = ~((SCU_RAM_SEL & MEM_RDY) | SCU_REG_SEL);
+	assign RDY_N = ~((SCU_RAM_SEL & ~SCU_RAM_PEND) | SCU_REG_SEL);
 	
 	assign SCIPL_N = '1;
 	assign SCDO = MEM_Q;

@@ -5,6 +5,8 @@ module Saturn (
 	
 	input             SRES_N,
 	
+	input             TIME_SET,
+	
 	output     [24:0] MEM_A,
 	input      [31:0] MEM_DI,
 	output     [31:0] MEM_DO,
@@ -17,10 +19,11 @@ module Saturn (
 	
 	output     [18:1] VDP1_VRAM_A,
 	output     [15:0] VDP1_VRAM_D,
-	input      [15:0] VDP1_VRAM_Q,
+	input      [31:0] VDP1_VRAM_Q,
 	output      [1:0] VDP1_VRAM_WE,
 	output            VDP1_VRAM_RD,
-	input             VDP1_VRAM_RDY,
+	input             VDP1_VRAM_ARDY,
+	input             VDP1_VRAM_DRDY,
 	
 	output     [17:1] VDP1_FB0_A,
 	output     [15:0] VDP1_FB0_D,
@@ -62,6 +65,8 @@ module Saturn (
 	output     [15:0] SCSP_RAM_D,
 	output      [1:0] SCSP_RAM_WE,
 	input      [15:0] SCSP_RAM_Q,
+	output            SCSP_RAM_RD,
+	input             SCSP_RAM_RDY,
 	
 	output      [7:0] R,
 	output      [7:0] G,
@@ -537,6 +542,7 @@ module Saturn (
 		.CE(SMPC_CE),
 		
 		.MRES_N(MRES_N),
+		.TIME_SET(TIME_SET),
 		
 		.AC(4'h4),	//North America area
 		
@@ -601,7 +607,8 @@ module Saturn (
 		.VRAM_WE(VDP1_VRAM_WE),
 		.VRAM_RD(VDP1_VRAM_RD),
 		.VRAM_Q(VDP1_VRAM_Q),
-		.VRAM_RDY(VDP1_VRAM_RDY),
+		.VRAM_ARDY(VDP1_VRAM_ARDY),
+		.VRAM_DRDY(VDP1_VRAM_DRDY),
 		
 		.FB0_A(VDP1_FB0_A),
 		.FB0_D(VDP1_FB0_D),
@@ -725,7 +732,9 @@ module Saturn (
 		.RAM_A(SCSP_RAM_A),
 		.RAM_D(SCSP_RAM_D),
 		.RAM_WE(SCSP_RAM_WE),
-		.RAM_Q(SCSP_RAM_Q)
+		.RAM_RD(SCSP_RAM_RD),
+		.RAM_Q(SCSP_RAM_Q),
+		.RAM_RDY(SCSP_RAM_RDY)
 	);
 	
 	fx68k M68K

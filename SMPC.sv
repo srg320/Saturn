@@ -4,6 +4,7 @@ module SMPC (
 	input             CE,
 	
 	input             MRES_N,
+	input             TIME_SET,
 	
 	input       [3:0] AC,
 	
@@ -103,7 +104,7 @@ module SMPC (
 			CDRES_N <= 0;
 			MIRQ_N <= 1;
 			RESD <= 1;
-			STE <= 0;
+			STE <= TIME_SET;/////////////////
 			
 			REG_DO <= '0;
 			RW_N_OLD <= 1;
