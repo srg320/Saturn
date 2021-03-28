@@ -7,13 +7,6 @@ module SCSP (
 	
 	input             CE_R,
 	input             CE_F,
-//	input      [20:0] A,
-//	input      [15:0] DI,
-//	output     [15:0] DO,
-//	input             CS_N,
-//	input       [1:0] WE_N,
-//	input             RD_N,
-//	output            RDY_N,
 	input      [15:0] DI,
 	output     [15:0] DO,
 	input             CS_N,
@@ -33,7 +26,7 @@ module SCSP (
 	input             SCUDS_N,
 	output reg        SCDTACK_N,
 	input       [2:0] SCFC,
-	input             SCAVEC_N,
+	output            SCAVEC_N,
 	output      [2:0] SCIPL_N,
 
 	output     [18:1] RAM_A,
@@ -41,7 +34,13 @@ module SCSP (
 	input      [15:0] RAM_Q,
 	output      [1:0] RAM_WE,
 	output            RAM_RD,
-	input             RAM_RDY
+	output            RAM_CS,
+	input             RAM_RDY,
+	
+	output     [15:0] SOUND_L,
+	output     [15:0] SOUND_R,
+	
+	output     [23:0] SCA_DBG
 );
 	import SCSP_PKG::*;
 	
@@ -68,7 +67,7 @@ module SCSP (
 	CR19_t     CR19;
 	STACK_t    STACK;
 	
-	bit [19:0] ADP;
+	bit [18:0] ADP;
 	
 	bit        WD_READ;
 	bit        DMA_ACCESS;
@@ -76,25 +75,31 @@ module SCSP (
 	bit [15:0] DMA_DAT;
 	bit        DMA_WR;
 	
-	typedef enum bit [4:0] {
-		MS_IDLE     = 5'b00001,  
-		MS_WAIT     = 5'b00010, 
-		MS_SCU_WAIT = 5'b00100, 
-		MS_END      = 5'b01000
+	typedef enum bit [6:0] {
+		MS_IDLE     = 7'b0000001,  
+		MS_WAIT     = 7'b0000010, 
+		MS_SCU_WAIT = 7'b0000100, 
+		MS_SCPU_WAIT= 7'b0001000,
+		MS_SCPU_END = 7'b0010000,
+		MS_END      = 7'b0100000
 	} MemState_t;
 	MemState_t MEM_ST;
 	
-	bit [18:1] MEM_A;
+	bit [20:1] MEM_A;
 	bit [15:0] MEM_D;
 	bit [15:0] MEM_Q;
 	bit  [1:0] MEM_WE;
 	bit        MEM_RD;
-	
-	bit [11:1] REG_A;
-	bit [15:0] REG_D;
+	bit        MEM_CS;
+	bit        REG_CS;
+//	
+//	bit [11:1] REG_A;
+//	bit [15:0] REG_D;
 	bit [15:0] REG_Q;
-	bit  [1:0] REG_WE;
-	bit        REG_RD;
+//	bit  [1:0] REG_WE;
+//	bit        REG_RD;
+	
+	bit [20:0] SCU_A;
 	
 	bit  [3:0] CLK_CNT;
 	always @(posedge CLK) if (CE) CLK_CNT <= CLK_CNT + 4'd1;
@@ -113,43 +118,17 @@ module SCSP (
 			DMA_A = '0;
 			DMA_DAT <= '0;
 			DMA_WR <= '0;
-			REG_RD <= 0;
 			DMA_ACCESS <= 0;
 		end
 		else if (CE) begin
 			DMA_A = '0;
 			DMA_DAT <= '0;
 			DMA_WR <= '0;
-			REG_RD <= 0;
 			DMA_ACCESS <= 0;
 		end
 	end
 	
-	wire SCU_REG_SEL = A[20] & ~DTEN_N & ~AD_N & ~CS_N;	//25B00000-25BFFFFF
-	wire M68K_REG_SEL = SCA[23:20] == 4'h1 & !SCAS_N && (!SCLDS_N || !SCUDS_N);	//100000-1FFFFF
-	always_comb begin
-		REG_A = '0;
-		REG_D <= '0;
-		REG_WE <= '0;
-		REG_RD <= 0;
-		if (DMA_REG_SEL) begin
-			REG_A = DMA_A[11:1];
-			REG_D <= DMA_DAT;
-			REG_WE <= {2{DMA_WR}};
-			REG_RD <= ~DMA_WR;
-		end else if (SCU_REG_SEL) begin
-			REG_A = A[11:1];
-			REG_D <= DI;
-			REG_WE <= ~WE_N;
-			REG_RD <= ~|WE_N;
-		end else if (M68K_REG_SEL) begin
-			REG_A <= SCA[11:1];
-			REG_D <= SCDI;
-			REG_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
-			REG_RD <= SCRW_N;
-		end
-	end
-	wire REG_SEL = DMA_REG_SEL | SCU_REG_SEL | M68K_REG_SEL;
+	
 
 	
 	OPPipe_t    OP2_PIPE;
@@ -161,9 +140,9 @@ module SCSP (
 	
 	//Operation 1: PG
 	//KEY ON/OFF
-	wire KYONEX_SET = REG_SEL & (REG_A ==? 11'b00?????0000) & REG_D[12] & REG_WE[0];
+	wire KYONEX_SET = REG_CS & (MEM_A ==? 11'b00?????0000) & MEM_D[12] & MEM_WE[0];
 	bit KEYON[32], KEYOFF[32];
-	bit [14: 0] PHASE;
+	bit [24: 0] PHASE;
 	always @(posedge CLK or negedge RST_N) begin
 		bit       KYONEX;
 		bit [4:0] SLOT;
@@ -203,7 +182,7 @@ module SCSP (
 	bit [15:0] LA;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [15:0] MD;
-		bit [15:0] TEMP;
+		bit [24:0] TEMP;
 		bit [15:0] LL;
 		bit [ 4:0] S;
 		
@@ -216,20 +195,20 @@ module SCSP (
 		else begin
 			S = OP2_PIPE.SLOT;
 			MD = MDCalc(STACK, SCR[S].SCR4);
-			TEMP = {1'b0,PHASE} + $signed(MD);
+			TEMP = PHASE + {{9{MD[15]}},MD};
 			
 			WD_READ <= 0;
 			if (CYCLE_CE) begin
 				LL = SCR[S].LEA - SCR[S].LSA;
 				if (OP2_PIPE.KON) begin
-					ADP <= {SCR[S].SCR0.SAH,SCR[S].SA};
+					ADP <= {SCR[S].SCR0.SAH[2:0],SCR[S].SA};
 					LA <= '0;
 				end else if (LA >= SCR[S].LEA) begin
-					ADP <= ADP - {4'h0,LL};
+					ADP <= ADP - {3'h0,LL};
 					LA <= LA - LL;
 				end else begin
-					ADP <= ADP + TEMP;
-					LA <= LA + TEMP;
+					ADP <= ADP + {{12{TEMP[24]}},TEMP[24:18]};
+					LA <= LA + {{9{TEMP[24]}},TEMP[24:18]};
 				end
 				WD_READ <= 1;
 				
@@ -359,7 +338,7 @@ module SCSP (
 			OP7_PIPE <= OP_PIPE_RESET;
 		end
 		else begin
-			S = OP4_PIPE.SLOT;
+			S = OP5_PIPE.SLOT;
 			if (CYCLE_CE) begin
 				
 				OP6_SD <= SD;
@@ -368,13 +347,87 @@ module SCSP (
 		end
 	end
 	
+	//Operation 7: Stack save
+	bit [15:0] DIR_ACC_L,DIR_ACC_R;
+	bit        DIR_OUT;
+	always @(posedge CLK or negedge RST_N) begin
+		bit [ 4:0] S;
+		
+		if (!RST_N) begin
+			//OP4_STATE[0] <= '{'0, EGS_IDLE};
+			OP7_PIPE <= OP_PIPE_RESET;
+			DIR_OUT <= 0;
+		end
+		else begin
+			S = OP6_PIPE.SLOT;
+			
+			DIR_OUT <= 0;
+			if (CYCLE_CE) begin
+				if (S == 5'd0) begin
+					DIR_ACC_L <= OP6_SD>>>2;
+					DIR_ACC_R <= OP6_SD>>>2;
+				end else begin
+					DIR_ACC_L <= DIR_ACC_L + OP6_SD>>>2;
+					DIR_ACC_R <= DIR_ACC_R + OP6_SD>>>2;
+				end
+				if (S == 5'd31) DIR_OUT <= 1;
+			end
+		end
+	end
+	
+	//Direct out
+	bit [15:0] DIR_L,DIR_R;
+	always @(posedge CLK or negedge RST_N) begin
+		
+		
+		if (!RST_N) begin
+			DIR_L <= '0;
+			DIR_R <= '0;
+		end
+		else begin
+			if (CYCLE_CE) begin
+				if (DIR_OUT) begin
+					DIR_L <= DIR_ACC_L;
+					DIR_R <= DIR_ACC_R;
+				end
+			end
+		end
+	end
+	assign SOUND_L = DIR_L;
+	assign SOUND_R = DIR_R;
+	
+	
+//	wire SCU_REG_SEL = A[20] & ~DTEN_N & ~AD_N & ~CS_N;	//25B00000-25BFFFFF
+//	wire M68K_REG_SEL = SCA[23:20] == 4'h1 & !SCAS_N && (!SCLDS_N || !SCUDS_N);	//100000-1FFFFF
+//	always_comb begin
+//		REG_A = '0;
+//		REG_D <= '0;
+//		REG_WE <= '0;
+//		REG_RD <= 0;
+//		if (DMA_REG_SEL) begin
+//			REG_A = DMA_A[11:1];
+//			REG_D <= DMA_DAT;
+//			REG_WE <= {2{DMA_WR}};
+//			REG_RD <= ~DMA_WR;
+//		end else if (SCU_REG_SEL) begin
+//			REG_A = A[11:1];
+//			REG_D <= DI;
+//			REG_WE <= ~WE_N;
+//			REG_RD <= ~|WE_N;
+//		end else if (M68K_REG_SEL) begin
+//			REG_A <= SCA[11:1];
+//			REG_D <= SCDI;
+//			REG_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
+//			REG_RD <= SCRW_N;
+//		end
+//	end
+//	wire REG_SEL = DMA_REG_SEL | SCU_REG_SEL | M68K_REG_SEL;
 	
 	//RAM access
-	wire SCU_RAM_SEL = ~A[20] & ~DTEN_N & ~AD_N & ~CS_N;	//25A00000-25AFFFFF
-//	bit MEM_RDY;
-	bit SCU_RAM_PEND;
+	wire SCU_SEL = ~DTEN_N & ~AD_N & ~CS_N;	//25A00000-25BFFFFF
+	bit SCU_PEND;
 	always @(posedge CLK or negedge RST_N) begin
-		bit SCU_RAM_SEL_OLD;
+		bit SCU_SEL_OLD;
 		
 		if (!RST_N) begin
 			MEM_ST <= MS_IDLE;
@@ -382,59 +435,93 @@ module SCSP (
 			MEM_D <= '0;
 			MEM_WE <= '0;
 			MEM_RD <= 0;
+			SCU_A <= '0;
 			SCDTACK_N <= 1;
-			SCU_RAM_PEND <= 0;
+			SCU_PEND <= 0;
 		end
 		else begin
-			SCU_RAM_SEL_OLD <= SCU_RAM_SEL;
-			if (SCU_RAM_SEL && !SCU_RAM_SEL_OLD && !SCU_RAM_PEND) SCU_RAM_PEND <= 1;
+			if (!CS_N && DTEN_N && AD_N && CE_R) begin
+				SCU_A <= {SCU_A[4:0],DI};
+			end
+			
+			SCU_SEL_OLD <= SCU_SEL;
+			if (SCU_SEL && !SCU_SEL_OLD && !SCU_PEND && CE_R) SCU_PEND <= 1;
 			
 			case (MEM_ST)
 				MS_IDLE: begin
-					/*if (WD_READ) begin
-						MEM_A <= ADP[18:1];
+					if (WD_READ) begin
+						MEM_A <= {2'b00,ADP[18:1]};
 						MEM_D <= '0;
 						MEM_WE <= '0;
 						MEM_RD <= 1;
+						MEM_CS <= 1;
+						REG_CS <= 0;
 						MEM_ST <= MS_WAIT;
-					end else if (DMA_ACCESS) begin
-						MEM_A <= DMA_A;
-						MEM_D <= DMA_DAT;
-						MEM_WE <= {2{DMA_WR}};
-						MEM_RD <= ~DMA_WR;
-						MEM_ST <= MS_WAIT;
-					end else*/ if (SCU_RAM_PEND) begin
-						MEM_A <= A[18:1];
+//					end else if (DMA_ACCESS) begin
+//						MEM_A <= DMA_A;
+//						MEM_D <= DMA_DAT;
+//						MEM_WE <= {2{DMA_WR}};
+//						MEM_RD <= ~DMA_WR;
+//						MEM_ST <= MS_WAIT;
+					end else if (SCU_PEND) begin
+						MEM_A <= SCU_A;
 						MEM_D <= DI;
 						MEM_WE <= ~WE_N;
 						MEM_RD <= &WE_N;
+						MEM_CS <= ~SCU_A[20];
+						REG_CS <= SCU_A[20];
 						MEM_ST <= MS_SCU_WAIT;
-					end else if (SCA[20] & !SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N) begin
-						MEM_A <= SCA[18:1];
+					end else if (!SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N) begin
+						MEM_A <= SCA[20:1];
 						MEM_D <= SCDI;
 						MEM_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
 						MEM_RD <= SCRW_N;
-						MEM_ST <= MS_WAIT;
+						MEM_CS <= ~SCA[20];
+						REG_CS <= SCA[20];
+						MEM_ST <= MS_SCPU_WAIT;
 					end
 				end
 				
 				MS_WAIT: begin
-					if (RAM_RDY) begin
-						MEM_Q <= RAM_Q;
+					if (RAM_RDY || REG_CS) begin
+						MEM_Q <= !MEM_A[20] ? RAM_Q : REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
+						MEM_CS <= 0;
+						REG_CS <= 0;
 						MEM_ST <= MS_END;
 					end
 				end
 				
-				MS_SCU_WAIT: begin
-					if (RAM_RDY) begin
-						MEM_Q <= RAM_Q;
+				MS_SCPU_WAIT: begin
+					if (RAM_RDY || REG_CS) begin
+						SCDTACK_N <= 0;
+						MEM_Q <= !MEM_A[20] ? RAM_Q : REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
-						SCU_RAM_PEND <= 0;
+						MEM_CS <= 0;
+						REG_CS <= 0;
+						MEM_ST <= MS_SCPU_END;
+					end
+				end
+				
+				MS_SCPU_END: begin
+					if (SCAS_N) begin
+						SCDTACK_N <= 1;
+						MEM_ST <= MS_IDLE;
+					end
+				end
+				
+				MS_SCU_WAIT: begin
+					if (RAM_RDY || REG_CS) begin
+						MEM_Q <= !MEM_A[20] ? RAM_Q : REG_Q;
+						MEM_WE <= '0;
+						MEM_RD <= 0;
+						MEM_CS <= 0;
+						REG_CS <= 0;
+						SCU_PEND <= 0;
 						MEM_ST <= MS_END;
-						if (MEM_A == 18'h00700>>1) MEM_Q[15:8] <= '0;
+						if (MEM_A == 20'h00700>>1) MEM_Q[15:8] <= '0;
 					end
 				end
 				
@@ -444,18 +531,17 @@ module SCSP (
 				
 				default:;
 			endcase
-			SCDTACK_N <= 1;////////////
+			
 		end
 	end
 	
-	assign RAM_A = MEM_A;
+	assign RAM_A = MEM_A[18:1];
 	assign RAM_D = MEM_D;
 	assign RAM_WE = MEM_WE;
 	assign RAM_RD = MEM_RD;
+	assign RAM_CS = MEM_CS;
 	
 	//Registers
-	bit [20:0] A;
-	bit [15:0] REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			SCR <= '{32{'0}};
@@ -480,7 +566,7 @@ module SCSP (
 			CR18 <= '0;
 			CR19 <= '0;
 			STACK <= '{64{'0}};
-			REG_DO <= '0;
+			REG_Q <= '0;
 		end
 		else if (!RES_N) begin
 			SCR <= '{32{'0}};
@@ -506,207 +592,205 @@ module SCSP (
 			CR19 <= '0;
 			STACK <= '{64{'0}};
 		end else begin
-			if (!CS_N && DTEN_N && AD_N && CE_R) begin
-				A <= {A[4:0],DI};
-			end
 			
-			if (REG_SEL) begin
-				if (REG_WE) begin
-//					if (REG_A[11:10] == 2'b00) begin
-//						case ({REG_A[4:1],1'b0})
-//							5'h00: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR0[ 7:0] <= REG_D[ 7:0] & SCR0_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR0[15:8] <= REG_D[15:8] & SCR0_MASK[15:8];
-//							end
-//							5'h02: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SA[ 7:0] <= REG_D[ 7:0] & SA_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SA[15:8] <= REG_D[15:8] & SA_MASK[15:8];
-//							end
-//							5'h04: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].LSA[ 7:0] <= REG_D[ 7:0] & LSA_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].LSA[15:8] <= REG_D[15:8] & LSA_MASK[15:8];
-//							end
-//							5'h06: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].LEA[ 7:0] <= REG_D[ 7:0] & LEA_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].LEA[15:8] <= REG_D[15:8] & LEA_MASK[15:8];
-//							end
-//							5'h08: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR1[ 7:0] <= REG_D[ 7:0] & SCR1_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR1[15:8] <= REG_D[15:8] & SCR1_MASK[15:8];
-//							end
-//							5'h0A: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR2[ 7:0] <= REG_D[ 7:0] & SCR2_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR2[15:8] <= REG_D[15:8] & SCR2_MASK[15:8];
-//							end
-//							5'h0C: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR3[ 7:0] <= REG_D[ 7:0] & SCR3_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR3[15:8] <= REG_D[15:8] & SCR3_MASK[15:8];
-//							end
-//							5'h0E: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR4[ 7:0] <= REG_D[ 7:0] & SCR4_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR4[15:8] <= REG_D[15:8] & SCR4_MASK[15:8];
-//							end
-//							5'h10: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR5[ 7:0] <= REG_D[ 7:0] & SCR5_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR5[15:8] <= REG_D[15:8] & SCR5_MASK[15:8];
-//							end
-//							5'h12: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR6[ 7:0] <= REG_D[ 7:0] & SCR6_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR6[15:8] <= REG_D[15:8] & SCR6_MASK[15:8];
-//							end
-//							5'h14: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR7[ 7:0] <= REG_D[ 7:0] & SCR7_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR7[15:8] <= REG_D[15:8] & SCR7_MASK[15:8];
-//							end
-//							5'h16: begin
-//								if (REG_WE[0]) SCR[REG_A[9:5]].SCR8[ 7:0] <= REG_D[ 7:0] & SCR8_MASK[ 7:0];
-//								if (REG_WE[1]) SCR[REG_A[9:5]].SCR8[15:8] <= REG_D[15:8] & SCR8_MASK[15:8];
-//							end
-//							default:;
-//						endcase
-//					end else if (REG_A[11:9] == 3'b010) begin
-//						case ({REG_A[8:1],1'b0})
-//							9'h000: begin
-//								if (REG_WE[0]) CR0[ 7:0] <= REG_D[ 7:0] & CR0_MASK[ 7:0];
-//								if (REG_WE[1]) CR0[15:8] <= REG_D[15:8] & CR0_MASK[15:8];
-//							end
-//							9'h002: begin
-//								if (REG_WE[0]) CR1[ 7:0] <= REG_D[ 7:0] & CR1_MASK[ 7:0];
-//								if (REG_WE[1]) CR1[15:8] <= REG_D[15:8] & CR1_MASK[15:8];
-//							end
-//							9'h004: begin
-//								if (REG_WE[0]) CR2[ 7:0] <= REG_D[ 7:0] & CR2_MASK[ 7:0];
-//								if (REG_WE[1]) CR2[15:8] <= REG_D[15:8] & CR2_MASK[15:8];
-//							end
-//							9'h006: begin
-//								if (REG_WE[0]) CR3[ 7:0] <= REG_D[ 7:0] & CR3_MASK[ 7:0];
-//								if (REG_WE[1]) CR3[15:8] <= REG_D[15:8] & CR3_MASK[15:8];
-//							end
-//							9'h008: begin
-//								if (REG_WE[0]) CR4[ 7:0] <= REG_D[ 7:0] & CR4_MASK[ 7:0];
-//								if (REG_WE[1]) CR4[15:8] <= REG_D[15:8] & CR4_MASK[15:8];
-//							end
-//							9'h012: begin
-//								if (REG_WE[0]) CR5[ 7:0] <= REG_D[ 7:0] & CR5_MASK[ 7:0];
-//								if (REG_WE[1]) CR5[15:8] <= REG_D[15:8] & CR5_MASK[15:8];
-//							end
-//							9'h014: begin
-//								if (REG_WE[0]) CR6[ 7:0] <= REG_D[ 7:0] & CR6_MASK[ 7:0];
-//								if (REG_WE[1]) CR6[15:8] <= REG_D[15:8] & CR6_MASK[15:8];
-//							end
-//							9'h016: begin
-//								if (REG_WE[0]) CR7[ 7:0] <= REG_D[ 7:0] & CR7_MASK[ 7:0];
-//								if (REG_WE[1]) CR7[15:8] <= REG_D[15:8] & CR7_MASK[15:8];
-//							end
-//							9'h018: begin
-//								if (REG_WE[0]) CR8[ 7:0] <= REG_D[ 7:0] & CR8_MASK[ 7:0];
-//								if (REG_WE[1]) CR8[15:8] <= REG_D[15:8] & CR8_MASK[15:8];
-//							end
-//							9'h01A: begin
-//								if (REG_WE[0]) CR9[ 7:0] <= REG_D[ 7:0] & CR9_MASK[ 7:0];
-//								if (REG_WE[1]) CR9[15:8] <= REG_D[15:8] & CR9_MASK[15:8];
-//							end
-//							9'h01C: begin
-//								if (REG_WE[0]) CR10[ 7:0] <= REG_D[ 7:0] & CR10_MASK[ 7:0];
-//								if (REG_WE[1]) CR10[15:8] <= REG_D[15:8] & CR10_MASK[15:8];
-//							end
-//							9'h01E: begin
-//								if (REG_WE[0]) CR11[ 7:0] <= REG_D[ 7:0] & CR11_MASK[ 7:0];
-//								if (REG_WE[1]) CR11[15:8] <= REG_D[15:8] & CR11_MASK[15:8];
-//							end
-//							9'h020: begin
-//								if (REG_WE[0]) CR12[ 7:0] <= REG_D[ 7:0] & CR12_MASK[ 7:0];
-//								if (REG_WE[1]) CR12[15:8] <= REG_D[15:8] & CR12_MASK[15:8];
-//							end
-//							9'h022: begin
-//								if (REG_WE[0]) CR13[ 7:0] <= REG_D[ 7:0] & CR13_MASK[ 7:0];
-//								if (REG_WE[1]) CR13[15:8] <= REG_D[15:8] & CR13_MASK[15:8];
-//							end
-//							9'h024: begin
-//								if (REG_WE[0]) CR14[ 7:0] <= REG_D[ 7:0] & CR14_MASK[ 7:0];
-//								if (REG_WE[1]) CR14[15:8] <= REG_D[15:8] & CR14_MASK[15:8];
-//							end
-//							9'h026: begin
-//								if (REG_WE[0]) CR15[ 7:0] <= REG_D[ 7:0] & CR15_MASK[ 7:0];
-//								if (REG_WE[1]) CR15[15:8] <= REG_D[15:8] & CR15_MASK[15:8];
-//							end
-//							9'h028: begin
-//								if (REG_WE[0]) CR16[ 7:0] <= REG_D[ 7:0] & CR16_MASK[ 7:0];
-//								if (REG_WE[1]) CR16[15:8] <= REG_D[15:8] & CR16_MASK[15:8];
-//							end
-//							9'h02A: begin
-//								if (REG_WE[0]) CR17[ 7:0] <= REG_D[ 7:0] & CR17_MASK[ 7:0];
-//								if (REG_WE[1]) CR17[15:8] <= REG_D[15:8] & CR17_MASK[15:8];
-//							end
-//							9'h02C: begin
-//								if (REG_WE[0]) CR18[ 7:0] <= REG_D[ 7:0] & CR18_MASK[ 7:0];
-//								if (REG_WE[1]) CR18[15:8] <= REG_D[15:8] & CR18_MASK[15:8];
-//							end
-//							9'h02E: begin
-//								if (REG_WE[0]) CR19[ 7:0] <= REG_D[ 7:0] & CR19_MASK[ 7:0];
-//								if (REG_WE[1]) CR19[15:8] <= REG_D[15:8] & CR19_MASK[15:8];
-//							end
-//							default:;
-//						endcase
-//					end else if (REG_A[11:9] == 3'b011) begin
-//						if (REG_WE[0]) STACK[REG_A[7:1]][ 7:0] <= REG_D[ 7:0];
-//						if (REG_WE[1]) STACK[REG_A[7:1]][15:8] <= REG_D[15:8];
-//					end
+			if (MEM_WE && REG_CS) begin
+				if (MEM_A[11:10] == 2'b00) begin
+					case ({MEM_A[4:1],1'b0})
+						5'h00: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR0[ 7:0] <= MEM_D[ 7:0] & SCR0_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR0[15:8] <= MEM_D[15:8] & SCR0_MASK[15:8];
+						end
+						5'h02: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SA[ 7:0] <= MEM_D[ 7:0] & SA_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SA[15:8] <= MEM_D[15:8] & SA_MASK[15:8];
+						end
+						5'h04: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].LSA[ 7:0] <= MEM_D[ 7:0] & LSA_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].LSA[15:8] <= MEM_D[15:8] & LSA_MASK[15:8];
+						end
+						5'h06: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].LEA[ 7:0] <= MEM_D[ 7:0] & LEA_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].LEA[15:8] <= MEM_D[15:8] & LEA_MASK[15:8];
+						end
+						5'h08: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR1[ 7:0] <= MEM_D[ 7:0] & SCR1_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR1[15:8] <= MEM_D[15:8] & SCR1_MASK[15:8];
+						end
+						5'h0A: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR2[ 7:0] <= MEM_D[ 7:0] & SCR2_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR2[15:8] <= MEM_D[15:8] & SCR2_MASK[15:8];
+						end
+						5'h0C: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR3[ 7:0] <= MEM_D[ 7:0] & SCR3_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR3[15:8] <= MEM_D[15:8] & SCR3_MASK[15:8];
+						end
+						5'h0E: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR4[ 7:0] <= MEM_D[ 7:0] & SCR4_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR4[15:8] <= MEM_D[15:8] & SCR4_MASK[15:8];
+						end
+						5'h10: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR5[ 7:0] <= MEM_D[ 7:0] & SCR5_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR5[15:8] <= MEM_D[15:8] & SCR5_MASK[15:8];
+						end
+						5'h12: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR6[ 7:0] <= MEM_D[ 7:0] & SCR6_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR6[15:8] <= MEM_D[15:8] & SCR6_MASK[15:8];
+						end
+						5'h14: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR7[ 7:0] <= MEM_D[ 7:0] & SCR7_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR7[15:8] <= MEM_D[15:8] & SCR7_MASK[15:8];
+						end
+						5'h16: begin
+							if (MEM_WE[0]) SCR[MEM_A[9:5]].SCR8[ 7:0] <= MEM_D[ 7:0] & SCR8_MASK[ 7:0];
+							if (MEM_WE[1]) SCR[MEM_A[9:5]].SCR8[15:8] <= MEM_D[15:8] & SCR8_MASK[15:8];
+						end
+						default:;
+					endcase
+				end else if (MEM_A[11:9] == 3'b010) begin
+					case ({MEM_A[8:1],1'b0})
+						9'h000: begin
+							if (MEM_WE[0]) CR0[ 7:0] <= MEM_D[ 7:0] & CR0_MASK[ 7:0];
+							if (MEM_WE[1]) CR0[15:8] <= MEM_D[15:8] & CR0_MASK[15:8];
+						end
+						9'h002: begin
+							if (MEM_WE[0]) CR1[ 7:0] <= MEM_D[ 7:0] & CR1_MASK[ 7:0];
+							if (MEM_WE[1]) CR1[15:8] <= MEM_D[15:8] & CR1_MASK[15:8];
+						end
+						9'h004: begin
+							if (MEM_WE[0]) CR2[ 7:0] <= MEM_D[ 7:0] & CR2_MASK[ 7:0];
+							if (MEM_WE[1]) CR2[15:8] <= MEM_D[15:8] & CR2_MASK[15:8];
+						end
+						9'h006: begin
+							if (MEM_WE[0]) CR3[ 7:0] <= MEM_D[ 7:0] & CR3_MASK[ 7:0];
+							if (MEM_WE[1]) CR3[15:8] <= MEM_D[15:8] & CR3_MASK[15:8];
+						end
+						9'h008: begin
+							if (MEM_WE[0]) CR4[ 7:0] <= MEM_D[ 7:0] & CR4_MASK[ 7:0];
+							if (MEM_WE[1]) CR4[15:8] <= MEM_D[15:8] & CR4_MASK[15:8];
+						end
+						9'h012: begin
+							if (MEM_WE[0]) CR5[ 7:0] <= MEM_D[ 7:0] & CR5_MASK[ 7:0];
+							if (MEM_WE[1]) CR5[15:8] <= MEM_D[15:8] & CR5_MASK[15:8];
+						end
+						9'h014: begin
+							if (MEM_WE[0]) CR6[ 7:0] <= MEM_D[ 7:0] & CR6_MASK[ 7:0];
+							if (MEM_WE[1]) CR6[15:8] <= MEM_D[15:8] & CR6_MASK[15:8];
+						end
+						9'h016: begin
+							if (MEM_WE[0]) CR7[ 7:0] <= MEM_D[ 7:0] & CR7_MASK[ 7:0];
+							if (MEM_WE[1]) CR7[15:8] <= MEM_D[15:8] & CR7_MASK[15:8];
+						end
+						9'h018: begin
+							if (MEM_WE[0]) CR8[ 7:0] <= MEM_D[ 7:0] & CR8_MASK[ 7:0];
+							if (MEM_WE[1]) CR8[15:8] <= MEM_D[15:8] & CR8_MASK[15:8];
+						end
+						9'h01A: begin
+							if (MEM_WE[0]) CR9[ 7:0] <= MEM_D[ 7:0] & CR9_MASK[ 7:0];
+							if (MEM_WE[1]) CR9[15:8] <= MEM_D[15:8] & CR9_MASK[15:8];
+						end
+						9'h01C: begin
+							if (MEM_WE[0]) CR10[ 7:0] <= MEM_D[ 7:0] & CR10_MASK[ 7:0];
+							if (MEM_WE[1]) CR10[15:8] <= MEM_D[15:8] & CR10_MASK[15:8];
+						end
+						9'h01E: begin
+							if (MEM_WE[0]) CR11[ 7:0] <= MEM_D[ 7:0] & CR11_MASK[ 7:0];
+							if (MEM_WE[1]) CR11[15:8] <= MEM_D[15:8] & CR11_MASK[15:8];
+						end
+						9'h020: begin
+							if (MEM_WE[0]) CR12[ 7:0] <= MEM_D[ 7:0] & CR12_MASK[ 7:0];
+							if (MEM_WE[1]) CR12[15:8] <= MEM_D[15:8] & CR12_MASK[15:8];
+						end
+						9'h022: begin
+							if (MEM_WE[0]) CR13[ 7:0] <= MEM_D[ 7:0] & CR13_MASK[ 7:0];
+							if (MEM_WE[1]) CR13[15:8] <= MEM_D[15:8] & CR13_MASK[15:8];
+						end
+						9'h024: begin
+							if (MEM_WE[0]) CR14[ 7:0] <= MEM_D[ 7:0] & CR14_MASK[ 7:0];
+							if (MEM_WE[1]) CR14[15:8] <= MEM_D[15:8] & CR14_MASK[15:8];
+						end
+						9'h026: begin
+							if (MEM_WE[0]) CR15[ 7:0] <= MEM_D[ 7:0] & CR15_MASK[ 7:0];
+							if (MEM_WE[1]) CR15[15:8] <= MEM_D[15:8] & CR15_MASK[15:8];
+						end
+						9'h028: begin
+							if (MEM_WE[0]) CR16[ 7:0] <= MEM_D[ 7:0] & CR16_MASK[ 7:0];
+							if (MEM_WE[1]) CR16[15:8] <= MEM_D[15:8] & CR16_MASK[15:8];
+						end
+						9'h02A: begin
+							if (MEM_WE[0]) CR17[ 7:0] <= MEM_D[ 7:0] & CR17_MASK[ 7:0];
+							if (MEM_WE[1]) CR17[15:8] <= MEM_D[15:8] & CR17_MASK[15:8];
+						end
+						9'h02C: begin
+							if (MEM_WE[0]) CR18[ 7:0] <= MEM_D[ 7:0] & CR18_MASK[ 7:0];
+							if (MEM_WE[1]) CR18[15:8] <= MEM_D[15:8] & CR18_MASK[15:8];
+						end
+						9'h02E: begin
+							if (MEM_WE[0]) CR19[ 7:0] <= MEM_D[ 7:0] & CR19_MASK[ 7:0];
+							if (MEM_WE[1]) CR19[15:8] <= MEM_D[15:8] & CR19_MASK[15:8];
+						end
+						default:;
+					endcase
+//				end else if (REG_A[11:9] == 3'b011) begin
+//					if (MEM_WE[0]) STACK[REG_A[7:1]][ 7:0] <= MEM_D[ 7:0];
+//					if (MEM_WE[1]) STACK[REG_A[7:1]][15:8] <= MEM_D[15:8];
+				end
+			end else if (MEM_RD && REG_CS) begin
+				if (MEM_A[11:10] == 2'b00) begin
+					case ({MEM_A[4:1],1'b0})
+						5'h00: REG_Q <= SCR[MEM_A[9:5]].SCR0 & SCR0_MASK;
+						5'h02: REG_Q <= SCR[MEM_A[9:5]].SA & SA_MASK;
+						5'h04: REG_Q <= SCR[MEM_A[9:5]].LSA & LSA_MASK;
+						5'h06: REG_Q <= SCR[MEM_A[9:5]].LEA & LEA_MASK;
+						5'h08: REG_Q <= SCR[MEM_A[9:5]].SCR1 & SCR1_MASK;
+						5'h0A: REG_Q <= SCR[MEM_A[9:5]].SCR2 & SCR2_MASK;
+						5'h0C: REG_Q <= SCR[MEM_A[9:5]].SCR3 & SCR3_MASK;
+						5'h0E: REG_Q <= SCR[MEM_A[9:5]].SCR4 & SCR4_MASK;
+						5'h10: REG_Q <= SCR[MEM_A[9:5]].SCR5 & SCR5_MASK;
+						5'h12: REG_Q <= SCR[MEM_A[9:5]].SCR6 & SCR6_MASK;
+						5'h14: REG_Q <= SCR[MEM_A[9:5]].SCR7 & SCR7_MASK;
+						5'h16: REG_Q <= SCR[MEM_A[9:5]].SCR8 & SCR8_MASK;
+						default:;
+					endcase
+				end else if (MEM_A[11:9] == 3'b010) begin
+					case ({MEM_A[9:1],1'b0})
+						9'h000: REG_Q <= CR0 & CR0_MASK;
+						9'h002: REG_Q <= CR1 & CR1_MASK;
+						9'h004: REG_Q <= CR2 & CR2_MASK;
+						9'h006: REG_Q <= CR3 & CR3_MASK;
+						9'h008: REG_Q <= CR4 & CR4_MASK;
+						9'h012: REG_Q <= CR5 & CR5_MASK;
+						9'h014: REG_Q <= CR6 & CR6_MASK;
+						9'h016: REG_Q <= CR7 & CR7_MASK;
+						9'h018: REG_Q <= CR8 & CR8_MASK;
+						9'h01A: REG_Q <= CR9 & CR9_MASK;
+						9'h01C: REG_Q <= CR10 & CR10_MASK;
+						9'h01E: REG_Q <= CR11 & CR11_MASK;
+						9'h020: REG_Q <= CR12 & CR12_MASK;
+						9'h022: REG_Q <= CR13 & CR13_MASK;
+						9'h024: REG_Q <= CR14 & CR14_MASK;
+						9'h026: REG_Q <= CR15 & CR15_MASK;
+						9'h028: REG_Q <= CR16 & CR16_MASK;
+						9'h02A: REG_Q <= CR17 & CR17_MASK;
+						9'h02C: REG_Q <= CR18 & CR18_MASK;
+						9'h02E: REG_Q <= CR19 & CR19_MASK;
+						default: REG_Q <= '0;
+					endcase
+//				end else if (MEM_A[11:9] == 3'b011) begin
+//					REG_Q <= STACK[MEM_A[7:1]];
 				end else begin
-//					if (REG_A[11:10] == 2'b00) begin
-//						case ({REG_A[4:1],1'b0})
-//							5'h00: REG_Q <= SCR[REG_A[9:5]].SCR0 & SCR0_MASK;
-//							5'h02: REG_Q <= SCR[REG_A[9:5]].SA & SA_MASK;
-//							5'h04: REG_Q <= SCR[REG_A[9:5]].LSA & LSA_MASK;
-//							5'h06: REG_Q <= SCR[REG_A[9:5]].LEA & LEA_MASK;
-//							5'h08: REG_Q <= SCR[REG_A[9:5]].SCR1 & SCR1_MASK;
-//							5'h0A: REG_Q <= SCR[REG_A[9:5]].SCR2 & SCR2_MASK;
-//							5'h0C: REG_Q <= SCR[REG_A[9:5]].SCR3 & SCR3_MASK;
-//							5'h0E: REG_Q <= SCR[REG_A[9:5]].SCR4 & SCR4_MASK;
-//							5'h10: REG_Q <= SCR[REG_A[9:5]].SCR5 & SCR5_MASK;
-//							5'h12: REG_Q <= SCR[REG_A[9:5]].SCR6 & SCR6_MASK;
-//							5'h14: REG_Q <= SCR[REG_A[9:5]].SCR7 & SCR7_MASK;
-//							5'h16: REG_Q <= SCR[REG_A[9:5]].SCR8 & SCR8_MASK;
-//							default:;
-//						endcase
-//					end else if (REG_A[11:9] == 3'b010) begin
-//						case ({REG_A[9:1],1'b0})
-////							9'h000: REG_Q <= CR0 & CR0_MASK;
-////							9'h002: REG_Q <= CR1 & CR1_MASK;
-////							9'h004: REG_Q <= CR2 & CR2_MASK;
-////							9'h006: REG_Q <= CR3 & CR3_MASK;
-////							9'h008: REG_Q <= CR4 & CR4_MASK;
-////							9'h012: REG_Q <= CR5 & CR5_MASK;
-////							9'h014: REG_Q <= CR6 & CR6_MASK;
-////							9'h016: REG_Q <= CR7 & CR7_MASK;
-////							9'h018: REG_Q <= CR8 & CR8_MASK;
-////							9'h01A: REG_Q <= CR9 & CR9_MASK;
-////							9'h01C: REG_Q <= CR10 & CR10_MASK;
-////							9'h01E: REG_Q <= CR11 & CR11_MASK;
-////							9'h020: REG_Q <= CR12 & CR12_MASK;
-////							9'h022: REG_Q <= CR13 & CR13_MASK;
-////							9'h024: REG_Q <= CR14 & CR14_MASK;
-////							9'h026: REG_Q <= CR15 & CR15_MASK;
-////							9'h028: REG_Q <= CR16 & CR16_MASK;
-////							9'h02A: REG_Q <= CR17 & CR17_MASK;
-////							9'h02C: REG_Q <= CR18 & CR18_MASK;
-////							9'h02E: REG_Q <= CR19 & CR19_MASK;
-//							default: REG_Q <= '0;
-//						endcase
-//					end else if (REG_A[11:9] == 3'b011) begin
-//						REG_Q <= STACK[REG_A[7:1]];
-//					end else begin
-						REG_Q <= '0;
-//					end
+					REG_Q <= '0;
 				end
 			end
 		end
 	end
 	
-	assign DO = SCU_REG_SEL ? REG_Q : MEM_Q;
-	assign RDY_N = ~((SCU_RAM_SEL & ~SCU_RAM_PEND) | SCU_REG_SEL);
+	assign DO = MEM_Q;
+	assign RDY_N = ~(SCU_SEL & ~SCU_PEND);
 	
 	assign SCIPL_N = '1;
 	assign SCDO = MEM_Q;
+	assign SCAVEC_N = 1;
+	
+	assign SCA_DBG = {SCA,1'b0};
 	
 endmodule

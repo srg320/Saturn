@@ -80,15 +80,17 @@ module Saturn (
 	input      [15:0] JOY1,
 	
 	input       [5:0] SCRN_EN,
+	input             PAUSE_EN,
 	
 	output      [7:0] DBG_WAIT_CNT
 );
 
-	bit CE_R, CE_F;
+	bit MCLK;
 	always @(posedge CLK) begin
-		if (CE) CE_R <= ~CE_R;
+		if (!PAUSE_EN && CE) MCLK <= ~MCLK;
 	end
-	assign CE_F = ~CE_R;
+	wire CE_R =  MCLK & ~PAUSE_EN;
+	wire CE_F = ~MCLK & ~PAUSE_EN;
 	
 	bit         SYSRES_N;
 	
@@ -740,7 +742,7 @@ module Saturn (
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(1/*~SNDRES_N*/),
+		.extReset(~SNDRES_N),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),
@@ -750,8 +752,8 @@ module Saturn (
 		.oEdb(SCDI),
 		.eRWn(SCRW_N),
 		.ASn(SCAS_N),
-		.UDSn(SCLDS_N),
-		.LDSn(SCUDS_N),
+		.LDSn(SCLDS_N),
+		.UDSn(SCUDS_N),
 		.DTACKn(SCDTACK_N),
 
 		.IPL0n(SCIPL_N[0]),

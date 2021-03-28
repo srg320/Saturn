@@ -193,22 +193,22 @@ package VDP1_PKG;
 	} Size_t;
 	parameter Size_t SIZE_NULL = {11'h000,11'h000};
 	
-	function bit [18:1] SprAddr(input bit [9:0] X, input bit [8:0] Y, input CMDSIZE_t CMDSIZE, input bit [1:0] DIR, input CMDSRCA_t CMDSRCA, input bit [2:0] CM);
+	function bit [18:1] SprAddr(input bit [9:0] X, input bit [9:0] Y, input CMDSIZE_t CMDSIZE, input bit [1:0] DIR, input CMDSRCA_t CMDSRCA, input bit [2:0] CM);
 		bit [18:1] ADDR;
 		bit  [9:0] offs_x;
-		bit  [8:0] offs_y;
-		bit [14:0] offs;
+		bit  [9:0] offs_y;
+		bit [15:0] offs;
 		
-		offs_x = !DIR[0] ? X : {CMDSIZE.SX,3'b000} - X - 9'd1;
-		offs_y = !DIR[1] ? Y : CMDSIZE.SY - Y - 8'd1;
+		offs_x = !DIR[0] ? X : {1'b0,CMDSIZE.SX,3'b000} - X - 10'd1;
+		offs_y = !DIR[1] ? Y : {2'b00,CMDSIZE.SY} - Y - 10'd1;
 		offs = (offs_y * CMDSIZE.SX);
 		case (CM)
 			3'b000,
-			3'b001:  ADDR = {CMDSRCA,2'b00} + {2'b00,offs,1'b0}   + offs_x[9:2];
+			3'b001:  ADDR = {CMDSRCA,2'b00} + {1'b0,offs,1'b0}   + offs_x[9:2];
 			3'b010,
 			3'b011,
-			3'b100:  ADDR = {CMDSRCA,2'b00} + {1'b0, offs,2'b00}  + offs_x[9:1];
-			default: ADDR = {CMDSRCA,2'b00} + {      offs,3'b000} + offs_x[9:0];
+			3'b100:  ADDR = {CMDSRCA,2'b00} + {offs,2'b00}  + offs_x[9:1];
+			default: ADDR = {CMDSRCA,2'b00} + {offs[14:0],3'b000} + offs_x[9:0];
 		endcase
 		return ADDR;
 	endfunction
@@ -293,5 +293,9 @@ package VDP1_PKG;
 		return CC;
 	endfunction
 
+	
+	function bit [10:0] Abs(input bit [10:0] C);
+		return $signed(C) >= 0 ? $signed(C) : -$signed(C);
+	endfunction
 	
 endpackage

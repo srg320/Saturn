@@ -56,10 +56,60 @@ module SMPC (
 	bit         RESD;
 	bit         STE;
 	
+	bit   [7:0] SEC;
+	bit   [7:0] MIN;
+	bit   [7:0] HOUR;
+	bit   [7:0] DAY;
+	
 	bit   [7:0] SMEM[4];
 	
 	parameter SR_PDE = 2;
 	parameter SR_RESB = 3;
+	
+	bit SEC_CLK;
+	always @(posedge CLK or negedge RST_N) begin
+		bit [21:0] CLK_CNT;
+		
+		if (!RST_N) begin
+			SEC_CLK <= 0;
+			CLK_CNT <= '0;
+		end else if (CE) begin
+			SEC_CLK <= 0;
+				
+			CLK_CNT <= CLK_CNT + 3'd1;
+			if (CLK_CNT == 22'd4000000-1) begin
+				CLK_CNT <= 22'd0;
+				SEC_CLK <= 1;
+			end
+		end
+	end
+	
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			SEC <= '0;
+			MIN <= '0;
+			HOUR <= '0;
+			DAY <= '0;
+		end else if (SEC_CLK && CE) begin
+			SEC[3:0] <= SEC[3:0] + 4'd1;
+			if (SEC[3:0] == 4'd9) begin
+				SEC[3:0] <= 4'd0;
+				SEC[7:4] <= SEC[7:4] + 4'd1;
+				if (SEC[7:4] == 4'd5) begin
+					SEC[7:4] <= 4'd0;
+					MIN[3:0] <= MIN[3:0] + 4'd1;
+					if (MIN[3:0] == 4'd9) begin
+						MIN[3:0] <= 4'd0;
+						MIN[7:4] <= MIN[7:4] + 4'd1;
+						if (MIN[7:4] == 4'd5) begin
+							MIN[7:4] <= 4'd0;
+							
+						end
+					end
+				end
+			end
+		end
+	end
 	
 	typedef enum bit [4:0] {
 		CS_IDLE = 5'b00001,  
@@ -125,7 +175,7 @@ module SMPC (
 			SSHNMI_N <= 1;
 			SYSRES_N <= 1;
 			SNDRES_N <= 0;
-			CDRES_N <= 0;
+			CDRES_N <= 1;
 			MIRQ_N <= 1;
 			SR <= '0;
 			RESD <= 1;
@@ -228,7 +278,7 @@ module SMPC (
 				
 				case (COMM_ST)
 					CS_IDLE: begin
-						if ((COMREG_SET || INTBACK_EXEC) && SF && !SRES_EXEC && !IRQV_N && IRQV_N_OLD) begin
+						if ((COMREG_SET || INTBACK_EXEC) /*&& SF*/ && !SRES_EXEC && !IRQV_N && IRQV_N_OLD) begin
 							COMREG_SET <= 0;
 							COMM_ST <= CS_EXEC;
 						end
@@ -403,10 +453,10 @@ module SMPC (
 									OREG[1] <= 8'h20;
 									OREG[2] <= 8'h21;
 									OREG[3] <= 8'h01;
-									OREG[4] <= 8'h01;
-									OREG[5] <= 8'h12;
-									OREG[6] <= 8'h34;
-									OREG[7] <= 8'h56;
+									OREG[4] <= DAY;
+									OREG[5] <= HOUR;
+									OREG[6] <= MIN;
+									OREG[7] <= SEC;
 									OREG[8] <= 8'h00;
 									OREG[9] <= {4'b0000,AC};
 									OREG[10] <= {1'b0,DOTSEL,2'b11,~MSHNMI_N,1'b1,~SYSRES_N,~SNDRES_N};

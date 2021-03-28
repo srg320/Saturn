@@ -42,15 +42,15 @@ module VDP1_DIV (
 	quotient,
 	remain);
 
-	input	[10:0]  denom;
-	input	[20:0]  numer;
-	output	[20:0]  quotient;
-	output	[10:0]  remain;
+	input	[9:0]  denom;
+	input	[19:0]  numer;
+	output	[19:0]  quotient;
+	output	[9:0]  remain;
 
-	wire [20:0] sub_wire0;
-	wire [10:0] sub_wire1;
-	wire [20:0] quotient = sub_wire0[20:0];
-	wire [10:0] remain = sub_wire1[10:0];
+	wire [19:0] sub_wire0;
+	wire [9:0] sub_wire1;
+	wire [19:0] quotient = sub_wire0[19:0];
+	wire [9:0] remain = sub_wire1[9:0];
 
 	lpm_divide	LPM_DIVIDE_component (
 				.denom (denom),
@@ -61,12 +61,12 @@ module VDP1_DIV (
 				.clken (1'b1),
 				.clock (1'b0));
 	defparam
-		LPM_DIVIDE_component.lpm_drepresentation = "SIGNED",
+		LPM_DIVIDE_component.lpm_drepresentation = "UNSIGNED",
 		LPM_DIVIDE_component.lpm_hint = "LPM_REMAINDERPOSITIVE=TRUE",
-		LPM_DIVIDE_component.lpm_nrepresentation = "SIGNED",
+		LPM_DIVIDE_component.lpm_nrepresentation = "UNSIGNED",
 		LPM_DIVIDE_component.lpm_type = "LPM_DIVIDE",
-		LPM_DIVIDE_component.lpm_widthd = 11,
-		LPM_DIVIDE_component.lpm_widthn = 21;
+		LPM_DIVIDE_component.lpm_widthd = 10,
+		LPM_DIVIDE_component.lpm_widthn = 20;
 
 
 endmodule
@@ -82,20 +82,20 @@ endmodule
 // Retrieval info: PRIVATE: VERSION_NUMBER NUMERIC "2"
 // Retrieval info: PRIVATE: new_diagram STRING "1"
 // Retrieval info: LIBRARY: lpm lpm.lpm_components.all
-// Retrieval info: CONSTANT: LPM_DREPRESENTATION STRING "SIGNED"
+// Retrieval info: CONSTANT: LPM_DREPRESENTATION STRING "UNSIGNED"
 // Retrieval info: CONSTANT: LPM_HINT STRING "LPM_REMAINDERPOSITIVE=TRUE"
-// Retrieval info: CONSTANT: LPM_NREPRESENTATION STRING "SIGNED"
+// Retrieval info: CONSTANT: LPM_NREPRESENTATION STRING "UNSIGNED"
 // Retrieval info: CONSTANT: LPM_TYPE STRING "LPM_DIVIDE"
-// Retrieval info: CONSTANT: LPM_WIDTHD NUMERIC "11"
-// Retrieval info: CONSTANT: LPM_WIDTHN NUMERIC "21"
-// Retrieval info: USED_PORT: denom 0 0 11 0 INPUT NODEFVAL "denom[10..0]"
-// Retrieval info: USED_PORT: numer 0 0 21 0 INPUT NODEFVAL "numer[20..0]"
-// Retrieval info: USED_PORT: quotient 0 0 21 0 OUTPUT NODEFVAL "quotient[20..0]"
-// Retrieval info: USED_PORT: remain 0 0 11 0 OUTPUT NODEFVAL "remain[10..0]"
-// Retrieval info: CONNECT: @denom 0 0 11 0 denom 0 0 11 0
-// Retrieval info: CONNECT: @numer 0 0 21 0 numer 0 0 21 0
-// Retrieval info: CONNECT: quotient 0 0 21 0 @quotient 0 0 21 0
-// Retrieval info: CONNECT: remain 0 0 11 0 @remain 0 0 11 0
+// Retrieval info: CONSTANT: LPM_WIDTHD NUMERIC "10"
+// Retrieval info: CONSTANT: LPM_WIDTHN NUMERIC "20"
+// Retrieval info: USED_PORT: denom 0 0 10 0 INPUT NODEFVAL "denom[9..0]"
+// Retrieval info: USED_PORT: numer 0 0 20 0 INPUT NODEFVAL "numer[19..0]"
+// Retrieval info: USED_PORT: quotient 0 0 20 0 OUTPUT NODEFVAL "quotient[19..0]"
+// Retrieval info: USED_PORT: remain 0 0 10 0 OUTPUT NODEFVAL "remain[9..0]"
+// Retrieval info: CONNECT: @denom 0 0 10 0 denom 0 0 10 0
+// Retrieval info: CONNECT: @numer 0 0 20 0 numer 0 0 20 0
+// Retrieval info: CONNECT: quotient 0 0 20 0 @quotient 0 0 20 0
+// Retrieval info: CONNECT: remain 0 0 10 0 @remain 0 0 10 0
 // Retrieval info: GEN_FILE: TYPE_NORMAL DIV.v FALSE
 // Retrieval info: GEN_FILE: TYPE_NORMAL DIV.inc FALSE
 // Retrieval info: GEN_FILE: TYPE_NORMAL DIV.cmp FALSE

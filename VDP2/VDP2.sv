@@ -181,7 +181,7 @@ module VDP2 (
 				HS_N <= 1;
 			end
 			
-			if (H_CNT == HBL_START-1+32) begin
+			if (H_CNT == HBL_START-1+36) begin
 				HBLANK <= 1;
 				if (V_CNT == VS_START-1) begin
 					VS_N <= 0;
@@ -194,7 +194,7 @@ module VDP2 (
 					VBLANK <= 0;
 					ODD <= ~ODD;
 				end
-			end else if (H_CNT == 32-1) begin
+			end else if (H_CNT == 36-1) begin
 				HBLANK <= 0;
 			end
 		end
@@ -544,7 +544,7 @@ module VDP2 (
 					                           NSX[2] <= NSxREG[2].SCX;
 						end
 						3'b001: begin
-							if (!NSxREG[0].LSCY) ;
+							if (!NSxREG[0].LSCY) NSY[0] <= NSY[0] + NSxREG[0].ZMY;
 							else if (RD0)        NSY[0] <= LS_WD[26:8];
 							else                 NSY[0] <= NSY[0] + NSxREG[0].ZMY;
 					                           NSY[2] <= NSY[2] + 19'h00100;
@@ -560,7 +560,7 @@ module VDP2 (
 					                           NSX[3] <= NSxREG[3].SCX;
 						end
 						3'b101: begin
-							if (!NSxREG[1].LSCY) ;
+							if (!NSxREG[1].LSCY) NSY[1] <= NSY[1] + NSxREG[1].ZMY;
 							else if (RD1)        NSY[1] <= LS_WD[26:8];
 							else                 NSY[1] <= NSY[1] + NSxREG[1].ZMY;
 					                           NSY[3] <= NSY[3] + 19'h00100;
