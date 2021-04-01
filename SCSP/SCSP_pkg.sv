@@ -26,27 +26,27 @@ package SCSP_PKG;
 	typedef struct packed		//RW,08
 	{
 		bit         UNUSED;
-		bit         LS;
+		bit         LPSLNK;
 		bit [ 3: 0] KRS;
 		bit [ 4: 0] DL;
 		bit [ 4: 0] RR;
 	} SCR1_t;
-	parameter bit [15:0] SCR1_MASK = 16'hFFFF;
+	parameter bit [15:0] SCR1_MASK = 16'h7FFF;
 	
 	typedef struct packed		//RW,0A
 	{
 		bit [ 4: 0] D2R;
 		bit [ 4: 0] D1R;
-		bit         HO;
+		bit         EGHOLD;
 		bit [ 4: 0] AR;
 	} SCR2_t;
-	parameter bit [15:0] SCR2_MASK = 16'h7FFF;
+	parameter bit [15:0] SCR2_MASK = 16'hFFFF;
 	
 	typedef struct packed		//RW,0C
 	{
 		bit [ 5: 0] UNUSED;
-		bit         SI;
-		bit         SD;
+		bit         STWINH;
+		bit         SDIR;
 		bit [ 7: 0] TL;
 	} SCR3_t;
 	parameter bit [15:0] SCR3_MASK = 16'h03FF;
@@ -70,7 +70,7 @@ package SCSP_PKG;
 	
 	typedef struct packed		//RW,12
 	{
-		bit         RE;
+		bit         LFORE;
 		bit [ 4: 0] LFOF;
 		bit [ 1: 0] PLFOWS;
 		bit [ 2: 0] PLFOS;
@@ -136,11 +136,11 @@ package SCSP_PKG;
 	
 	typedef struct packed		//RW,100408
 	{
-		bit [ 4: 0] MSLC;
-		bit [ 3: 0] CA;
+		bit [ 4: 0] MSLC;		//W
+		bit [ 3: 0] CA;		//R
 		bit [ 6: 0] UNUSED;
 	} CR4_t;
-	parameter bit [15:0] CR4_MASK = 16'h00FF;
+	parameter bit [15:0] CR4_MASK = 16'hFF80;
 	
 	typedef struct packed		//RW,100412
 	{
@@ -160,10 +160,10 @@ package SCSP_PKG;
 	typedef struct packed		//RW,100416
 	{
 		bit         UNUSED;
-		bit         GA;
-		bit         DI;
-		bit         EX;
-		bit [10: 0] DRGA;
+		bit         DGATE;
+		bit         DDIR;
+		bit         DEXE;
+		bit [10: 0] DTLG;
 		bit         UNUSED2;
 	} CR7_t;
 	parameter bit [15:0] CR7_MASK = 16'h7FFE;
@@ -275,14 +275,13 @@ package SCSP_PKG;
 		SCR8_t      SCR8;
 	} SCR_t;
 	
-	typedef SOUS_t STACK_t[64];
+	typedef SOUS_t STACK_t[32];
 	
-	typedef enum bit [4:0] {
-		EGS_IDLE    = 5'b00001,  
-		EGS_ATTACK  = 5'b00010, 
-		EGS_DECAY1  = 5'b00100,
-		EGS_DECAY2  = 5'b01000,
-		EGS_RELEASE = 5'b10000
+	typedef enum bit [1:0] {
+		EGS_ATTACK  = 2'b00, 
+		EGS_DECAY1  = 2'b01,
+		EGS_DECAY2  = 2'b10,
+		EGS_RELEASE = 2'b11
 	} EGState_t;
 	
 	typedef struct packed
@@ -327,21 +326,43 @@ package SCSP_PKG;
 	function bit [15:0] MDCalc(input STACK_t STACK, SCR4_t SCR4);
 		bit [15:0] MD;
 		bit [15:0] X,Y;
-		bit [16:0] TEMP;
+		bit [15:0] TEMP;
 		
 		X = STACK[SCR4.MDXSL];
 		Y = STACK[SCR4.MDYSL];
-		TEMP = $signed(X )+ $signed(Y); 
-		MD = TEMP[16:1]>>(15-SCR4.MDL);
+		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
+		MD = $signed(TEMP)>>>(15-SCR4.MDL);
 		
 		return MD;
 	endfunction
 	
-	function bit [24:0] PhaseCalc(SCR5_t SCR5);
-		bit [24:0] P;
-		P = {14'b00000000000000,SCR5.FNS}<<(SCR5.OCT^4'h8);
+	function bit [25:0] PhaseCalc(SCR5_t SCR5);
+		bit [25:0] P;
+		bit [4:0] S;
+		
+		S = {SCR5.OCT[3],4'b0111} - {1'b0,SCR5.OCT};
+		P = {9'b000000001,SCR5.FNS,7'b0000000}>>S[3:0];
 		
 		return P;
+	endfunction
+	
+	function bit [5:0] RateCalc(bit [4:0] R, bit [3:0] KRS, SCR5_t SCR5);
+		bit [5:0] RATE;
+		bit [7:0] TEMP;
+		
+		if (KRS == 4'hF) 
+			TEMP = {1'b0,R,1'b0};
+		else
+			TEMP = {3'b000,KRS,SCR5.FNS[9]} + {2'b00,R,1'b0} + {3'b000,SCR5.OCT^4'h8} - 8'h08;
+		
+		if (TEMP[7])
+			RATE = 5'h00;
+		else if (TEMP >= 8'h3C)
+			RATE = 8'h3C;
+		else
+			RATE = TEMP[5:0];
+			
+		return RATE;
 	endfunction
 	
 	function bit [9:0] EnvVolCalc(bit [9:0] ENV, bit [7:0] TL);
@@ -364,6 +385,14 @@ package SCSP_PKG;
 						 (TL[2] ? D2+D4+   D16+    D64+D128+D256 : 10'd0) + 
 						 (TL[1] ? D2+D4+D8+    D32+    D128+D256 : 10'd0) + 
 						 (TL[0] ? D2+D4+D8+D16+    D64+     D256 : 10'd0));
+		
+		return RES;
+	endfunction
+	
+	function bit [15:0] VolCalc(bit [15:0] ENV, bit [7:0] TL);
+		bit [15:0] RES;
+		
+		RES = ENV>>>TL[7:4];
 		
 		return RES;
 	endfunction

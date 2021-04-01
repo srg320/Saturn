@@ -2,6 +2,7 @@ module Saturn (
 	input             CLK,
 	input             RST_N,
 	input             CE,
+	input             SCSP_CE,
 	
 	input             SRES_N,
 	
@@ -64,8 +65,9 @@ module Saturn (
 	output     [18:1] SCSP_RAM_A,
 	output     [15:0] SCSP_RAM_D,
 	output      [1:0] SCSP_RAM_WE,
-	input      [15:0] SCSP_RAM_Q,
 	output            SCSP_RAM_RD,
+	output            SCSP_RAM_CS,
+	input      [15:0] SCSP_RAM_Q,
 	input             SCSP_RAM_RDY,
 	
 	output      [7:0] R,
@@ -77,12 +79,16 @@ module Saturn (
 	output reg        HBL_N,
 	output reg        VBL_N,
 	
+	output     [15:0] SOUND_L,
+	output     [15:0] SOUND_R,
+	
 	input      [15:0] JOY1,
 	
 	input       [5:0] SCRN_EN,
 	input             PAUSE_EN,
 	
-	output      [7:0] DBG_WAIT_CNT
+	output      [7:0] DBG_WAIT_CNT,
+	output reg        DBG_HOOK
 );
 
 	bit MCLK;
@@ -374,7 +380,6 @@ module Saturn (
 	                  !BCS2_N ? VDP2_DO :
 							!BCSS_N ? SCSP_DO : 16'h0000;
 	assign IRQL_N   = 1;
-	assign IRQS_N   = 1;
 	
 	bit [20:0] BA;
 	SCU SCU
@@ -507,11 +512,13 @@ module Saturn (
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			DBG_WAIT_CNT <= '0;
+			DBG_HOOK <= 0;
 		end else if (CE_R) begin
 			DBG_WAIT_CNT <= DBG_WAIT_CNT + 8'd1;
 			if (CRD_N && CDQM_N[0] && CDQM_N[1] && CDQM_N[2] && CDQM_N[3]) begin
 				DBG_WAIT_CNT <= 8'd0;
 			end
+			if (CA == 25'h0012B0 && !CRD_N && !CCS3_N) DBG_HOOK <= 1;
 		end
 	end
 	
@@ -703,7 +710,7 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE(CE_R),
+		.CE(SCSP_CE),
 		
 		.RES_N(SYSRES_N),
 		
@@ -716,6 +723,7 @@ module Saturn (
 		.DTEN_N(BDTEN_N),
 		.WE_N(BWE_N),
 		.RDY_N(BRDYS_N),
+		.INT_N(IRQS_N),
 		
 		.SCCE_R(SCCE_R),
 		.SCCE_F(SCCE_F),
@@ -735,8 +743,12 @@ module Saturn (
 		.RAM_D(SCSP_RAM_D),
 		.RAM_WE(SCSP_RAM_WE),
 		.RAM_RD(SCSP_RAM_RD),
+		.RAM_CS(SCSP_RAM_CS),
 		.RAM_Q(SCSP_RAM_Q),
-		.RAM_RDY(SCSP_RAM_RDY)
+		.RAM_RDY(SCSP_RAM_RDY),
+		
+		.SOUND_L(SOUND_L),
+		.SOUND_R(SOUND_R)
 	);
 	
 	fx68k M68K

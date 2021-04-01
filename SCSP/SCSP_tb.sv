@@ -92,8 +92,8 @@ module SCSP_tb;
 		.oEdb(SCDI),
 		.eRWn(SCRW_N),
 		.ASn(SCAS_N),
-		.UDSn(SCUDS_N),
 		.LDSn(SCLDS_N),
+		.UDSn(SCUDS_N),
 		.DTACKn(SCDTACK_N),
 
 		.IPL0n(SCIPL_N[0]),
@@ -110,8 +110,8 @@ module SCSP_tb;
 		.BRn(1'b1),
 		.BGACKn(1'b1),
 
-		.BERRn(1'b1)/*,
-		.HALTn(1'b1)*/
+		.BERRn(1'b1),
+		.HALTn(1'b1)
 	);
 	
 	assign SCA_DBG = {SCA,1'b0};
