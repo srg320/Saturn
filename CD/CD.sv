@@ -37,6 +37,7 @@ module CD
 	output            RAM_CS,
 	output      [1:0] RAM_WE,
 	output            RAM_RD,
+	input             RAM_RDY,
 
 	input      [15:0] CD_D,
 	input             CD_CK
@@ -51,6 +52,7 @@ module CD
 	bit        SCS1_N;
 	bit        SCS2_N;
 	bit        SCS6_N;
+	bit        SWAIT_N;
 	bit        DACK0;
 	bit        DACK1;
 	bit        DREQ0_N;
@@ -87,6 +89,7 @@ module CD
 		.WRLN(SWRL_N),
 		.WRHN(SWRH_N),
 		.RDN(SRD_N),
+		.WAITN(SWAIT_N),
 		
 		.IRQ6N(SIRQL_N),
 		.IRQ7N(SIRQH_N),
@@ -155,6 +158,8 @@ module CD
 		.CD_D(CD_D),
 		.CD_CK(CD_CK)
 	);
+	
+	assign SWAIT_N = RAM_RDY;
 	
 	assign RAM_A = SA[18:1];
 	assign RAM_D = SDO;

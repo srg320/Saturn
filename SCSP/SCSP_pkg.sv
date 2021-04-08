@@ -331,9 +331,9 @@ package SCSP_PKG;
 		X = STACK[SCR4.MDXSL];
 		Y = STACK[SCR4.MDYSL];
 		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
-		MD = $signed(TEMP)>>>(15-SCR4.MDL);
+		MD = $signed(TEMP)>>>(26-SCR4.MDL);
 		
-		return MD;
+		return SCR4.MDL ? MD : '0;
 	endfunction
 	
 	function bit [25:0] PhaseCalc(SCR5_t SCR5);

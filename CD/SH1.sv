@@ -43,7 +43,8 @@ module SH1
 	
 	output            CS1N_CASHN,
 	output            CS2N,
-	output            CASLN
+	output            CASLN,
+	input             WAITN
 );
 
 	SH7034 #(rom_file) sh7034
@@ -63,7 +64,7 @@ module SH1
 		.PA0I_TIOCA0(TIOCA0),
 		.PA1I(1'b0),
 		.PA2I_TIOCB0(1'b0),
-		.PA3I_WAITN(1'b0),
+		.PA3I_WAITN(WAITN),
 		.PA4I(1'b0),
 		.PA5I(1'b0),
 		.PA6I(1'b0),

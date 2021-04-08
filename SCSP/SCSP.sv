@@ -180,7 +180,7 @@ module SCSP (
 		bit [15:0] NEW_PHASE_INT;
 		bit [15:0] NEW_SA_INT;
 		bit  [9:0] NEW_SA_FRAC;
-		//bit [15:0] LL;
+		bit [15:0] LL;
 		
 		if (!RST_N) begin
 			WD_READ <= 0;
@@ -193,17 +193,17 @@ module SCSP (
 			
 //			{NEW_PHASE_INT,NEW_PHASE_FRAC} = {16'h0000,PHASE_ACC[S]} + PHASE;
 			
-			//LL = SCR[S].LEA - SCR[S].LSA;
+			LL = SCR[S].LEA - SCR[S].LSA;
 			
-			{NEW_SA_INT,NEW_SA_FRAC} = {SA[S],SAF[S]} + PHASE;
+			{NEW_SA_INT,NEW_SA_FRAC} = {SA[S],SAF[S]} + PHASE + {OP3_MD,10'h000};
 			
 			WD_READ <= 0;
 			if (SLOT_CE) begin
-				if (EVOL[S]) begin
+				if (EVOL[S] != 10'h3FF) begin
 //					PHASE_ACC[S] <= NEW_PHASE_FRAC;
 					
 					if (NEW_SA_INT >= SCR[S].LEA) begin
-						{SA[S],SAF[S]} <= {SCR[S].LSA,10'h000};//NEW_SA_INT - LL;
+						{SA[S],SAF[S]} <= {NEW_SA_INT - LL,NEW_SA_FRAC};//{SCR[S].LSA,10'h000};
 					end else begin
 						{SA[S],SAF[S]} <= {NEW_SA_INT,NEW_SA_FRAC};
 					end
@@ -237,7 +237,7 @@ module SCSP (
 			end
 		end
 	end
-	assign ADP = {SCR[OP3_PIPE.SLOT].SCR0.SAH,SCR[OP3_PIPE.SLOT].SA} + ((SA[OP3_PIPE.SLOT] + OP3_MD)<<1);
+	assign ADP = {SCR[OP3_PIPE.SLOT].SCR0.SAH,SCR[OP3_PIPE.SLOT].SA} + {3'b000,SA[OP3_PIPE.SLOT],1'b0};
 	
 	//Operation 4: EG
 	bit  [9:0] EVOL[32]; //Envelope level
@@ -249,7 +249,7 @@ module SCSP (
 		
 		if (!RST_N) begin
 			OP5_PIPE <= OP_PIPE_RESET;
-			EVOL <= '{32{'0}};
+			EVOL <= '{32{'1}};
 			EGST <= '{32{EGS_RELEASE}};
 		end
 		else begin
@@ -257,46 +257,46 @@ module SCSP (
 			if (SLOT_CE) begin
 				case (EGST[S])
 					EGS_ATTACK: begin
-						VOL_NEXT = EVOL[S] + {SCR[S].SCR2.AR,5'b11111};
+						VOL_NEXT = EVOL[S] - {SCR[S].SCR2.AR,5'b11111} + 1;
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
-							EVOL[S] <= 10'h3FF;
+							EVOL[S] <= 10'h000;
 							EGST[S] <= EGS_DECAY1;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
 					end
 					
 					EGS_DECAY1: begin
-						VOL_NEXT = EVOL[S] - {SCR[S].SCR2.D1R,5'b00000};
-						if (VOL_NEXT[9:5] > SCR[S].SCR1.DL) begin
+						VOL_NEXT = EVOL[S] + {SCR[S].SCR2.D1R,5'b00000};
+						if (VOL_NEXT[9:5] < SCR[S].SCR1.DL) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
-							EVOL[S] <= {SCR[S].SCR1.DL,5'b00000};
+							EVOL[S] <= VOL_NEXT[9:0];//{SCR[S].SCR1.DL,5'b00000};
 							EGST[S] <= EGS_DECAY2;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
 					end
 					
 					EGS_DECAY2: begin
-						VOL_NEXT = EVOL[S] - {SCR[S].SCR2.D2R,5'b00000};
+						VOL_NEXT = EVOL[S] + {SCR[S].SCR2.D2R,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
-							EVOL[S] <= 10'h000;
+							EVOL[S] <= 10'h3FF;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
 					end
 					
 					EGS_RELEASE: begin
-						VOL_NEXT = EVOL[S] - {SCR[S].SCR1.RR,5'b00000};
+						VOL_NEXT = EVOL[S] + {SCR[S].SCR1.RR,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
-							EVOL[S] <= 10'h000;
+							EVOL[S] <= 10'h3FF;
 						end
 						if (OP4_PIPE.KON) begin
-							EVOL[S] <= 10'h000;
+							EVOL[S] <= 10'h3FF;
 							EGST[S] <= EGS_ATTACK;
 						end
 					end
@@ -324,7 +324,7 @@ module SCSP (
 			TL = SCR[S].SCR3.TL;
 			if (SLOT_CE) begin
 				TEMP = VolCalc(OP5_WD, TL);
-				OP6_SD <= EVOL[S] ? TEMP : '0;
+				OP6_SD <= EVOL[S] != 10'h3FF ? TEMP : '0;
 				OP6_PIPE <= OP5_PIPE;
 			end
 //			EVOL_DBG <= TEMP;
@@ -343,7 +343,7 @@ module SCSP (
 		else begin
 			S = OP6_PIPE.SLOT;
 			if (SLOT_CE) begin
-				TEMP = $signed(OP6_SD) * EVOL[S];
+				TEMP = $signed(OP6_SD) * (10'h3FF-EVOL[S]);
 				OP7_SD <= TEMP[25:10];
 				OP7_PIPE <= OP6_PIPE;
 			end
