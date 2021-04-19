@@ -2,7 +2,6 @@ module Saturn (
 	input             CLK,
 	input             RST_N,
 	input             CE,
-	input             SCSP_CE,
 	
 	input             SRES_N,
 	
@@ -62,6 +61,7 @@ module Saturn (
 	output      [1:0] VDP2_RB1_WE,
 	output            VDP2_RB1_RD,
 
+	input             SCSP_CE,
 	output     [18:1] SCSP_RAM_A,
 	output     [15:0] SCSP_RAM_D,
 	output      [1:0] SCSP_RAM_WE,
@@ -69,6 +69,23 @@ module Saturn (
 	output            SCSP_RAM_CS,
 	input      [15:0] SCSP_RAM_Q,
 	input             SCSP_RAM_RDY,
+
+	input             CD_CE,
+	input             CD_CDATA,
+	output            CD_HDATA,
+	output            CD_COMCLK,
+	input             CD_COMREQ_N,
+	input             CD_COMSYNC_N,
+	output            CD_DEMP,
+	input      [15:0] CD_D,
+	input             CD_CK,
+	output     [18:1] CD_RAM_A,
+	output     [15:0] CD_RAM_D,
+	output      [1:0] CD_RAM_WE,
+	output            CD_RAM_RD,
+	output            CD_RAM_CS,
+	input      [15:0] CD_RAM_Q,
+	input             CD_RAM_RDY,
 	
 	output      [7:0] R,
 	output      [7:0] G,
@@ -216,6 +233,7 @@ module Saturn (
 	//SMPC
 	bit   [7:0] SMPC_DO;
 	bit         SNDRES_N;
+	bit         CDRES_N;
 	
 	//VDP1
 	bit  [15:0] VDP1_DO;
@@ -229,6 +247,9 @@ module Saturn (
 	//SCSP
 	bit  [15:0] SCSP_DO;
 	
+	//CD
+	bit  [15:0] CD_DO;
+	bit         ARQT_N;
 	
 	SH7604 MSH
 	(
@@ -372,14 +393,17 @@ module Saturn (
 	assign CDQM_N   = MSHDQM_N;
 	assign CRD_N    = MSHRD_N;
 	assign CIVECF_N = MSHIVECF_N;
-	
 	assign ECWAIT_N = MEM_WAIT_N;
-	assign AWAIT_N  = 1;
-	assign AIRQ_N   = 1;
+	
+	assign ADI      = !ACS2_N ? CD_DO  : 16'h0000;
+//	assign AWAIT_N  = 1;
+	assign AIRQ_N   = ARQT_N;
+	
 	assign BDI      = !BCS1_N ? VDP1_DO :
 	                  !BCS2_N ? VDP2_DO :
 							!BCSS_N ? SCSP_DO : 16'h0000;
 	assign IRQL_N   = 1;
+	
 	
 	bit [20:0] BA;
 	SCU SCU
@@ -574,7 +598,7 @@ module Saturn (
 		
 		.SYSRES_N(SYSRES_N),
 		.SNDRES_N(SNDRES_N),
-		.CDRES_N(),
+		.CDRES_N(CDRES_N),
 		
 		.MIRQ_N(MIRQ_N),
 		
@@ -789,48 +813,172 @@ module Saturn (
 	
 	
 	//CD
-	bit [15:0] AD;
-	assign AD = AA[1] ? CDI[15:0] : CDI[31:16];
+	bit [21:0] SA;
+	bit [15:0] SDI;
+	bit [15:0] SDO;
+	bit        SWRL_N;
+	bit        SWRH_N;
+	bit        SRD_N;
+	bit        SCS1_N;
+	bit        SCS2_N;
+	bit        SCS6_N;
+	bit        SWAIT_N;
+	bit        DACK0;
+	bit        DACK1;
+	bit        DREQ0_N;
+	bit        DREQ1_N;
+	bit        SIRQL_N;
+	bit        SIRQH_N;
 	
-	bit [15:0] HIRQ;
-	bit [15:0] HIRQMASK;
-	bit [15:0] CR[4];
-	always @(posedge CLK or negedge RST_N) begin
-		if (!RST_N) begin
-			HIRQ <= 16'hFFFF;
-			HIRQMASK <= 16'hFFFF;
-			CR <= '{16'h0043,16'h4442,16'h4C4F,16'h434B};//'{16'hFFFF,16'hFFFF,16'hFFFF,16'hFFFF}
-		end else if (CE_R) begin
-			if (!ACS2_N && AA[25:16] == 10'h189 && (!AWRL_N || !AWRU_N)) begin
-				case ({AA[15:1],1'b0})
-//					16'h0008: HIRQ <= HIRQ & AD;//HIRQ
-					16'h000C: HIRQMASK <= AD;	//HIRQMASK
-//					16'h0018: CR[0] <= AD;	//CR1
-//					16'h001C: CR[1] <= AD;	//CR2
-//					16'h0020: CR[2] <= AD;	//CR3
-//					16'h0024: CR[3] <= AD;	//CR4
-					default: ;
-				endcase
-			end
-		end
+	bit [15:0] YGR019_SDO;
+	
+	bit SHCLK;
+	bit SHCE_R, SHCE_F;
+	always @(posedge CLK) begin
+		if (CD_CE) SHCLK <= ~SHCLK;
 	end
+	assign SHCE_R =  SHCLK & CD_CE;
+	assign SHCE_F = ~SHCLK & CD_CE;
+	
+	SH1 #("cdb105.mif") sh1
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		.CE_R(SHCE_R),
+		.CE_F(SHCE_F),
+		
+		.RES_N(CDRES_N),
+		
+		.A(SA),
+		.DI(SDI),
+		.DO(SDO),
+		
+		.CS1N_CASHN(SCS1_N),//in original CASH_N
+		.CS2N(SCS2_N),
+		.CS6N(SCS6_N),
+		.WRLN(SWRL_N),
+		.WRHN(SWRH_N),
+		.RDN(SRD_N),
+		.WAITN(SWAIT_N),
+		
+		.IRQ6N(SIRQL_N),
+		.IRQ7N(SIRQH_N),
+		
+		.DACK0(DACK0),
+		.DACK1(DACK1),
+		.DREQ0N(DREQ0_N),
+		.DREQ1N(DREQ1_N),
+		
+		.RXD0(CD_CDATA),
+		.TXD0(CD_HDATA),
+		.SCK0O(CD_COMCLK),
+		.PB2I(CD_COMSYNC_N),
+		.TIOCB3(CD_COMREQ_N),
+		.PB6O(CD_DEMP),
+		
+		.TIOCA0(1'b0),//MPEG
+		.TIOCA1(1'b0),//MPEG
+		.TIOCA2(1'b1),//MPEGA_IRQ_N
+		.TIOCB2(1'b1)//MPEGV_IRQ_N
+	);
+	
+	assign SDI = !SCS1_N ? CD_RAM_Q : YGR019_SDO;
+	
+	YGR019 ygr 
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		
+		.RES_N(CDRES_N),
+		
+		.CE_R(CE_R),
+		.CE_F(CE_F),
+		.AA(AA[14:1]),
+		.ADI(ADO),
+		.ADO(CD_DO),
+		.AFC(AFC),
+		.ACS2_N(ACS2_N),
+		.ARD_N(ARD_N),
+		.AWRL_N(AWRL_N),
+		.AWRU_N(AWRU_N),
+		.ATIM0_N(ATIM0_N),
+		.ATIM2_N(ATIM2_N),
+		.AWAIT_N(AWAIT_N),
+		.ARQT_N(ARQT_N),
+		
+		.SHCE_R(SHCE_R),
+		.SHCE_F(SHCE_F),
+		.SA(SA[21:1]),
+		.SDI(SDO),
+		.BDI(SDI),
+		.SDO(YGR019_SDO),
+		.SWRL_N(SWRL_N),
+		.SWRH_N(SWRH_N),
+		.SRD_N(SRD_N),
+		.SCS2_N(SCS2_N),
+		.SCS6_N(SCS6_N),
+		.SIRQL_N(SIRQL_N),
+		.SIRQH_N(SIRQH_N),
+		
+		.DACK0(DACK0),
+		.DACK1(DACK1),
+		.DREQ0_N(DREQ0_N),
+		.DREQ1_N(DREQ1_N),
 
-	always_comb begin
-		ADI = '0;
-		if (!ACS1_N) begin
-			ADI = 16'hFFFF;
-		end else if (!ACS2_N && AA[25:16] == 10'h189) begin
-			case ({AA[15:1],1'b0})
-				16'h0008: ADI = HIRQ;		//HIRQ
-				16'h000C: ADI = HIRQMASK;	//HIRQMASK
-				16'h0018: ADI = CR[0];		//CR1
-				16'h001C: ADI = CR[1];		//CR2
-				16'h0020: ADI = CR[2];		//CR3
-				16'h0024: ADI = CR[3];		//CR4
-				default: ADI = '0;
-			endcase
-		end
-	end
+		.CD_D(CD_D),
+		.CD_CK(CD_CK)
+	);
+	
+	assign SWAIT_N = CD_RAM_RDY;
+	
+	assign CD_RAM_A = SA[18:1];
+	assign CD_RAM_D = SDO;
+	assign CD_RAM_CS = ~SCS1_N;
+	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
+	assign CD_RAM_RD = ~SRD_N;
+	
+//	bit [15:0] AD;
+//	assign AD = AA[1] ? CDI[15:0] : CDI[31:16];
+//	
+//	bit [15:0] HIRQ;
+//	bit [15:0] HIRQMASK;
+//	bit [15:0] CR[4];
+//	always @(posedge CLK or negedge RST_N) begin
+//		if (!RST_N) begin
+//			HIRQ <= 16'hFFFF;
+//			HIRQMASK <= 16'hFFFF;
+//			CR <= '{16'h0043,16'h4442,16'h4C4F,16'h434B};//'{16'hFFFF,16'hFFFF,16'hFFFF,16'hFFFF}
+//		end else if (CE_R) begin
+//			if (!ACS2_N && AA[25:16] == 10'h189 && (!AWRL_N || !AWRU_N)) begin
+//				case ({AA[15:1],1'b0})
+////					16'h0008: HIRQ <= HIRQ & AD;//HIRQ
+//					16'h000C: HIRQMASK <= AD;	//HIRQMASK
+////					16'h0018: CR[0] <= AD;	//CR1
+////					16'h001C: CR[1] <= AD;	//CR2
+////					16'h0020: CR[2] <= AD;	//CR3
+////					16'h0024: CR[3] <= AD;	//CR4
+//					default: ;
+//				endcase
+//			end
+//		end
+//	end
+//
+//	always_comb begin
+//		ADI = '0;
+//		if (!ACS1_N) begin
+//			ADI = 16'hFFFF;
+//		end else if (!ACS2_N && AA[25:16] == 10'h189) begin
+//			case ({AA[15:1],1'b0})
+//				16'h0008: ADI = HIRQ;		//HIRQ
+//				16'h000C: ADI = HIRQMASK;	//HIRQMASK
+//				16'h0018: ADI = CR[0];		//CR1
+//				16'h001C: ADI = CR[1];		//CR2
+//				16'h0020: ADI = CR[2];		//CR3
+//				16'h0024: ADI = CR[3];		//CR4
+//				default: ADI = '0;
+//			endcase
+//		end
+//	end
 	
 	
 endmodule

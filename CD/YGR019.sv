@@ -84,6 +84,7 @@ module YGR019 (
 	always @(posedge CLK or negedge RST_N) begin
 		bit        SWR_N_OLD;
 		bit        SRD_N_OLD;
+		bit        DACK1_OLD;
 		bit        FIFO_INC_AMOUNT;
 		bit        FIFO_DEC_AMOUNT;
 		bit        FIFO_DREQ_AVAIL;
@@ -110,6 +111,8 @@ module YGR019 (
 			FIFO_DREQ_AVAIL <= 0;
 			FIFO_DREQ_PEND <= 0;
 			FIFO_DREQ <= 0;
+			
+			SIRQL_N <= 1;
 		end else begin
 			if (!RES_N) begin
 				
@@ -121,7 +124,7 @@ module YGR019 (
 					if ((!AWRL_N || !AWRU_N) && CE_R) begin
 						case ({AA[5:2],2'b00})
 //							6'h00: DTR <= ADI;
-							6'h08: HIRQ <= ADI;
+							6'h08: HIRQ <= HIRQ & ADI;
 							6'h0C: HMASK <= ADI;
 							6'h18: CR[0] <= ADI;
 							6'h1C: CR[1] <= ADI;
@@ -145,7 +148,7 @@ module YGR019 (
 							6'h18: SCU_REG_DO <= RR[0];
 							6'h1C: SCU_REG_DO <= RR[1];
 							6'h20: SCU_REG_DO <= RR[2];
-							6'h24: SCU_REG_DO <= RR[3];
+							6'h24: begin SCU_REG_DO <= RR[3]; MBX[1] <= 1; end
 							default: SCU_REG_DO <= '0;
 						endcase
 					end
@@ -241,8 +244,9 @@ module YGR019 (
 					end
 				end
 				
-				if (SHCE_F) begin
-					if (TRCTL[2] && !DACK1) begin
+				if (SHCE_R) begin
+					DACK1_OLD <= DACK1;
+					if (TRCTL[2] && DACK1 && !DACK1_OLD) begin
 						FIFO_BUF[FIFO_WR_POS] <= BDI;
 						FIFO_WR_POS <= FIFO_WR_POS + 3'd1;
 //						if (FIFO_WR_POS[1:0] == 2'd3) begin
@@ -263,7 +267,7 @@ module YGR019 (
 	assign SDO = SH_REG_DO;
 	assign SIRQH_N = ~|(CDIRQ & HMASK);
 	assign DREQ0_N = 1;
-	assign DREQ1_N = ~|FIFO_DREQ;
+	assign DREQ1_N = ~FIFO_DREQ;
 	
 	
 endmodule
