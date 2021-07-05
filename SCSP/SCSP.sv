@@ -257,7 +257,7 @@ module SCSP (
 			if (SLOT_CE) begin
 				case (EGST[S])
 					EGS_ATTACK: begin
-						VOL_NEXT = EVOL[S] - {SCR[S].SCR2.AR,5'b11111} + 1;
+						VOL_NEXT = EVOL[S] - {SCR[S].SCR2.AR,5'b11111} + 11'd1;
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin

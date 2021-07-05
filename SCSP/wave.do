@@ -17,8 +17,10 @@ add wave -noupdate /SCSP_tb/SCSP/MEM_D
 add wave -noupdate /SCSP_tb/SCSP/MEM_Q
 add wave -noupdate /SCSP_tb/SCSP/MEM_WE
 add wave -noupdate /SCSP_tb/SCSP/MEM_RD
+add wave -noupdate /SCSP_tb/SCSP/MEM_CS
+add wave -noupdate /SCSP_tb/SCSP/REG_CS
 TreeUpdate [SetDefaultTree]
-WaveRestoreCursors {{Cursor 1} {695 ns} 0}
+WaveRestoreCursors {{Cursor 1} {2999951 ns} 0}
 quietly wave cursor active 1
 configure wave -namecolwidth 150
 configure wave -valuecolwidth 100
@@ -34,4 +36,4 @@ configure wave -griddelta 40
 configure wave -timeline 0
 configure wave -timelineunits us
 update
-WaveRestoreZoom {3823 ns} {4823 ns}
+WaveRestoreZoom {2999050 ns} {3000050 ns}

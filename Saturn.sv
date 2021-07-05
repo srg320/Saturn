@@ -105,7 +105,8 @@ module Saturn (
 	input             PAUSE_EN,
 	
 	output      [7:0] DBG_WAIT_CNT,
-	output reg        DBG_HOOK
+	output reg        DBG_HOOK,
+	output reg  [7:0] DBG_CD_CNT
 );
 
 	bit MCLK;
@@ -910,8 +911,8 @@ module Saturn (
 		.SHCE_F(SHCE_F),
 		.SA(SA[21:1]),
 		.SDI(SDO),
-		.BDI(SDI),
 		.SDO(YGR019_SDO),
+		.BDI(SDI),
 		.SWRL_N(SWRL_N),
 		.SWRH_N(SWRH_N),
 		.SRD_N(SRD_N),
@@ -932,53 +933,24 @@ module Saturn (
 	assign SWAIT_N = CD_RAM_RDY;
 	
 	assign CD_RAM_A = SA[18:1];
-	assign CD_RAM_D = SDO;
+	assign CD_RAM_D = YGR019_SDO;
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
 	
-//	bit [15:0] AD;
-//	assign AD = AA[1] ? CDI[15:0] : CDI[31:16];
-//	
-//	bit [15:0] HIRQ;
-//	bit [15:0] HIRQMASK;
-//	bit [15:0] CR[4];
-//	always @(posedge CLK or negedge RST_N) begin
-//		if (!RST_N) begin
-//			HIRQ <= 16'hFFFF;
-//			HIRQMASK <= 16'hFFFF;
-//			CR <= '{16'h0043,16'h4442,16'h4C4F,16'h434B};//'{16'hFFFF,16'hFFFF,16'hFFFF,16'hFFFF}
-//		end else if (CE_R) begin
-//			if (!ACS2_N && AA[25:16] == 10'h189 && (!AWRL_N || !AWRU_N)) begin
-//				case ({AA[15:1],1'b0})
-////					16'h0008: HIRQ <= HIRQ & AD;//HIRQ
-//					16'h000C: HIRQMASK <= AD;	//HIRQMASK
-////					16'h0018: CR[0] <= AD;	//CR1
-////					16'h001C: CR[1] <= AD;	//CR2
-////					16'h0020: CR[2] <= AD;	//CR3
-////					16'h0024: CR[3] <= AD;	//CR4
-//					default: ;
-//				endcase
-//			end
-//		end
-//	end
-//
-//	always_comb begin
-//		ADI = '0;
-//		if (!ACS1_N) begin
-//			ADI = 16'hFFFF;
-//		end else if (!ACS2_N && AA[25:16] == 10'h189) begin
-//			case ({AA[15:1],1'b0})
-//				16'h0008: ADI = HIRQ;		//HIRQ
-//				16'h000C: ADI = HIRQMASK;	//HIRQMASK
-//				16'h0018: ADI = CR[0];		//CR1
-//				16'h001C: ADI = CR[1];		//CR2
-//				16'h0020: ADI = CR[2];		//CR3
-//				16'h0024: ADI = CR[3];		//CR4
-//				default: ADI = '0;
-//			endcase
-//		end
-//	end
+	always @(posedge CLK or negedge RST_N) begin
+		bit SWR_OLD;
+		if (!RST_N) begin
+			DBG_CD_CNT <= '0;
+		end else if (SHCE_R) begin
+			SWR_OLD <= ~SWRL_N || ~SWRH_N;
+			if ((!SWRL_N || !SWRH_N) && !SWR_OLD) begin
+				if (!SCS1_N && SA[18:1] == 18'h3AC0C) begin
+					DBG_CD_CNT <= DBG_CD_CNT + 8'd1;
+				end
+			end
+		end
+	end
 	
 	
 endmodule
