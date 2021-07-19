@@ -1181,7 +1181,7 @@ package VDP2_PKG;
 	{
 		bit [ 2: 0] CHCN;
 		bit         CHSZ;
-		bit [ 1: 0] BMSZ;
+		bit         BMSZ;
 		bit         BMEN;
 		PNCNx_t     PNC;
 		bit [ 2: 0] BMP;
@@ -1647,14 +1647,21 @@ package VDP2_PKG;
 	
 	function bit [19:1] NxBMAddr(input bit [2:0] NxMP, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, input bit [2:0] NxCHCN, input bit [1:0] NxBMSZ);
 		bit   [19:1] addr;
-		bit    [4:0] cell_offs;
+		bit   [16:0] offs;
 
+		case (NxBMSZ)
+			2'b00: offs = {NxMP[2:0],NxOFFY[7:0],NxOFFX[8:3]};	//512x256 dots
+			2'b01: offs = {NxMP[1:0],NxOFFY[8:0],NxOFFX[8:3]};	//512x512 dots
+			2'b10: offs = {NxMP[0:0],NxOFFY[7:0],NxOFFX[9:3]};	//1024x256 dots
+			2'b11: offs = {NxMP[0:0],NxOFFY[8:0],NxOFFX[9:3]};	//1024x512 dots
+		endcase
+		
 		case (NxCHCN)
-			3'b000: addr = {NxMP[2:0],NxOFFY[7:0],NxOFFX[8:3],              1'b0};	//4bits/dot, 16 colors
-			3'b001: addr = {NxMP[1:0],NxOFFY[7:0],NxOFFX[8:3],NxCH_CNT[0:0],1'b0};	//8bits/dot, 256 colors
+			3'b000: addr = {offs[16:0],              1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {offs[15:0],NxCH_CNT[0:0],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {NxMP[0:0],NxOFFY[7:0],NxOFFX[8:3],NxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {          NxOFFY[7:0],NxOFFX[8:3],NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			3'b011: addr = {offs[14:0],NxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {offs[13:0],NxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	
@@ -1949,21 +1956,25 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] RxBMAddr(input bit [2:0] RxMP, input bit [2:0] RxCH_CNT, input bit [10:0] RxOFFX, input bit [10:0] RxOFFY, input bit [2:0] RxCHCN, input bit [1:0] RxBMSZ);
+	function bit [19:1] RxBMAddr(input bit [2:0] RxMP, input bit [2:0] RxCH_CNT, input bit [10:0] RxOFFX, input bit [10:0] RxOFFY, input bit [2:0] RxCHCN, input bit RxBMSZ);
 		bit   [19:1] addr;
-		bit    [4:0] cell_offs;
+		bit   [16:0] offs;
+
+		case (RxBMSZ)
+			1'b0: offs = {RxMP[2:0],RxOFFY[7:0],RxOFFX[8:3]};	//512x256 dots
+			1'b1: offs = {RxMP[1:0],RxOFFY[8:0],RxOFFX[8:3]};	//512x512 dots
+		endcase
 
 		case (RxCHCN)
-			3'b000: addr = {RxMP[2:0],RxOFFY[7:0],RxOFFX[8:3],              1'b0};	//4bits/dot, 16 colors
-			3'b001: addr = {RxMP[1:0],RxOFFY[7:0],RxOFFX[8:3],RxCH_CNT[0:0],1'b0};	//8bits/dot, 256 colors
+			3'b000: addr = {offs[16:0],              1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {offs[15:0],RxCH_CNT[0:0],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {RxMP[0:0],RxOFFY[7:0],RxOFFX[8:3],RxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {          RxOFFY[7:0],RxOFFX[8:3],RxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			3'b011: addr = {offs[14:0],RxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {offs[13:0],RxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	
 		return addr;
 	endfunction
-	
 	
 endpackage

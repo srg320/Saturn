@@ -42,7 +42,9 @@ module YGR019 (
 	
 	output     [15:0] CR0,
 	output     [31:0] DBG_HEADER,
-	output     [7:0] DBG_CNT
+	output     [7:0] DBG_CNT,
+	output     [7:0] FIFO_CNT_DBG,
+	output     [7:0] ABUS_WAIT_CNT_DBG
 );
 	import YGR019_PKG::*;
 
@@ -66,7 +68,7 @@ module YGR019 (
 	bit        FIFO_FULL;
 	bit        FIFO_EMPTY;
 	bit        FIFO_DREQ;
-	bit        CDD_DREQ;
+	bit  [1:0] CDD_DREQ;
 	
 	bit        CDFIFO_RD;
 	bit        CDFIFO_WR;
@@ -82,7 +84,7 @@ module YGR019 (
 		.CLK(CLK),
 		.RST_N(RST_N),
 		.IN_CLK(53693175),
-		.OUT_CLK(44100*2),
+		.OUT_CLK(44100*2*2),
 		.CE(CDD_CE)
 	);
 
@@ -102,9 +104,14 @@ module YGR019 (
 	
 	wire SCU_REG_SEL = (AA[14:12] == 3'b000) & ~ACS2_N;
 	wire SH_REG_SEL = (SA[21:20] == 2'b00) & ~SCS2_N;
+	wire SCU_DATA_WAIT = SCU_REG_SEL && AA[5:2] == 4'b0000 && FIFO_EMPTY;
 	bit [15:0] SCU_REG_DO;
+	bit        ABUS_WAIT;
 	bit [15:0] SH_REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
+		bit        AWR_N_OLD;
+		bit        ARD_N_OLD;
+		bit        SCU_REG_SEL_OLD;
 		bit        SWR_N_OLD;
 		bit        SRD_N_OLD;
 		bit        DACK0_OLD;
@@ -122,17 +129,18 @@ module YGR019 (
 			CR <= '{4{'0}};
 			RR <= '{4{'0}};
 			HIRQ <= '0;
-			HMASK <= '1;
+			HMASK <= '0;
 
 			REG08 <= '0;
 			REG1A <= '0;
 			REG1C <= 16'h0016;
 			
 			CDIRQ <= '0;
-			CDMASK <= '1;
+			CDMASK <= '0;
 			
-			SCU_REG_DO <= '0;
+//			SCU_REG_DO <= '0;
 			SH_REG_DO <= '0;
+			ABUS_WAIT <= 0;
 			
 			FIFO_BUF <= '{8{'0}};
 			FIFO_WR_POS <= '0;
@@ -144,7 +152,7 @@ module YGR019 (
 			FIFO_DREQ_PEND <= 0;
 			FIFO_DREQ <= 0;
 			
-			CDD_DREQ <= 0;
+			CDD_DREQ <= '0;
 			CDD_WAIT <= 0;
 			CDD_SYNCED <= 0;
 			CDD_CNT <= 4'd0;
@@ -158,8 +166,19 @@ module YGR019 (
 				FIFO_INC_AMOUNT = 0;
 				FIFO_DEC_AMOUNT = 0;
 
+				if (/*!SCU_DATA_WAIT &&*/ CE_R) begin
+					AWR_N_OLD <= AWRL_N & AWRU_N;
+					ARD_N_OLD <= ARD_N;
+				end
+				
+				if (CE_F) begin
+					SCU_REG_SEL_OLD <= SCU_REG_SEL;
+				end
+				
+				if (ABUS_WAIT_CNT_DBG < 8'h80 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 1;
+				
 				if (SCU_REG_SEL) begin
-					if ((!AWRL_N || !AWRU_N) && CE_R) begin
+					if ((!AWRL_N || !AWRU_N) /*&& AWR_N_OLD*/ && !SCU_DATA_WAIT && CE_R) begin
 						case ({AA[5:2],2'b00})
 //							6'h00: DTR <= ADI;
 							6'h08: HIRQ <= HIRQ & ADI;
@@ -170,24 +189,35 @@ module YGR019 (
 							6'h24: begin CR[3] <= ADI; SIRQL_N <= 0; end
 							default:;
 						endcase
-					end else if (!ARD_N && CE_F) begin
+					end else if (!ARD_N && ARD_N_OLD /*&& !SCU_DATA_WAIT*/ && CE_F) begin
 						case ({AA[5:2],2'b00})
 							6'h00: begin
-								SCU_REG_DO <= FIFO_BUF[FIFO_RD_POS]; 
-								FIFO_RD_POS <= FIFO_RD_POS + 3'd1;
-								FIFO_DEC_AMOUNT = 1;
-								if (FIFO_RD_POS[1:0] == 2'd3) begin
-									FIFO_DREQ_PEND <= 1;
-								end
+								ABUS_WAIT <= 1;
+								ABUS_WAIT_CNT_DBG <= '0;
 							end
-							6'h08: SCU_REG_DO <= HIRQ;
-							6'h0C: SCU_REG_DO <= HMASK;
-							6'h18: SCU_REG_DO <= RR[0];
-							6'h1C: SCU_REG_DO <= RR[1];
-							6'h20: SCU_REG_DO <= RR[2];
-							6'h24: begin SCU_REG_DO <= RR[3]; MBX[1] <= 1; end
-							default: SCU_REG_DO <= '0;
+//							6'h24: begin MBX[1] <= 1; end
+							default: ;
 						endcase
+					end
+				end else if (SCU_REG_SEL_OLD && ARD_N && !ARD_N_OLD && CE_F) begin
+					case ({AA[5:2],2'b00})
+						6'h00: begin
+							FIFO_RD_POS <= FIFO_RD_POS + 3'd1;
+							FIFO_DEC_AMOUNT = 1;
+//							if (FIFO_RD_POS[1:0] == 2'd3) begin
+							if (FIFO_AMOUNT == 7'd1) begin
+								FIFO_DREQ_PEND <= 1;
+							end
+						end
+						6'h24: begin MBX[1] <= 1; end
+						default:;
+					endcase
+				end
+				
+				if (CE_F) begin
+					if (ABUS_WAIT && !FIFO_EMPTY) begin
+						ABUS_WAIT <= 0;
+						ABUS_WAIT_CNT_DBG <= 8'hFF;
 					end
 				end
 				
@@ -201,10 +231,6 @@ module YGR019 (
 									if (TRCTL[2]) begin
 										FIFO_BUF[FIFO_WR_POS] <= SDI;
 										FIFO_WR_POS <= FIFO_WR_POS + 3'd1;
-	//									if (FIFO_WR_POS[1:0] == 2'd3) begin
-	//										FIFO_DREQ_AVAIL <= 1;
-	//										FIFO_DREQ_PEND <= 1;
-	//									end
 										FIFO_INC_AMOUNT = 1;
 									end
 								end
@@ -262,26 +288,22 @@ module YGR019 (
 				
 				//DREQ1
 				if (SHCE_R) begin
+					if (FIFO_CNT_DBG < 8'h80) FIFO_CNT_DBG <= FIFO_CNT_DBG + 1;
+					
 					if (FIFO_DREQ_PEND) begin
 						FIFO_DREQ_PEND <= 0;
 						FIFO_DREQ <= 1;
-//					end else if (FIFO_DREQ) begin
-//						FIFO_DREQ <= 0;
+						FIFO_CNT_DBG <= '0;
 					end
-				end
-				
-				if (SHCE_R) begin
+
 					DACK1_OLD <= DACK1;
 					if (TRCTL[2] && DACK1 && !DACK1_OLD) begin
 						FIFO_BUF[FIFO_WR_POS] <= BDI;
 						FIFO_WR_POS <= FIFO_WR_POS + 3'd1;
-//						if (FIFO_WR_POS[1:0] == 2'd3) begin
-//							FIFO_DREQ_AVAIL <= 1;
-//							FIFO_DREQ_PEND <= 1;
-//						end
 						FIFO_INC_AMOUNT = 1;
-						if (!FIFO_EMPTY && FIFO_DREQ) begin
+						if (FIFO_AMOUNT > 7'd2 && FIFO_DREQ) begin
 							FIFO_DREQ <= 0;
+							FIFO_CNT_DBG <= 8'hFF;
 						end
 					end
 				end
@@ -312,9 +334,8 @@ module YGR019 (
 						end else if (CDD_CNT == 12'd12) begin
 							DBG_HEADER[31:16] <= CDFIFO_Q;
 						end else if (CDD_CNT == 12'd14) begin
-							DBG_HEADER[15:0] <= CDFIFO_Q;
-						end else if (CDD_CNT == 12'd16) begin
 							CDIRQ[4] <= 1;
+							DBG_HEADER[15:0] <= CDFIFO_Q;
 						end else if (CDD_CNT == 12'd2352-2) begin
 							CDD_SYNCED <= 0;
 							CDD_CNT <= 12'd0;
@@ -325,68 +346,46 @@ module YGR019 (
 				end
 				
 				if (SHCE_R) begin
-					if (CDD_PEND) begin
-						CDD_DREQ <= REG1A[7];
-						CDD_PEND <= 0;
-					end else if (CDD_DREQ) begin
-						CDD_DREQ <= 0;
-					end
+					if (DBG_CNT < 8'h80) DBG_CNT <= DBG_CNT + 1;
 					
-					DBG_CNT <= DBG_CNT + 1;
+					if (CDD_PEND) begin
+						CDD_DREQ[0] <= REG1A[7];
+						CDD_PEND <= 0;
+						if (REG1A[7]) DBG_CNT <= '0;
+					end else if (CDD_DREQ[0]) begin
+						CDD_DREQ[0] <= 0;
+					end
+					CDD_DREQ[1] <= CDD_DREQ[0];
 					
 					DACK0_OLD <= DACK0;
 					if (DACK0 && !DACK0_OLD) begin
-						DBG_CNT <= '0;
+						DBG_CNT <= 8'hFF;
 					end
 				end
-				
-//				if (SHCE_R) begin
-//					CD_CK_OLD <= CD_CK;
-//					if (CD_CK && !CD_CK_OLD) begin
-//						CDD_CNT <= CDD_CNT + 12'd2;
-//						if (!CDD_SYNCED) begin
-//							if (CDD_CNT == 12'd10) begin
-//								CDD_SYNCED <= 1; 
-//								REG1A[7] <= 1; 
-//							end
-//						end else if (CDD_CNT == 12'd12) begin
-//							DBG_HEADER[31:16] <= CD_D;
-//						end else if (CDD_CNT == 12'd14) begin
-//							DBG_HEADER[15:0] <= CD_D;
-//						end else if (CDD_CNT == 12'd16) begin
-//							CDIRQ[4] <= 1;
-//						end else if (CDD_CNT == 12'd2352-2) begin
-//							CDD_SYNCED <= 0;
-//							CDD_CNT <= 12'd0;
-//						end
-//					end
-//					
-//					if (CD_CK && !CD_CK_OLD && CDD_SYNCED) begin
-//						CDD_DREQ <= REG1A[7];
-////						CDD_WAIT <= REG1A[7];
-//					end else if (CDD_DREQ) begin
-//						CDD_DREQ <= 0;
-//					end
-//					
-//					DBG_CNT <= DBG_CNT + 1;
-//					
-//					DACK0_OLD <= DACK0;
-//					if (DACK0 && !DACK0_OLD) begin
-////						CDD_WAIT <= 0;
-//						DBG_CNT <= '0;
-//					end
-//				end
 			end
 		end
 	end
+	
+	always_comb begin
+		case ({AA[5:2],2'b00})
+			6'h00: SCU_REG_DO = FIFO_BUF[FIFO_RD_POS]; 
+			6'h08: SCU_REG_DO = HIRQ;
+			6'h0C: SCU_REG_DO = HMASK;
+			6'h18: SCU_REG_DO = RR[0];
+			6'h1C: SCU_REG_DO = RR[1];
+			6'h20: SCU_REG_DO = RR[2];
+			6'h24: SCU_REG_DO = RR[3];
+			default: SCU_REG_DO = '0;
+		endcase
+	end
 
 	assign ADO = SCU_REG_DO;
-	assign AWAIT_N = 1;
+	assign AWAIT_N = ~ABUS_WAIT;
 	assign ARQT_N = 1;
 	
 	assign SDO = !DACK0 && REG1A[7] ? CDD_DATA : SH_REG_SEL ? SH_REG_DO : SDI;
 	assign SIRQH_N = ~|(CDIRQ & CDMASK);
-	assign DREQ0_N = ~CDD_DREQ;
+	assign DREQ0_N = ~|CDD_DREQ;
 	assign DREQ1_N = ~FIFO_DREQ;
 	
 	

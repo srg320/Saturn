@@ -45,6 +45,7 @@ module VDP1 (
 	output     [10:0] DRAW_X_DBG,
 	output     [10:0] DRAW_Y_DBG,
 	output     [15:0] FRAMES_DBG,
+	output     [7:0] START_DRAW_CNT,
 	output     [15:0] REG_DBG
 );
 	import VDP1_PKG::*;
@@ -61,7 +62,7 @@ module VDP1 (
 	COPR_t     COPR;
 	MODR_t     MODR;
 
-	bit        FRAME_CHANGE;
+	bit        FRAME_START;
 	bit        FRAME_ERASE;
 	bit        FRAME_ERASE_HIT;
 	
@@ -233,7 +234,7 @@ module VDP1 (
 			LOPR <= '0;
 			COPR <= '0;
 			
-		end else if (FRAME_CHANGE) begin
+		end else if (FRAME_START) begin
 			CMD_ADDR <= '0;
 			CMD_READ <= 1;
 			SPR_READ <= 0;
@@ -832,6 +833,7 @@ module VDP1 (
 	
 	//VRAM
 	wire CPU_VRAM_SEL = (A[20:19] == 2'b00) & ~DTEN_N & ~AD_N & ~CS_N;	//000000-07FFFF
+	wire CPU_FB_SEL = (A[20:19] == 2'b01) & ~DTEN_N & ~AD_N & ~CS_N;	//080000-0FFFFF
 	bit [18:1] VRAM_LAST_A;
 		bit        IO_DATA_PEND;
 		bit        CLT_DATA_PEND;
@@ -981,7 +983,7 @@ module VDP1 (
 				end
 			end
 			
-			if (FRAME_CHANGE) begin
+			if (FRAME_START) begin
 				CMD_READ_PEND <= 0;
 				SPR_READ_PEND <= 0;
 				CLT_READ_PEND <= 0;
@@ -1024,6 +1026,7 @@ module VDP1 (
 	always @(posedge CLK or negedge RST_N) begin
 		bit        VTIM_N_OLD;
 		bit        FRAME_ERASECHANGE_PEND;
+		bit        START_DRAW_PEND;
 		
 		if (!RST_N) begin
 			TVMR <= '0;
@@ -1042,6 +1045,8 @@ module VDP1 (
 			
 			FRAME <= 0;
 			FRAMES_DBG <= '0;
+			
+			START_DRAW_CNT <= '0;
 		end else if (!RES_N) begin
 				
 		end else begin
@@ -1049,6 +1054,7 @@ module VDP1 (
 				A <= {A[4:0],DI};
 			end
 			
+			START_DRAW_PEND <= 0;
 			if (REG_SEL) begin
 				if (!(&WE_N) && CE_R) begin
 					case ({A[5:1],1'b0})
@@ -1062,6 +1068,7 @@ module VDP1 (
 						default:;
 					endcase
 					if (A[5:1] == 5'h02>>1 && DI[1]) FRAME_ERASECHANGE_PEND <= 1;
+					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 1; end
 				end else if (WE_N && CE_F) begin
 					case ({A[5:1],1'b0})
 						5'h10: REG_DO <= EDSR & EDSR_MASK;
@@ -1074,29 +1081,33 @@ module VDP1 (
 			end
 			
 			VTIM_N_OLD <= VTIM_N;
-			FRAME_CHANGE <= 0;
-			if (VTIM_N && !VTIM_N_OLD) begin
+			FRAME_START <= 0;
+			if (START_DRAW_PEND) begin
+				FRAME_START <= 1;
+				EDSR.CEF <= 0;
+				EDSR.BEF <= EDSR.CEF;
+			end else if (VTIM_N && !VTIM_N_OLD) begin
 				FRAME_ERASE <= 0;
 				if (!FBCR.FCM) begin
-//					if (FRAME) begin
 					FB_SEL <= ~FB_SEL;
-					FRAME_CHANGE <= 1;
 					FRAME_ERASE <= 1;
-					EDSR.CEF <= 0;
-					EDSR.BEF <= EDSR.CEF;
-//					end
-				end else begin
-					if (FRAME_ERASECHANGE_PEND && FBCR.FCT) begin
-						FB_SEL <= ~FB_SEL;
-						FRAME_CHANGE <= 1;
+					if (PTMR.PTM == 2'b10) begin
+						FRAME_START <= 1;
 						EDSR.CEF <= 0;
 						EDSR.BEF <= EDSR.CEF;
-						FRAME_ERASECHANGE_PEND <= 0;
-//						FRAMES_DBG <= 16'd0;
-					end else if (FRAME_ERASECHANGE_PEND && !FBCR.FCT) begin
-						FRAME_ERASE <= 1;
-						FRAME_ERASECHANGE_PEND <= 0;
 					end
+				end else if (FRAME_ERASECHANGE_PEND && FBCR.FCT) begin
+					FB_SEL <= ~FB_SEL;
+					if (PTMR.PTM == 2'b10) begin
+						FRAME_START <= 1;
+						EDSR.CEF <= 0;
+						EDSR.BEF <= EDSR.CEF;
+					end
+					FRAME_ERASECHANGE_PEND <= 0;
+//					FRAMES_DBG <= 16'd0;
+				end else if (FRAME_ERASECHANGE_PEND && !FBCR.FCT) begin
+					FRAME_ERASE <= 1;
+					FRAME_ERASECHANGE_PEND <= 0;
 				end
 //				FRAME <= 1;//~FRAME;
 				if (!EDSR.CEF) FRAMES_DBG <= FRAMES_DBG + 16'd1;
@@ -1112,10 +1123,10 @@ module VDP1 (
 	end
 	
 	assign DO = REG_SEL ? REG_DO : IO_VRAM_DO;
-	assign RDY_N = ~((CPU_VRAM_SEL & CPU_VRAM_RDY) | REG_SEL);
+	assign RDY_N = ~((CPU_VRAM_SEL & CPU_VRAM_RDY) | CPU_FB_SEL | REG_SEL);
 	
 	assign IRQ_N = ~EDSR.CEF;
 
-	assign REG_DBG = TVMR^FBCR^PTMR;
+	assign REG_DBG = TVMR;
 	
 endmodule

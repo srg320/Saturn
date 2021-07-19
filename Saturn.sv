@@ -260,7 +260,7 @@ module Saturn (
 		.CE_F(CE_F),
 		
 		.RES_N(MSHRES_N),
-		.NMI_N(1'b1/*MSHNMI_N*/),
+		.NMI_N(MSHNMI_N),
 		
 		.IRL_N(MSHIRL_N),
 		
@@ -556,13 +556,14 @@ module Saturn (
 			SMPC_CE <= 0;
 			CLK_CNT <= '0;
 			MRES_N <= 0;
-		end else if (CE_R) begin
+		end else begin
 			SMPC_CE <= 0;
-				
-			CLK_CNT <= CLK_CNT + 3'd1;
-			if (CLK_CNT == 3'd6) begin
-				CLK_CNT <= 3'd0;
-				SMPC_CE <= 1;
+			if (CE_R) begin
+				CLK_CNT <= CLK_CNT + 3'd1;
+				if (CLK_CNT == 3'd6) begin
+					CLK_CNT <= 3'd0;
+					SMPC_CE <= 1;
+				end
 			end
 			
 			if (SMPC_CE) MRES_N <= 1;

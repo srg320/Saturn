@@ -111,11 +111,14 @@ module SMPC (
 		end
 	end
 	
-	typedef enum bit [4:0] {
-		CS_IDLE = 5'b00001,  
-		CS_EXEC = 5'b00010, 
-		CS_END  = 5'b00100,
-		CS_WAIT = 5'b01000
+	typedef enum bit [6:0] {
+		CS_IDLE         = 7'b0000001,  
+		CS_START        = 7'b0000010, 
+		CS_WAIT         = 7'b0000100, 
+		CS_EXEC         = 7'b0001000,
+		CS_INTBACK_WAIT = 7'b0010000,
+		CS_INTBACK      = 7'b0100000,
+		CS_END          = 7'b1000000
 	} CommExecState_t;
 	CommExecState_t COMM_ST;
 	
@@ -180,6 +183,371 @@ module SMPC (
 			SR <= '0;
 			RESD <= 1;
 		end else begin
+			if (CE) begin
+				IRQV_N_OLD <= IRQV_N;
+				
+				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
+				
+				if (!SRES_N && !RESD && !SRES_EXEC) begin
+					MSHNMI_N <= 0;
+					SSHNMI_N <= 0;
+					WAIT_CNT <= 20'd400000;
+					SRES_EXEC <= 1;
+				end else if (SRES_EXEC && !WAIT_CNT) begin
+					MSHNMI_N <= 1;
+					SSHNMI_N <= 1;
+				end
+				
+				SR[4:0] <= {~SRES_N,IREG[1][7:4]};
+
+				
+				case (COMM_ST)
+					CS_IDLE: begin
+						if (INTBACK_EXEC && !SRES_EXEC) begin
+							WAIT_CNT <= 20'd4000;
+							COMM_ST <= CS_INTBACK_WAIT;
+						end else if (COMREG_SET && !SRES_EXEC) begin
+							COMREG_SET <= 0;
+							COMM_ST <= CS_START;
+						end
+						MIRQ_N <= 1;
+					end
+					
+					CS_START: begin
+						OREG[31] <= COMREG;
+						case (COMREG) 
+							8'h00: begin		//MSHON
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h02: begin		//SSHON
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h03: begin		//SSHOFF
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h06: begin		//SNDON
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h07: begin		//SNDOFF
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h08: begin		//CDON
+								WAIT_CNT <= 20'd159;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h09: begin		//CDOFF
+								WAIT_CNT <= 20'd159;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h0D: begin		//SYSRES
+								WAIT_CNT <= 20'd400000;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h0E: begin		//CKCHG352
+								WAIT_CNT <= 20'd400000;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h0F: begin		//CKCHG320
+								WAIT_CNT <= 20'd400000;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h10: begin		//INTBACK
+								if (IREG[2] == 8'hF0)  begin
+									LAST_CONT <= IREG[0][7];
+									WAIT_CNT <= 20'd200;
+									COMM_ST <= CS_WAIT;
+								end else begin
+									COMM_ST <= CS_END;
+								end
+							end
+							
+							8'h16: begin		//SETTIME
+								WAIT_CNT <= 20'd279;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h17: begin		//SETSMEM
+								WAIT_CNT <= 20'd159;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h18: begin		//NMIREQ
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h19: begin		//RESENAB
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							8'h1A: begin		//RESDISA
+								WAIT_CNT <= 20'd127;
+								COMM_ST <= CS_WAIT;
+							end
+							
+							default: begin
+								COMM_ST <= CS_END;
+							end
+						endcase
+					end
+					
+					CS_WAIT: begin
+						if (!WAIT_CNT) COMM_ST <= CS_EXEC;
+					end
+					
+					CS_EXEC: begin
+						OREG[31] <= COMREG;
+						SF <= 0;
+						case (COMREG) 
+							8'h00: begin		//MSHON
+								MSHRES_N <= 1;
+								MSHNMI_N <= 1;//?
+							end
+							
+							8'h02: begin		//SSHON
+								SSHRES_N <= 1;
+								SSHNMI_N <= 1;//?
+							end
+							
+							8'h03: begin		//SSHOFF
+								SSHRES_N <= 0;
+								SSHNMI_N <= 1;//?
+							end
+							
+							8'h06: begin		//SNDON
+								SNDRES_N <= 1;
+							end
+							
+							8'h07: begin		//SNDOFF
+								SNDRES_N <= 0;
+							end
+							
+							8'h08: begin		//CDON
+								CDRES_N <= 1;
+							end
+							
+							8'h09: begin		//CDOFF
+								CDRES_N <= 0;
+							end
+							
+							8'h0D: begin		//SYSRES
+								MSHRES_N <= 0;
+								MSHNMI_N <= 0;
+								SSHRES_N <= 0;
+								SSHNMI_N <= 0;
+								SNDRES_N <= 0;
+								CDRES_N <= 0;
+								SYSRES_N <= 0;
+							end
+							
+							8'h0E: begin		//CKCHG352
+								MSHNMI_N <= 0;
+								SSHRES_N <= 0;
+								SSHNMI_N <= 0;
+								SNDRES_N <= 0;
+								SYSRES_N <= 0;
+								DOTSEL <= 1;
+							end
+							
+							8'h0F: begin		//CKCHG320
+								MSHNMI_N <= 0;
+								SSHRES_N <= 0;
+								SSHNMI_N <= 0;
+								SNDRES_N <= 0;
+								SYSRES_N <= 0;
+								DOTSEL <= 0;
+							end
+							
+							8'h10: begin		//INTBACK
+								if (!INTBACK_EXEC) begin
+									OREG[0] <= {STE,RESD,6'b000000};
+									OREG[1] <= 8'h20;
+									OREG[2] <= 8'h21;
+									OREG[3] <= 8'h01;
+									OREG[4] <= DAY;
+									OREG[5] <= HOUR;
+									OREG[6] <= MIN;
+									OREG[7] <= SEC;
+									OREG[8] <= 8'h00;
+									OREG[9] <= {4'b0000,AC};
+									OREG[10] <= {1'b0,DOTSEL,2'b11,~MSHNMI_N,1'b1,~SYSRES_N,~SNDRES_N};
+									OREG[11] <= {1'b0,~CDRES_N,6'b000000};
+									OREG[12] <= SMEM[0];
+									OREG[13] <= SMEM[1];
+									OREG[14] <= SMEM[2];
+									OREG[15] <= SMEM[3];
+									SR[7:5] <= {2'b01,IREG[1][3]};
+									if (IREG[1][3]) begin
+										INTBACK_EXEC <= 1;
+										SF <= 1;
+									end
+									PDL <= 1;
+									MIRQ_N <= 0;
+								end
+							end
+							
+							8'h16: begin		//SETTIME
+								STE <= 1;
+							end
+							
+							8'h17: begin		//SETSMEM
+								SMEM[0] <= IREG[0];
+								SMEM[1] <= IREG[1];
+								SMEM[2] <= IREG[2];
+								SMEM[3] <= IREG[3];
+							end
+							
+							8'h18: begin		//NMIREQ
+								MSHNMI_N <= 0;
+							end
+							
+							8'h19: begin		//RESENAB
+								RESD <= 0;
+							end
+							
+							8'h1A: begin		//RESDISA
+								RESD <= 1;
+							end
+							
+							default:;
+						endcase
+						COMM_ST <= CS_END;
+					end
+					
+					CS_INTBACK_WAIT: begin
+						if (!WAIT_CNT) COMM_ST <= CS_INTBACK;
+					end
+					
+					CS_INTBACK: begin
+						if (INTBACK_EXEC) begin
+							OREG[0] <= 8'hF1;
+							OREG[1] <= 8'h02;
+							OREG[2] <= JOY1[15:8];
+							OREG[3] <= JOY1[7:0];
+							OREG[4] <= 8'hF0;
+							OREG[5] <= 8'h00;
+							OREG[6] <= 8'h00;
+							OREG[7] <= 8'h00;
+							OREG[8] <= 8'h00;
+							OREG[9] <= 8'h00;
+							OREG[10] <= 8'h00;
+							OREG[11] <= 8'h00;
+							OREG[12] <= 8'h00;
+							OREG[13] <= 8'h00;
+							OREG[14] <= 8'h00;
+							OREG[15] <= 8'h00;
+							SR[7:5] <= {1'b1,1'b1,1'b0};
+							PDL <= ~INTBACK_EXEC;
+							SF <= 0;
+							INTBACK_EXEC <= 0;
+							MIRQ_N <= 0;
+							COMM_ST <= CS_IDLE;
+						end else  begin
+							COMM_ST <= CS_EXEC;
+						end
+					end
+					
+					CS_END: begin
+						case (COMREG) 
+							8'h00: begin		//MSHON
+								
+							end
+							
+							8'h02: begin		//SSHON
+								
+							end
+							
+							8'h03: begin		//SSHOFF
+								
+							end
+							
+							8'h06: begin		//SNDON
+								
+							end
+							
+							8'h07: begin		//SNDOFF
+								
+							end
+							
+							8'h08: begin		//CDON
+								
+							end
+							
+							8'h09: begin		//CDOFF
+								
+							end
+							
+							8'h0D: begin		//SYSRES
+								MSHRES_N <= 1;
+								MSHNMI_N <= 1;
+								SSHRES_N <= 1;
+								SSHNMI_N <= 1;
+								SNDRES_N <= 1;
+								CDRES_N <= 1;
+								SYSRES_N <= 1;
+							end
+							
+							8'h0E: begin		//CKCHG352
+								MSHNMI_N <= 1;
+								SNDRES_N <= 1;
+								SYSRES_N <= 1;
+							end
+							
+							8'h0F: begin		//CKCHG320
+								MSHNMI_N <= 1;
+								SNDRES_N <= 1;
+								SYSRES_N <= 1;
+							end
+							
+							8'h10: begin		//INTBACK
+
+							end
+							
+							8'h16: begin		//SETTIME
+								
+							end
+							
+							8'h17: begin		//SETSMEM
+								
+							end
+							
+							8'h18: begin		//NMIREQ
+								MSHNMI_N <= 1;
+							end
+							
+							8'h19: begin		//RESENAB
+								
+							end
+							
+							8'h1A: begin		//RESDISA
+								
+							end
+							
+							default:;
+						endcase
+						COMM_ST <= CS_IDLE;
+					end
+				endcase
+			end
+			
+			if (!IRQV_N && IRQV_N_OLD) INTBACK_EXEC <= 0;
+			
 			RW_N_OLD <= RW_N;
 			if (!RW_N && RW_N_OLD && !CS_N) begin
 				case ({A,1'b1})
@@ -254,280 +622,6 @@ module SMPC (
 					7'h75: REG_DO <= {1'b0,PDR1};
 					7'h77: REG_DO <= {1'b0,PDR2};
 					default: REG_DO <= '0;
-				endcase
-			end
-				
-			if (CE) begin
-				IRQV_N_OLD <= IRQV_N;
-				
-				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
-				
-				if (!SRES_N && !RESD && !SRES_EXEC) begin
-					MSHNMI_N <= 0;
-					SSHNMI_N <= 0;
-					WAIT_CNT <= 20'd400000;
-					SRES_EXEC <= 1;
-				end else if (SRES_EXEC && !WAIT_CNT) begin
-					MSHNMI_N <= 1;
-					SSHNMI_N <= 1;
-				end
-				
-				SR[4:0] <= {~SRES_N,IREG[1][7:4]};
-				
-				if (IRQV_N && !IRQV_N_OLD) MIRQ_N <= 1;
-				
-				case (COMM_ST)
-					CS_IDLE: begin
-						if ((COMREG_SET || INTBACK_EXEC) /*&& SF*/ && !SRES_EXEC && !IRQV_N && IRQV_N_OLD) begin
-							COMREG_SET <= 0;
-							COMM_ST <= CS_EXEC;
-						end
-//						MIRQ_N <= 1;///////////////////////
-					end
-					
-					CS_EXEC: begin
-						OREG[31] <= COMREG;
-						case (COMREG) 
-							8'h00: begin		//MSHON
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h02: begin		//SSHON
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h03: begin		//SSHOFF
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h06: begin		//SNDON
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h07: begin		//SNDOFF
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h08: begin		//CDON
-								WAIT_CNT <= 20'd159;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h09: begin		//CDOFF
-								WAIT_CNT <= 20'd159;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h0D: begin		//SYSRES
-								MSHRES_N <= 0;
-								MSHNMI_N <= 0;
-								SSHRES_N <= 0;
-								SSHNMI_N <= 0;
-								SNDRES_N <= 0;
-								CDRES_N <= 0;
-								SYSRES_N <= 0;
-								WAIT_CNT <= 20'd400000;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h0E: begin		//CKCHG352
-								WAIT_CNT <= 20'd400000;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h0F: begin		//CKCHG320
-								WAIT_CNT <= 20'd400000;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h10: begin		//INTBACK
-								if (IREG[2] == 8'hF0)  begin
-//									if (IREG[0][7] != LAST_CONT || !INTBACK_EXEC) begin
-										LAST_CONT <= IREG[0][7];
-										WAIT_CNT <= 20'd200;
-										COMM_ST <= CS_WAIT;
-//									end
-								end else begin
-									COMM_ST <= CS_END;
-								end
-							end
-							
-							8'h16: begin		//SETTIME
-								WAIT_CNT <= 20'd279;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h17: begin		//SETSMEM
-								WAIT_CNT <= 20'd159;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h18: begin		//NMIREQ
-								MSHNMI_N <= 0;
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h19: begin		//RESENAB
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							8'h1A: begin		//RESDISA
-								WAIT_CNT <= 20'd127;
-								COMM_ST <= CS_WAIT;
-							end
-							
-							default: begin
-								COMM_ST <= CS_END;
-							end
-						endcase
-					end
-					
-					CS_WAIT: begin
-						if (!WAIT_CNT) COMM_ST <= CS_END;
-					end
-					
-					CS_END: begin
-						OREG[31] <= COMREG;
-						SF <= 0;
-						COMM_ST <= CS_IDLE;
-						case (COMREG) 
-							8'h00: begin		//MSHON
-								MSHRES_N <= 1;
-								MSHNMI_N <= 1;//?
-							end
-							
-							8'h02: begin		//SSHON
-								SSHRES_N <= 1;
-								SSHNMI_N <= 1;//?
-							end
-							
-							8'h03: begin		//SSHOFF
-								SSHRES_N <= 0;
-								SSHNMI_N <= 1;//?
-							end
-							
-							8'h06: begin		//SNDON
-								SNDRES_N <= 1;
-							end
-							
-							8'h07: begin		//SNDOFF
-								SNDRES_N <= 0;
-							end
-							
-							8'h08: begin		//CDON
-								CDRES_N <= 1;
-							end
-							
-							8'h09: begin		//CDOFF
-								CDRES_N <= 0;
-							end
-							
-							8'h0D: begin		//SYSRES
-								MSHRES_N <= 1;
-								MSHNMI_N <= 1;
-								SSHRES_N <= 1;
-								SSHNMI_N <= 1;
-								SNDRES_N <= 1;
-								CDRES_N <= 1;
-								SYSRES_N <= 1;
-							end
-							
-							8'h0E: begin		//CKCHG352
-								DOTSEL <= 1;
-							end
-							
-							8'h0F: begin		//CKCHG320
-								DOTSEL <= 0;
-							end
-							
-							8'h10: begin		//INTBACK
-								if (!INTBACK_EXEC /*&& IREG[0][0]*/) begin
-									OREG[0] <= {STE,RESD,6'b000000};
-									OREG[1] <= 8'h20;
-									OREG[2] <= 8'h21;
-									OREG[3] <= 8'h01;
-									OREG[4] <= DAY;
-									OREG[5] <= HOUR;
-									OREG[6] <= MIN;
-									OREG[7] <= SEC;
-									OREG[8] <= 8'h00;
-									OREG[9] <= {4'b0000,AC};
-									OREG[10] <= {1'b0,DOTSEL,2'b11,~MSHNMI_N,1'b1,~SYSRES_N,~SNDRES_N};
-									OREG[11] <= {1'b0,~CDRES_N,6'b000000};
-									OREG[12] <= SMEM[0];
-									OREG[13] <= SMEM[1];
-									OREG[14] <= SMEM[2];
-									OREG[15] <= SMEM[3];
-									SR[7:5] <= {2'b01,IREG[1][3]};
-									if (IREG[1][3]) begin
-										INTBACK_EXEC <= 1;
-										SF <= 1;
-									end
-									PDL <= 1;
-								end else /*if (INTBACK_EXEC || IREG[1][3])*/ begin
-									OREG[0] <= 8'hF1;
-									OREG[1] <= 8'h02;
-									OREG[2] <= JOY1[15:8];
-									OREG[3] <= JOY1[7:0];
-									OREG[4] <= 8'hF0;
-									OREG[5] <= 8'h00;
-									OREG[6] <= 8'h00;
-									OREG[7] <= 8'h00;
-									OREG[8] <= 8'h00;
-									OREG[9] <= 8'h00;
-									OREG[10] <= 8'h00;
-									OREG[11] <= 8'h00;
-									OREG[12] <= 8'h00;
-									OREG[13] <= 8'h00;
-									OREG[14] <= 8'h00;
-									OREG[15] <= 8'h00;
-									SR[7:5] <= {1'b1,1'b1,1'b0};
-									SF <= 1;
-									PDL <= ~INTBACK_EXEC;
-									INTBACK_EXEC <= 1;
-//									if (BR) begin
-//										INTBACK_EXEC <= 0;
-//										SF <= 0;
-//										BR <= 0;
-//									end
-								end
-								MIRQ_N <= 0;
-							end
-							
-							8'h16: begin		//SETTIME
-								STE <= 1;
-							end
-							
-							8'h17: begin		//SETSMEM
-								SMEM[0] <= IREG[0];
-								SMEM[1] <= IREG[1];
-								SMEM[2] <= IREG[2];
-								SMEM[3] <= IREG[3];
-							end
-							
-							
-							8'h18: begin		//NMIREQ
-								MSHNMI_N <= 1;
-							end
-							
-							8'h19: begin		//RESENAB
-								RESD <= 0;
-							end
-							
-							8'h1A: begin		//RESDISA
-								RESD <= 1;
-							end
-							
-							default:;
-						endcase
-					end
 				endcase
 			end
 		end

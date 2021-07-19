@@ -66,7 +66,9 @@ module SCU (
 	
 	input             MIREQ_N,
 	
-	output     [31:0] DBG_ASR
+	output     [31:0] DBG_ASR,
+	output     [15:0] VBIN_INT_CNT,
+	output reg        IMS0_DBG
 );
 	import SCU_PKG::*;
 	
@@ -178,10 +180,11 @@ module SCU (
 	bit        DSP_IRQ;
 	
 	//DMA
+	bit [26:0] DMA_IA[3];
 	bit [26:0] DMA_RA[3];
 	bit [26:0] DMA_WA[3];
-	bit [26:0] DMA_IA[3];
-	bit [31:0] DMA_TN[3];
+	bit [19:0] DMA_TN[3];
+	bit        DMA_EC[3];
 	bit  [1:0] DMA_CH;
 	bit        DMA_RUN[3];
 	bit        DMA_END;
@@ -238,7 +241,7 @@ module SCU (
 	wire VDP1_REQ = !IRQ1_N &  IRQ1_N_OLD;
 	
 	//DMA & CPU access
-	wire ABUS_SEL = ~CCS1_N | (CA[24:16] < 9'h190 & ~CCS2_N);				//02000000-058FFFFF
+	wire ABUS_SEL = ~CCS1_N | (CA[24:20] < 5'h19 & ~CCS2_N);				//02000000-058FFFFF
 	wire BBUS_SEL = CA[24:16] >= 9'h1A0 & CA[24:16] < 9'h1FE & ~CCS2_N;	//05A00000-05FDFFFF
 	bit         CBUS_WAIT;
 	
@@ -266,6 +269,7 @@ module SCU (
 		
 		bit  [26:0] DMA_ADDR;
 		bit         DMA_WE;
+		bit  [19:0] DMA_TN_NEXT;
 		bit         DMA_IND;
 		bit   [1:0] DMA_IND_REG;
 		bit         DMA_DSP;
@@ -316,6 +320,7 @@ module SCU (
 			DMA_WA <= '{'0,'0,'0};
 			DMA_IA <= '{'0,'0,'0};
 			DMA_TN <= '{'0,'0,'0};
+			DMA_EC <= '{0,0,0};
 			DMA_CH <= '0;
 			DMA_PEND <= '{0,0,0};
 			DMA_RUN <= '{0,0,0};
@@ -352,13 +357,13 @@ module SCU (
 						if (!(&CDQM_N[3:2]) || !CRD_N) begin
 							ABUS_D <= CDI[31:16];
 							ABUS_WE <= ~CDQM_N[3:2];
-//							ABUS_WORD <= ~&CDQM_N[1:0] | ~CRD_N;
+							ABUS_WORD <= ~&CDQM_N[1:0] | (CA[24:20] == 5'h18 & ~CA[19] & ~CCS2_N & ~CRD_N);
 							CPU_ST <= CPUS_ACCESSH;
 						end else begin
-//							ABUS_A[1] <= 1;
+							ABUS_A[1] <= 1;
 							ABUS_D <= CDI[15:0];
 							ABUS_WE <= ~CDQM_N[1:0];
-//							ABUS_WORD <= 0;
+							ABUS_WORD <= 0;
 							CPU_ST <= CPUS_ACCESSL;
 						end
 						CPU_ABUS_REQ <= 1;
@@ -386,13 +391,13 @@ module SCU (
 					if (CPU_ABUS_REQ && ABUS_RDY) begin
 						AB_DO[31:16] <= ABUS_Q;
 						CPU_ABUS_REQ <= 0;
-//						if (ABUS_WORD) begin
-//							ABUS_WORD <= 0;
-//							CPU_ST <= CPUS_READL;
-//						end else begin
+						if (ABUS_WORD) begin
+							ABUS_WORD <= 0;
+							CPU_ST <= CPUS_READL;
+						end else begin
 							CBUS_WAIT <= 0;
 							CPU_ST <= CPUS_END;
-//						end
+						end
 					end
 					if (CPU_BBUS_REQ && BBUS_RDY) begin
 						AB_DO[31:16] <= BBUS_Q;
@@ -408,13 +413,13 @@ module SCU (
 				end
 				
 				CPUS_READL : begin
-//					if (ABUS_SEL) begin
-//						ABUS_A <= ABUS_A + 27'd2;
-//						ABUS_D <= CDI[15:0];
-//						ABUS_WE <= ~CDQM_N[1:0];
-//						CPU_ABUS_REQ <= 1;
-//						CPU_ST <= CPUS_ACCESSL;
-//					end
+					if (ABUS_SEL) begin
+						ABUS_A <= ABUS_A + 27'd2;
+						ABUS_D <= CDI[15:0];
+						ABUS_WE <= ~CDQM_N[1:0];
+						CPU_ABUS_REQ <= 1;
+						CPU_ST <= CPUS_ACCESSL;
+					end
 					if (BBUS_SEL) begin
 						BBUS_A <= BBUS_A + 23'd2;
 						BBUS_D <= CDI[15:0];
@@ -495,7 +500,7 @@ module SCU (
 					if (!DMD[DMA_CH].MOD) begin
 						DMA_RA[DMA_CH] <= DR[DMA_CH];
 						DMA_WA[DMA_CH] <= DW[DMA_CH];
-						DMA_TN[DMA_CH] <= {12'h000,DC[DMA_CH]};
+						DMA_TN[DMA_CH] <= DC[DMA_CH];
 						
 						DMA_ADDR <= DR[DMA_CH];
 						DMA_WE <= 0;
@@ -509,24 +514,15 @@ module SCU (
 						DMA_IND <= 1;
 						DMA_IND_REG <= 2'd0;
 						DMA_ST <= DS_DMA_ACCESS;
-//						if (DW[DMA_CH][26:16] >= 11'h200 && DW[DMA_CH][26:16] < 11'h590 && !ABUS_REQ && !ABUS_SEL) begin	//A-BUS 02000000-058FFFFF
-//							DMA_ST <= DS_ABUS_ACCESS;
-//						end else if (DW[DMA_CH][26:16] >= 11'h5A0 && DW[DMA_CH][26:16] < 11'h5FE && !BBUS_REQ && !BBUS_SEL) begin	//B-BUS 05A00000-05FDFFFF
-//							DMA_ST <= DS_BBUS_ACCESS;
-//						end else if (DW[DMA_CH][26:24] == 3'h6 && !CBUS_REQ) begin	//C-BUS 06000000-07FFFFFF
-//							DMA_ST <= DS_CBUS_ACCESS;
-//						end else begin
-//							DMA_ST <= DS_DMA_END;
-//						end
 					end
 				end
 				
 				DS_DMA_IND : begin
 					DMA_IA[DMA_CH] <= DMA_IA[DMA_CH] + 27'd4;
 					case (DMA_IND_REG)
-						2'd0: DMA_RA[DMA_CH] <= DMA_DATA[26:0];
+						2'd0: DMA_TN[DMA_CH] <= DMA_DATA[19:0];
 						2'd1: DMA_WA[DMA_CH] <= DMA_DATA[26:0];
-						2'd2: DMA_TN[DMA_CH] <= DMA_DATA;
+						2'd2: {DMA_EC[DMA_CH],DMA_RA[DMA_CH]} <= {DMA_DATA[31],DMA_DATA[26:0]};
 					endcase
 					if (DMA_IND_REG < 2'd2) begin
 						DMA_IND_REG <= DMA_IND_REG + 2'd1;
@@ -535,7 +531,7 @@ module SCU (
 						DMA_IND <= 1;
 						DMA_ST <= DS_DMA_ACCESS;
 					end else begin
-						DMA_ADDR <= DMA_RA[DMA_CH];
+						DMA_ADDR <= DMA_DATA[26:0];
 						DMA_WE <= 0;
 						DMA_IND <= 0;
 						DMA_ST <= DS_DMA_ACCESS;
@@ -544,7 +540,7 @@ module SCU (
 				
 				DS_DMA_ACCESS : begin
 					AB <= 0;
-					if (DMA_ADDR[26:16] >= 11'h200 && DMA_ADDR[26:16] < 11'h590 && !ABUS_REQ && !ABUS_SEL) begin	//A-BUS 02000000-058FFFFF
+					if (DMA_ADDR[26:20] >= 7'h20 && DMA_ADDR[26:20] < 7'h59 && !ABUS_REQ && !ABUS_SEL) begin	//A-BUS 02000000-058FFFFF
 						ABUS_A <= DMA_ADDR[26:0];
 						ABUS_D <= !DMA_ADDR[1] ? DMA_DATA[31:16] : DMA_DATA[15:0];
 						ABUS_WE <= DMA_WE;
@@ -570,24 +566,6 @@ module SCU (
 						DMA_ST <= DS_DMA_ACCESS_WAIT;
 					end
 				end
-				
-//				DS_DMA_BBUS_WAIT : begin
-//					if (BBUS_REQ && BBUS_RDY) begin
-//						DMA_DATA <= BBUS_Q;
-//						BBUS_REQ <= 0;
-//						DSTA.DACSB <= 0;
-//						
-//						DSP_DMA_ACK <= DMA_DSP;
-//						DMA_DSP <= 0;
-//						DSTA.DACSD <= 0;
-//						
-//						DMA_ST <= DMA_DSP ? DS_IDLE :
-//						          DMA_IND ? DS_DMA_IND : 
-//						          DMA_WE ? DS_DMA_WRITE : 
-//						          DS_DMA_READ;
-//					end
-//					DSTA.DACSD <= DMA_DSP;
-//				end
 				
 				DS_DMA_ACCESS_WAIT : begin
 					if (ABUS_REQ && ABUS_RDY) begin
@@ -634,28 +612,50 @@ module SCU (
 				
 				DS_DMA_WRITE : begin
 					if (DAD[DMA_CH].DWA) DMA_WA[DMA_CH] <= DMA_WA[DMA_CH] + (27'd1 << DAD[DMA_CH].DWA);
-					if (AB && !DMA_ADDR[1]) begin
+					
+					DMA_TN_NEXT = DMA_TN[DMA_CH] - (AB ? 20'd2 : 20'd4);
+					DMA_TN[DMA_CH] <= DMA_TN_NEXT;
+					if (!DMA_TN_NEXT) begin
+						if (!DMD[DMA_CH].MOD || DMA_EC[DMA_CH]) begin
+							DMA_END <= 1;
+							DMA_ST <= DS_DMA_END;
+						end else begin
+							DMA_ADDR <= DMA_IA[DMA_CH];
+							DMA_WE <= 0;
+							DMA_IND <= 1;
+							DMA_IND_REG <= 2'd0;
+							DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
+						end
+					end else if (AB && !DMA_ADDR[1]) begin
 						DMA_ADDR <= DMA_ADDR + 27'd2;
 						DMA_ST <= DS_DMA_ACCESS;
 					end else begin
-						DMA_TN[DMA_CH][19:0] <= DMA_TN[DMA_CH][19:0] - 20'd4;
-						if (!DMA_TN[DMA_CH][19:0]) begin
-							if (!DMD[DMA_CH].MOD || DMA_TN[DMA_CH][31]) begin
-								DMA_END <= 1;
-								DMA_ST <= DS_DMA_END;
-							end else begin
-								DMA_ADDR <= DMA_IA[DMA_CH];
-								DMA_WE <= 0;
-								DMA_IND <= 1;
-								DMA_IND_REG <= 2'd0;
-								DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
-							end
-						end else begin
-							DMA_ADDR <= DMA_RA[DMA_CH];
-							DMA_WE <= 0;
-							DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
-						end
+						DMA_ADDR <= DMA_RA[DMA_CH];
+						DMA_WE <= 0;
+						DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
 					end
+					
+//					if (AB && !DMA_ADDR[1]) begin
+//						DMA_ADDR <= DMA_ADDR + 27'd2;
+//						DMA_ST <= DS_DMA_ACCESS;
+//					end else begin
+//						if (!DMA_TN[DMA_CH]) begin
+//							if (!DMD[DMA_CH].MOD || DMA_EC[DMA_CH]) begin
+//								DMA_END <= 1;
+//								DMA_ST <= DS_DMA_END;
+//							end else begin
+//								DMA_ADDR <= DMA_IA[DMA_CH];
+//								DMA_WE <= 0;
+//								DMA_IND <= 1;
+//								DMA_IND_REG <= 2'd0;
+//								DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
+//							end
+//						end else begin
+//							DMA_ADDR <= DMA_RA[DMA_CH];
+//							DMA_WE <= 0;
+//							DMA_ST <= DSTP.STOP ? DS_DMA_END : DS_DMA_ACCESS;
+//						end
+//					end
 				end
 				
 				DS_DMA_END : begin
@@ -683,8 +683,8 @@ module SCU (
 		end else if (CE_F) begin	
 			 if (VECT_RD) begin
 				case (CA[3:0])
-					4'h6: begin DMA_INT[0] <= 0; DMA_INT[1] <= 0; end
-					4'h5: begin DMA_INT[2] <= 0; end
+					4'h6: begin DMA_INT[1] <= 0; DMA_INT[2] <= 0; end
+					4'h5: begin DMA_INT[0] <= 0; end
 					default:;
 				endcase
 			end
@@ -772,6 +772,7 @@ module SCU (
 				
 				AS_END: begin
 					if (!ABUS_REQ && !CPU_ABUS_REQ) begin
+						ABUS_RDY <= 0;
 						ABUS_ST <= AS_IDLE;
 					end
 				end
@@ -1177,9 +1178,9 @@ module SCU (
 							 EXT_INT[1] ||
 							 EXT_INT[2] ||
 							 EXT_INT[3])  && !IMS.MS15) begin INT_LVL = 4'h7; INT_PEND <= 1; end	//7
-				else if (DMA_INT[0]    && !IMS.MS9)  begin INT_LVL = 4'h6; INT_PEND <= 1; end	//6
+				else if (DMA_INT[2]    && !IMS.MS9)  begin INT_LVL = 4'h6; INT_PEND <= 1; end	//6
 				else if (DMA_INT[1]    && !IMS.MS10) begin INT_LVL = 4'h6; INT_PEND <= 1; end	//6
-				else if (DMA_INT[2]    && !IMS.MS11) begin INT_LVL = 4'h5; INT_PEND <= 1; end	//5
+				else if (DMA_INT[0]    && !IMS.MS11) begin INT_LVL = 4'h5; INT_PEND <= 1; end	//5
 				else if ((EXT_INT[4] ||
 							 EXT_INT[5] ||
 							 EXT_INT[6] ||
@@ -1202,6 +1203,9 @@ module SCU (
 				INT_LVL = 4'h0;
 				INT_PEND <= 0;
 			end
+			
+			if (INT_LVL == 4'hF) VBIN_INT_CNT <= VBIN_INT_CNT + 1;
+			else VBIN_INT_CNT <= '0;
 		end
 	end
 	assign CIRL_N = ~INT_LVL;
@@ -1220,7 +1224,7 @@ module SCU (
 			4'h7: IVEC = EXT_INT[0]  ? 8'h50 : 
 			             EXT_INT[1]  ? 8'h51 : 
 							 EXT_INT[2]  ? 8'h52 : 8'h53;
-			4'h6: IVEC = DMA_INT[0]  ? 8'h49 : 8'h4A;
+			4'h6: IVEC = DMA_INT[2]  ? 8'h49 : 8'h4A;
 			4'h5: IVEC = 8'h4B;
 			4'h4: IVEC = EXT_INT[4]  ? 8'h54 : 
 			             EXT_INT[5]  ? 8'h54 : 
@@ -1421,6 +1425,10 @@ module SCU (
 						if (!CDQM_N[1]) IMS[15: 8] <= CDI[15: 8] & IMS_WMASK[15: 8];
 						if (!CDQM_N[2]) IMS[23:16] <= CDI[23:16] & IMS_WMASK[23:16];
 						if (!CDQM_N[3]) IMS[31:24] <= CDI[31:24] & IMS_WMASK[31:24];
+						if (!CDQM_N[0] && !CDI[0]) IMS0_DBG <= 0;
+					end
+					8'hA4: begin
+						if (!CDQM_N[0] && !CDI[0]) IMS0_DBG <= 1;
 					end
 					
 					8'hB0: begin
