@@ -56,7 +56,6 @@ module VDP1 (
 	EWDR_t     EWDR;
 	EWLR_t     EWLR;
 	EWRR_t     EWRR;
-	ENDR_t     ENDR;
 	EDSR_t     EDSR;
 	LOPR_t     LOPR;
 	COPR_t     COPR;
@@ -65,6 +64,7 @@ module VDP1 (
 	bit        FRAME_START;
 	bit        FRAME_ERASE;
 	bit        FRAME_ERASE_HIT;
+	bit        DRAW_TERMINATE;
 	
 	//Color lookup table
 	bit  [3:1] CLT_WA;
@@ -95,6 +95,8 @@ module VDP1 (
 	assign FB1_D  = FB_SEL ? EWDR      : FB_DRAW_D;
 	assign FB0_WE = FB_SEL ? FB_DRAW_WE /*& CE_R*/  : FRAME_ERASE_HIT & DCLK;
 	assign FB1_WE = FB_SEL ? FRAME_ERASE_HIT & DCLK : FB_DRAW_WE /*& CE_R*/;
+	assign FB0_RD = 0;
+	assign FB1_RD = 0;
 	
 	assign FB_DRAW_Q = FB_SEL ? FB0_Q : FB1_Q;
 	assign FB_DISP_Q = FB_SEL ? FB1_Q : FB0_Q;
@@ -240,6 +242,11 @@ module VDP1 (
 			SPR_READ <= 0;
 			CLT_READ <= 0;
 			CMD_ST <= CMDS_READ;
+		end else if (DRAW_TERMINATE) begin
+			CMD_READ <= 0;
+			SPR_READ <= 0;
+			CLT_READ <= 0;
+			CMD_ST <= CMDS_IDLE;
 		end else begin
 			case (CMD.CMDPMOD.CM)
 				3'b000,
@@ -1035,13 +1042,13 @@ module VDP1 (
 			EWDR <= '0;
 			EWLR <= 16'h0000;
 			EWRR <= 16'h4EFF;
-			ENDR <= '0;
 			EDSR <= '0;
 			
 			REG_DO <= '0;
 			A <= '0;
 			
 			FRAME_ERASECHANGE_PEND <= 0;
+			DRAW_TERMINATE <= 0;
 			
 			FRAME <= 0;
 			FRAMES_DBG <= '0;
@@ -1055,6 +1062,7 @@ module VDP1 (
 			end
 			
 			START_DRAW_PEND <= 0;
+			DRAW_TERMINATE <= 0;
 			if (REG_SEL) begin
 				if (!(&WE_N) && CE_R) begin
 					case ({A[5:1],1'b0})
@@ -1064,11 +1072,11 @@ module VDP1 (
 						5'h06: EWDR <= DI & EWDR_MASK;
 						5'h08: EWLR <= DI & EWLR_MASK;
 						5'h0A: EWRR <= DI & EWRR_MASK;
-						5'h0C: ENDR <= DI & ENDR_MASK;
 						default:;
 					endcase
 					if (A[5:1] == 5'h02>>1 && DI[1]) FRAME_ERASECHANGE_PEND <= 1;
 					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 1; end
+					if (A[5:1] == 5'h0C>>1 && DI[1]) DRAW_TERMINATE <= 1;
 				end else if (WE_N && CE_F) begin
 					case ({A[5:1],1'b0})
 						5'h10: REG_DO <= EDSR & EDSR_MASK;

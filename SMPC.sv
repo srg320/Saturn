@@ -103,7 +103,24 @@ module SMPC (
 						MIN[7:4] <= MIN[7:4] + 4'd1;
 						if (MIN[7:4] == 4'd5) begin
 							MIN[7:4] <= 4'd0;
-							
+							HOUR[3:0] <= HOUR[3:0] + 4'd1;
+							if (HOUR[3:0] == 4'd9) begin
+								HOUR[3:0] <= 4'd0;
+								HOUR[7:4] <= HOUR[7:4] + 4'd1;
+								if (HOUR[7:4] == 4'd2 && HOUR[3:0] == 4'd3) begin
+									HOUR[7:4] <= 4'd0;
+									HOUR[3:0] <= 4'd0;
+									DAY[3:0] <= DAY[3:0] + 4'd1;
+									if (DAY[3:0] == 4'd9) begin
+										DAY[7:4] <= DAY[7:4] + 4'd1;
+										DAY[3:0] <= 4'd0;
+										if (DAY[7:4] == 4'd3 && HOUR[3:0] == 4'd1) begin//TODO
+											DAY[7:4] <= 4'd0;
+											DAY[3:0] <= 4'd1;
+										end
+									end
+								end
+							end
 						end
 					end
 				end
@@ -131,8 +148,7 @@ module SMPC (
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
 		bit        COMREG_SET;
-		bit        LAST_CONT;
-		bit        BR, CONT;
+		bit        CONT;
 		bit        PDL;
 		
 		if (!RST_N) begin
@@ -166,9 +182,7 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 			INTBACK_EXEC <= 0;
-			LAST_CONT <= 0;
 			PDL <= 0;
-			BR <= 0;
 			CONT <= 0;
 		end
 		else if (!MRES_N) begin
@@ -268,7 +282,6 @@ module SMPC (
 							
 							8'h10: begin		//INTBACK
 								if (IREG[2] == 8'hF0)  begin
-									LAST_CONT <= IREG[0][7];
 									WAIT_CNT <= 20'd200;
 									COMM_ST <= CS_WAIT;
 								end else begin
@@ -554,7 +567,6 @@ module SMPC (
 					7'h01: begin 
 						if (INTBACK_EXEC) begin
 							if (DI[6]) begin
-								BR <= 1;
 								INTBACK_EXEC <= 0;
 								SF <= 0;
 								SR[7:5] <= 3'b000;

@@ -213,7 +213,7 @@ module SCSP (
 					{SA[S],SAF[S]} <= '0;
 				end
 				
-				OP3_MD <= MDCalc(STACK0, SCR[S].SCR4);
+				OP3_MD <= '0;//MDCalc(STACK0, SCR[S].SCR4);
 				OP3_PIPE <= OP2_PIPE;
 			end
 		end
@@ -649,8 +649,8 @@ module SCSP (
 			CR17 <= '0;
 			CR18 <= '0;
 			CR19 <= '0;
-			STACK0 <= '{32{'0}};
-			STACK1 <= '{32{'0}};
+//			STACK0 <= '{32{'0}};
+//			STACK1 <= '{32{'0}};
 			REG_Q <= '0;
 			REG_RDY <= 0;
 		end else begin
@@ -676,8 +676,8 @@ module SCSP (
 				CR17 <= '0;
 				CR18 <= '0;
 				CR19 <= '0;
-				STACK0 <= '{32{'0}};
-				STACK1 <= '{32{'0}};
+//				STACK0 <= '{32{'0}};
+//				STACK1 <= '{32{'0}};
 			end else begin
 				DMA_EXEC_OLD <= DMA_EXEC;
 				if (!DMA_EXEC && DMA_EXEC_OLD) begin
@@ -907,8 +907,8 @@ module SCSP (
 				end
 				
 				if (SLOT_CE) begin
-					STACK0[OP7_PIPE.SLOT] <= STACK1[OP7_PIPE.SLOT];
-					STACK1[OP7_PIPE.SLOT] <= OP7_SD;
+//					STACK0[OP7_PIPE.SLOT] <= STACK1[OP7_PIPE.SLOT];
+//					STACK1[OP7_PIPE.SLOT] <= OP7_SD;
 				end
 			end
 		end

@@ -230,6 +230,8 @@ module Saturn (
 	bit         SMPCCE_N;
 	bit         MWR_N;
 	bit   [1:0] BIRL;
+	bit         MFTI;
+	bit         SFTI;
 	
 	//SMPC
 	bit   [7:0] SMPC_DO;
@@ -294,16 +296,16 @@ module Saturn (
 		
 		.WAIT_N(MSHWAIT_N),
 		.IVECF_N(),
-//		.BRLS_N(MSHBRLS_N),
-//		.BGR_N(MSHBGR_N),
-		.BRLS_N(CBREQ_N),
-		.BGR_N(CBACK_N),
+		.BRLS_N(MSHBRLS_N),
+		.BGR_N(MSHBGR_N),
+//		.BRLS_N(CBREQ_N),
+//		.BGR_N(CBACK_N),
 		
 		.DREQ0(1'b1),
 		.DREQ1(1'b1),
 		
 		.FTCI(1'b1),
-		.FTI(1'b0),
+		.FTI(MFTI),
 		
 		.RXD(1'b1),
 		.TXD(),
@@ -316,7 +318,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(0/*RST_N*/),
+		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -361,7 +363,7 @@ module Saturn (
 		.DREQ1(1'b1),
 		
 		.FTCI(1'b1),
-		.FTI(1'b0),
+		.FTI(SFTI),
 		
 		.RXD(1'b1),
 		.TXD(),
@@ -373,8 +375,10 @@ module Saturn (
 	
 	assign MSHIRL_N  = CIRL_N;
 	assign SSHIRL_N  = {1'b1,BIRL,1'b1};
+	
+	assign MSHBRLS_N = SSHBREQ_N & CBREQ_N;
 	assign SSHBACK_N = MSHBGR_N;
-	assign MSHBRLS_N = SSHBREQ_N;
+	assign CBACK_N   = MSHBGR_N | ~SSHBREQ_N;
 
 	assign MSHDI     = CDO;
 	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N));
@@ -395,6 +399,8 @@ module Saturn (
 	assign CRD_N    = MSHRD_N;
 	assign CIVECF_N = MSHIVECF_N;
 	assign ECWAIT_N = MEM_WAIT_N;
+	
+	
 	
 	assign ADI      = !ACS2_N ? CD_DO  : 16'h0000;
 //	assign AWAIT_N  = 1;
@@ -511,8 +517,8 @@ module Saturn (
 		.VINT_N(1'b1),
 		.IREQ_N(BIRL),
 		
-		.MFTI(),
-		.SFTI(),
+		.MFTI(MFTI),
+		.SFTI(SFTI),
 		
 		.DCE_N(DRAMCE_N),
 		.DOE_N(),

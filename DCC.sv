@@ -30,8 +30,8 @@ module DCC (
 	input             VINT_N,
 	output      [2:1] IREQ_N,
 	
-	output            MFTI,
-	output            SFTI,
+	output reg        MFTI,
+	output reg        SFTI,
 	
 	output            DCE_N,
 	output            DOE_N,
@@ -63,7 +63,27 @@ module DCC (
 	assign DOE_N = RD_N;
 	assign DWE_N = WE_N;
 	
-	assign MFTI = 0;
-	assign SFTI = 0;
+	wire MINIT_SEL = (A[24:23] == 2'b10) & ~CS0_N;
+	wire SINIT_SEL = (A[24:23] == 2'b11) & ~CS0_N;
+	always @(posedge CLK or negedge RST_N) begin
+		bit WE_N_OLD;
+		
+		if (!RST_N) begin
+			MFTI = 1;
+			SFTI = 1;
+		end else if (!RES_N) begin
+			MFTI = 1;
+			SFTI = 1;
+		end else if (CE_R) begin
+			MFTI = 1;
+			SFTI = 1;
+			
+			WE_N_OLD <= &WE_N;
+			if (!(&WE_N) && WE_N_OLD) begin
+				MFTI <= ~SINIT_SEL;
+				SFTI <= ~MINIT_SEL;
+			end
+		end
+	end
 
 endmodule

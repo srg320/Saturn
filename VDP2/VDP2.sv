@@ -220,6 +220,7 @@ module VDP2 (
 	
 	
 	bit BG_FETCH;
+	bit RBG_FETCH;
 	bit SCRL_FETCH;
 	bit RPA_FETCH;
 	bit BACK_FETCH;
@@ -227,6 +228,7 @@ module VDP2 (
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			BG_FETCH <= 0;
+			RBG_FETCH <= 0;
 			SCRL_FETCH <= 0;
 			RPA_FETCH <= 0;
 			BACK_FETCH <= 0;
@@ -234,8 +236,14 @@ module VDP2 (
 		else if (DOT_CE) begin
 			if (H_CNT == HRES-1 && !VBLANK) begin
 				BG_FETCH <= 1;
-			end else if (H_CNT == 9'h140-1) begin
+			end else if (H_CNT == 9'h148-1) begin
 				BG_FETCH <= 0;
+			end
+			
+			if (H_CNT == 9'h010-1 && !VBLANK) begin
+				RBG_FETCH <= 1;
+			end else if (H_CNT == 9'h158-1) begin
+				RBG_FETCH <= 0;
 			end
 			
 			if (H_CNT == 9'h197-1 && !VBLANK) begin
@@ -271,14 +279,22 @@ module VDP2 (
 		bit [3:0] VCPB1;
 		
 		case (H_CNT[2:0])
-			T0: begin VCPA0 = REGS.CYCA0L[15:12]; VCPA1 = REGS.CYCA1L[15:12]; VCPB0 = REGS.CYCB0L[15:12]; VCPB1 = REGS.CYCB1L[15:12]; end
-			T1: begin VCPA0 = REGS.CYCA0L[11: 8]; VCPA1 = REGS.CYCA1L[11: 8]; VCPB0 = REGS.CYCB0L[11: 8]; VCPB1 = REGS.CYCB1L[11: 8]; end
-			T2: begin VCPA0 = REGS.CYCA0L[ 7: 4]; VCPA1 = REGS.CYCA1L[ 7: 4]; VCPB0 = REGS.CYCB0L[ 7: 4]; VCPB1 = REGS.CYCB1L[ 7: 4]; end
-			T3: begin VCPA0 = REGS.CYCA0L[ 3: 0]; VCPA1 = REGS.CYCA1L[ 3: 0]; VCPB0 = REGS.CYCB0L[ 3: 0]; VCPB1 = REGS.CYCB1L[ 3: 0]; end
-			T4: begin VCPA0 = REGS.CYCA0U[15:12]; VCPA1 = REGS.CYCA1U[15:12]; VCPB0 = REGS.CYCB0U[15:12]; VCPB1 = REGS.CYCB1U[15:12]; end
-			T5: begin VCPA0 = REGS.CYCA0U[11: 8]; VCPA1 = REGS.CYCA1U[11: 8]; VCPB0 = REGS.CYCB0U[11: 8]; VCPB1 = REGS.CYCB1U[11: 8]; end
-			T6: begin VCPA0 = REGS.CYCA0U[ 7: 4]; VCPA1 = REGS.CYCA1U[ 7: 4]; VCPB0 = REGS.CYCB0U[ 7: 4]; VCPB1 = REGS.CYCB1U[ 7: 4]; end
-			T7: begin VCPA0 = REGS.CYCA0U[ 3: 0]; VCPA1 = REGS.CYCA1U[ 3: 0]; VCPB0 = REGS.CYCB0U[ 3: 0]; VCPB1 = REGS.CYCB1U[ 3: 0]; end
+			T0: begin VCPA0 = REGS.CYCA0L[15:12]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[15:12] : REGS.CYCA0L[15:12]; 
+			          VCPB0 = REGS.CYCB0L[15:12]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1L[15:12] : REGS.CYCB0L[15:12]; end
+			T1: begin VCPA0 = REGS.CYCA0L[11: 8]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[11: 8] : REGS.CYCA0L[11: 8]; 
+			          VCPB0 = REGS.CYCB0L[11: 8]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1L[11: 8] : REGS.CYCB0L[11: 8]; end
+			T2: begin VCPA0 = REGS.CYCA0L[ 7: 4]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[ 7: 4] : REGS.CYCA0L[ 7: 4]; 
+			          VCPB0 = REGS.CYCB0L[ 7: 4]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1L[ 7: 4] : REGS.CYCB0L[ 7: 4]; end
+			T3: begin VCPA0 = REGS.CYCA0L[ 3: 0]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[ 3: 0] : REGS.CYCA0L[ 3: 0]; 
+			          VCPB0 = REGS.CYCB0L[ 3: 0]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1L[ 3: 0] : REGS.CYCB0L[ 3: 0]; end
+			T4: begin VCPA0 = REGS.CYCA0U[15:12]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1U[15:12] : REGS.CYCA0U[15:12]; 
+			          VCPB0 = REGS.CYCB0U[15:12]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1U[15:12] : REGS.CYCB0U[15:12]; end
+			T5: begin VCPA0 = REGS.CYCA0U[11: 8]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1U[11: 8] : REGS.CYCA0U[11: 8]; 
+			          VCPB0 = REGS.CYCB0U[11: 8]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1U[11: 8] : REGS.CYCB0U[11: 8]; end
+			T6: begin VCPA0 = REGS.CYCA0U[ 7: 4]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1U[ 7: 4] : REGS.CYCA0U[ 7: 4]; 
+			          VCPB0 = REGS.CYCB0U[ 7: 4]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1U[ 7: 4] : REGS.CYCB0U[ 7: 4]; end
+			T7: begin VCPA0 = REGS.CYCA0U[ 3: 0]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1U[ 3: 0] : REGS.CYCA0U[ 3: 0]; 
+			          VCPB0 = REGS.CYCB0U[ 3: 0]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1U[ 3: 0] : REGS.CYCB0U[ 3: 0]; end
 		endcase
 			
 		VA_PIPE[0].NxA0PN[0] = VCPA0 == VCP_N0PN & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
@@ -324,33 +340,33 @@ module VDP2 (
 		VA_PIPE[0].NxB0VS[1] = VCPB0 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
 		VA_PIPE[0].NxB1VS[1] = VCPB1 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
 		
-		VA_PIPE[0].NxA0CPU = ((VCPA0 == VCP_CPU | VCPA0 == VCP_NA) & BG_FETCH) | VBLANK | ~REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1CPU = ((VCPA1 == VCP_CPU | VCPA1 == VCP_NA) & BG_FETCH) | VBLANK | ~REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0CPU = ((VCPB0 == VCP_CPU | VCPB0 == VCP_NA) & BG_FETCH) | VBLANK | ~REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1CPU = ((VCPB1 == VCP_CPU | VCPB1 == VCP_NA) & BG_FETCH) | VBLANK | ~REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0CPU = ((VCPA0 == VCP_CPU | VCPA0 == VCP_NA) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1CPU = ((VCPA1 == VCP_CPU | VCPA1 == VCP_NA) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0CPU = ((VCPB0 == VCP_CPU | VCPB0 == VCP_NA) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1CPU = ((VCPB1 == VCP_CPU | VCPB1 == VCP_NA) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
 		
-		VA_PIPE[0].RxA0PN[0] = REGS.RAMCTL.RDBSA0 == 2'b10 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxA1PN[0] = REGS.RAMCTL.RDBSA1 == 2'b10 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB0PN[0] = REGS.RAMCTL.RDBSB0 == 2'b10 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB1PN[0] = REGS.RAMCTL.RDBSB1 == 2'b10 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA0PN[0] = REGS.RAMCTL.RDBSA0 == 2'b10 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA1PN[0] = REGS.RAMCTL.RDBSA1 == 2'b10 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB0PN[0] = REGS.RAMCTL.RDBSB0 == 2'b10 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB1PN[0] = REGS.RAMCTL.RDBSB1 == 2'b10 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
 		VA_PIPE[0].RxA0PN[1] = 0;
 		VA_PIPE[0].RxA1PN[1] = 0;
 		VA_PIPE[0].RxB0PN[1] = 0;
 		VA_PIPE[0].RxB1PN[1] = 0;
 		
-		VA_PIPE[0].RxA0CH[0] = REGS.RAMCTL.RDBSA0 == 2'b11 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxA1CH[0] = REGS.RAMCTL.RDBSA1 == 2'b11 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB0CH[0] = REGS.RAMCTL.RDBSB0 == 2'b11 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB1CH[0] = REGS.RAMCTL.RDBSB1 == 2'b11 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA0CH[0] = REGS.RAMCTL.RDBSA0 == 2'b11 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA1CH[0] = REGS.RAMCTL.RDBSA1 == 2'b11 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB0CH[0] = REGS.RAMCTL.RDBSB0 == 2'b11 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB1CH[0] = REGS.RAMCTL.RDBSB1 == 2'b11 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
 		VA_PIPE[0].RxA0CH[1] = 0;
 		VA_PIPE[0].RxA1CH[1] = 0;
 		VA_PIPE[0].RxB0CH[1] = 0;
 		VA_PIPE[0].RxB1CH[1] = 0;
 		
-		VA_PIPE[0].RxA0CO[0] = REGS.RAMCTL.RDBSA0 == 2'b01 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxA1CO[0] = REGS.RAMCTL.RDBSA1 == 2'b01 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB0CO[0] = REGS.RAMCTL.RDBSB0 == 2'b01 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
-		VA_PIPE[0].RxB1CO[0] = REGS.RAMCTL.RDBSB1 == 2'b01 & REGS.BGON.R0ON & BG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA0CO[0] = REGS.RAMCTL.RDBSA0 == 2'b01 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxA1CO[0] = REGS.RAMCTL.RDBSA1 == 2'b01 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB0CO[0] = REGS.RAMCTL.RDBSB0 == 2'b01 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
+		VA_PIPE[0].RxB1CO[0] = REGS.RAMCTL.RDBSB1 == 2'b01 & REGS.BGON.R0ON & RBG_FETCH & ~VBLANK & REGS.TVMD.DISP;
 		VA_PIPE[0].RxA0CO[1] = 0;
 		VA_PIPE[0].RxA1CO[1] = 0;
 		VA_PIPE[0].RxB0CO[1] = 0;
@@ -748,7 +764,7 @@ module VDP2 (
 				endcase
 				
 				if (VA_PIPE[1].BS) begin
-					BACK_COL <= Color555To888(WD);
+					BACK_COL <= Color555To888(WD[14:0]);
 				end
 				
 				if (VA_PIPE[1].LN) begin
@@ -772,11 +788,11 @@ module VDP2 (
 		
 		NxOFFX[0] = (NX[0] & 19'h7F800) + (NSX[0] & 19'h7F800);
 		NxOFFY[0] = NSY[0] + VS[0];
-		NxOFFX[1] = NX[1] + NSX[1];
+		NxOFFX[1] = (NX[1] & 19'h7F800) + (NSX[1] & 19'h7F800);
 		NxOFFY[1] = NSY[1] + VS[1];
-		NxOFFX[2] = NX[2] + NSX[2];
+		NxOFFX[2] = (NX[2] & 19'h7F800) + (NSX[2] & 19'h7F800);
 		NxOFFY[2] = NSY[2];
-		NxOFFX[3] = NX[3] + NSX[3];
+		NxOFFX[3] = (NX[3] & 19'h7F800) + (NSX[3] & 19'h7F800);
 		NxOFFY[3] = NSY[3];
 	end
 	assign NxOFFX0_DBG = NxOFFX[0].INT;
@@ -840,7 +856,7 @@ module VDP2 (
 			NxCH_ADDR[3] =                   NxCHAddr(PN_PIPE[2][3], NBG_CH_CNT[3], VA_PIPE[4].NxX[3], VA_PIPE[4].NxY[3], NSxREG[3].CHCN, NSxREG[3].CHSZ);
 			
 			RxCH_ADDR[0] = !RSxREG[0].BMEN ? RxCHAddr(RBG_PN_PIPE[2][0], VA_PIPE[4].R0X, VA_PIPE[4].R0Y, RSxREG[0].CHCN, RSxREG[0].CHSZ) :
-												      RxBMAddr(REGS.MPOFR.RAMP,  VA_PIPE[4].R0X[2:0], SCRX, SCRY, RSxREG[0].CHCN, RSxREG[0].BMSZ);
+												      RxBMAddr(REGS.MPOFR.RAMP, VA_PIPE[4].R0X, VA_PIPE[4].R0Y, RSxREG[0].CHCN, RSxREG[0].BMSZ);
 			
 			N0VS_ADDR = {1'b0,NSxREG[0].VCSTA} + {13'h000,SCRX[8:3]};
 			
@@ -871,7 +887,7 @@ module VDP2 (
 				VRAMB1_RD <= &WE_N & (VRAMB0_SEL|VRAMB1_SEL);
 				VRAMA_RW_PEND <= VRAMA0_SEL|VRAMA1_SEL;
 				VRAMB_RW_PEND <= VRAMB0_SEL|VRAMB1_SEL;
-			end else if (BG_FETCH) begin
+			end else if (BG_FETCH || RBG_FETCH) begin
 				VRAMA0_RD <= 0;
 				VRAMA1_RD <= 0;
 				if (NBG_A0VA.PN) begin
@@ -934,10 +950,10 @@ module VDP2 (
 					VRAMB0_RD <= 1;
 				end else	if (NBG_B0VA.CH) begin
 					VRAMB0_A <= NxCH_ADDR[NBG_B0VA.Nx][16:1];
-					VRAMB0_RD <= 1;
+					VRAMB0_RD <= ~NxCH_ADDR[NBG_B0VA.Nx][17];
 				end else	if (RBG_B0VA.CH) begin
 					VRAMB0_A <= RxCH_ADDR[RBG_B0VA.Rx][16:1];
-					VRAMB0_RD <= 1;
+					VRAMB0_RD <= RxCH_ADDR[RBG_B0VA.Rx][17];
 				end else	if (NBG_B0VA.VS) begin
 					VRAMB0_A <= N0VS_ADDR[16:1];
 					VRAMB0_RD <= 1;
@@ -961,10 +977,11 @@ module VDP2 (
 					VRAMB1_RD <= 1;
 				end else	if (NBG_B1VA.CH) begin
 					VRAMB1_A <= NxCH_ADDR[NBG_B1VA.Nx][16:1];
+					VRAMB1_RD <= ~NxCH_ADDR[NBG_B1VA.Nx][17];
 					VRAMB1_RD <= 1;
 				end else	if (RBG_B1VA.CH) begin
 					VRAMB1_A <= RxCH_ADDR[RBG_B1VA.Rx][16:1];
-					VRAMB1_RD <= 1;
+					VRAMB1_RD <= RxCH_ADDR[RBG_B1VA.Rx][17];
 				end else	if (NBG_B1VA.VS) begin
 					VRAMB1_A <= N0VS_ADDR[16:1];
 					VRAMB1_RD <= 1;
@@ -1052,7 +1069,7 @@ module VDP2 (
 		else if (DOT_CE) begin
 			if (!REGS.TVMD.DISP || VBLANK || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
 				
-			end else if (BG_FETCH) begin
+			end else if (BG_FETCH || RBG_FETCH) begin
 				if (NBG_A0VA.PN) begin
 //					NxPN_VRAMA0_A1 <= NxPN_ADDR[NBG_A0VA.Nx][1];
 				end else if (NBG_A0VA.CH) begin
@@ -1149,11 +1166,15 @@ module VDP2 (
 		bit        PN_A1[4];
 		bit  [2:0] CNT[4];
 		bit  [2:0] RCNT[2];
-		bit        HF[4];
+		bit        NHF[4];
+		bit        NPR[4];
+		bit        NCC[4];
 		bit        RHF[2];
+		bit        RPR[4];
+		bit        RCC[4];
 		bit  [6:0] PALN[4];
 		bit  [6:0] RPALN[2];
-		bit [31:0] CH[4];
+		bit [31:0] NCH[4];
 		bit [31:0] RCH[2];
 		bit        TPON[4];
 		bit        RTPON[2];
@@ -1199,10 +1220,10 @@ module VDP2 (
 									 VA_PIPE[0].RxB0PN[i] ? 2'd2 : 
 									 2'd3;
 //				BGS0.RxCH[i] = BG_PIPE[3].RxPN[i];
-				BGS0.RxCH[i] = VA_PIPE[3].RxA0CH[i] | VA_PIPE[3].RxA1CH[i] | VA_PIPE[3].RxB0CH[i] | VA_PIPE[3].RxB1CH[i];
-				BGS0.RxCHS[i] = VA_PIPE[3].RxA0CH[i] && !RxCH_ADDR[RBG_A0VA.Rx][17] ? 2'd0 : 
-									 VA_PIPE[3].RxA1CH[i] &&  RxCH_ADDR[RBG_A1VA.Rx][17] ? 2'd1 : 
-									 VA_PIPE[3].RxB0CH[i] && !RxCH_ADDR[RBG_B0VA.Rx][17] ? 2'd2 : 
+				BGS0.RxCH[i] = VA_PIPE[0].RxA0CH[i] | VA_PIPE[0].RxA1CH[i] | VA_PIPE[0].RxB0CH[i] | VA_PIPE[0].RxB1CH[i];
+				BGS0.RxCHS[i] = VA_PIPE[0].RxA0CH[i] && !RxCH_ADDR[RBG_A0VA.Rx][17] ? 2'd0 : 
+									 VA_PIPE[0].RxA1CH[i] &&  RxCH_ADDR[RBG_A1VA.Rx][17] ? 2'd1 : 
+									 VA_PIPE[0].RxB0CH[i] && !RxCH_ADDR[RBG_B0VA.Rx][17] ? 2'd2 : 
 									 2'd3;
 			end
 			BGS0.RxCH_CNT = RBG_CH_CNT;
@@ -1239,36 +1260,38 @@ module VDP2 (
 				if (BG_PIPE[3].NxCH[i]) begin
 					CNT[i] = BG_PIPE[3].NxCH_CNT[i];
 					PALN[i] = !NSxREG[i].BMEN ? PN_PIPE[3][i].PALN : {NSxREG[i].BMP,4'b0000};
-					HF[i] = PN_PIPE[3][i].HF & ~NSxREG[i].BMEN;
-					CH[i] = CH_PIPE[1][i];
+					NHF[i] = PN_PIPE[3][i].HF & ~NSxREG[i].BMEN;
+					NPR[i] = !NSxREG[i].BMEN ? PN_PIPE[3][i].PR : NSxREG[i].BMPR;
+					NCC[i] = !NSxREG[i].BMEN ? PN_PIPE[3][i].CC : NSxREG[i].BMCC;
+					NCH[i] = CH_PIPE[1][i];
 					TPON[i] = NSxREG[i].TPON;
 					case (NSxREG[i].CHCN)
 						3'b000: begin				//4bits/dot, 16 colors
-							NBG_CDL[i][0 ^ {3{HF[i]}}] <= {1'b1,|CH[i][31:28]|TPON[i],{13'h0000,PALN[i],CH[i][31:28]}};
-							NBG_CDL[i][1 ^ {3{HF[i]}}] <= {1'b1,|CH[i][27:24]|TPON[i],{13'h0000,PALN[i],CH[i][27:24]}};
-							NBG_CDL[i][2 ^ {3{HF[i]}}] <= {1'b1,|CH[i][23:20]|TPON[i],{13'h0000,PALN[i],CH[i][23:20]}};
-							NBG_CDL[i][3 ^ {3{HF[i]}}] <= {1'b1,|CH[i][19:16]|TPON[i],{13'h0000,PALN[i],CH[i][19:16]}};
-							NBG_CDL[i][4 ^ {3{HF[i]}}] <= {1'b1,|CH[i][15:12]|TPON[i],{13'h0000,PALN[i],CH[i][15:12]}};
-							NBG_CDL[i][5 ^ {3{HF[i]}}] <= {1'b1,|CH[i][11: 8]|TPON[i],{13'h0000,PALN[i],CH[i][11: 8]}};
-							NBG_CDL[i][6 ^ {3{HF[i]}}] <= {1'b1,|CH[i][ 7: 4]|TPON[i],{13'h0000,PALN[i],CH[i][ 7: 4]}};
-							NBG_CDL[i][7 ^ {3{HF[i]}}] <= {1'b1,|CH[i][ 3: 0]|TPON[i],{13'h0000,PALN[i],CH[i][ 3: 0]}};
+							NBG_CDL[i][3'b000              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][31:28]|TPON[i],{13'h0000,PALN[i],NCH[i][31:28]}};
+							NBG_CDL[i][3'b001              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][27:24]|TPON[i],{13'h0000,PALN[i],NCH[i][27:24]}};
+							NBG_CDL[i][3'b010              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][23:20]|TPON[i],{13'h0000,PALN[i],NCH[i][23:20]}};
+							NBG_CDL[i][3'b011              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][19:16]|TPON[i],{13'h0000,PALN[i],NCH[i][19:16]}};
+							NBG_CDL[i][3'b100              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][15:12]|TPON[i],{13'h0000,PALN[i],NCH[i][15:12]}};
+							NBG_CDL[i][3'b101              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][11: 8]|TPON[i],{13'h0000,PALN[i],NCH[i][11: 8]}};
+							NBG_CDL[i][3'b110              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][ 7: 4]|TPON[i],{13'h0000,PALN[i],NCH[i][ 7: 4]}};
+							NBG_CDL[i][3'b111              ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][ 3: 0]|TPON[i],{13'h0000,PALN[i],NCH[i][ 3: 0]}};
 						end
 						3'b001: begin				//8bits/dot, 256 colors
-							NBG_CDL[i][{CNT[i][0],2'b00} ^ {3{HF[i]}}] <= {1'b1,|CH[i][31:24]|TPON[i],{13'h0000,PALN[i][6:4],CH[i][31:24]}};
-							NBG_CDL[i][{CNT[i][0],2'b01} ^ {3{HF[i]}}] <= {1'b1,|CH[i][23:16]|TPON[i],{13'h0000,PALN[i][6:4],CH[i][23:16]}};
-							NBG_CDL[i][{CNT[i][0],2'b10} ^ {3{HF[i]}}] <= {1'b1,|CH[i][15: 8]|TPON[i],{13'h0000,PALN[i][6:4],CH[i][15: 8]}};
-							NBG_CDL[i][{CNT[i][0],2'b11} ^ {3{HF[i]}}] <= {1'b1,|CH[i][ 7: 0]|TPON[i],{13'h0000,PALN[i][6:4],CH[i][ 7: 0]}};
+							NBG_CDL[i][{CNT[i][0:0],2'b00} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][31:24]|TPON[i],{13'h0000,PALN[i][6:4],NCH[i][31:24]}};
+							NBG_CDL[i][{CNT[i][0:0],2'b01} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][23:16]|TPON[i],{13'h0000,PALN[i][6:4],NCH[i][23:16]}};
+							NBG_CDL[i][{CNT[i][0:0],2'b10} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][15: 8]|TPON[i],{13'h0000,PALN[i][6:4],NCH[i][15: 8]}};
+							NBG_CDL[i][{CNT[i][0:0],2'b11} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][ 7: 0]|TPON[i],{13'h0000,PALN[i][6:4],NCH[i][ 7: 0]}};
 						end
 						3'b010: begin				//16bits/dot, 2048 colors
-							NBG_CDL[i][{CNT[i][1:0],1'b0} ^ {3{HF[i]}}] <= {1'b1,|CH[i][26:16]|TPON[i],{13'h0000,CH[i][26:16]}};
-							NBG_CDL[i][{CNT[i][1:0],1'b1} ^ {3{HF[i]}}] <= {1'b1,|CH[i][10: 0]|TPON[i],{13'h0000,CH[i][10: 0]}};
+							NBG_CDL[i][{CNT[i][1:0], 1'b0} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][26:16]|TPON[i],{13'h0000,NCH[i][26:16]}};
+							NBG_CDL[i][{CNT[i][1:0], 1'b1} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b1,|NCH[i][10: 0]|TPON[i],{13'h0000,NCH[i][10: 0]}};
 						end
 						3'b011: begin				//16bits/dot, 32768 colors
-							NBG_CDL[i][{CNT[i][1:0],1'b0} ^ {3{HF[i]}}] <= {1'b0,CH[i][31]|TPON[i],Color555To888(CH[i][31:16])};
-							NBG_CDL[i][{CNT[i][1:0],1'b1} ^ {3{HF[i]}}] <= {1'b0,CH[i][15]|TPON[i],Color555To888(CH[i][15: 0])};
+							NBG_CDL[i][{CNT[i][1:0], 1'b0} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b0,NCH[i][31]|TPON[i],Color555To888(NCH[i][30:16])};
+							NBG_CDL[i][{CNT[i][1:0], 1'b1} ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b0,NCH[i][15]|TPON[i],Color555To888(NCH[i][14: 0])};
 						end
 						3'b100: begin				//32bits/dot, 16M colors
-							NBG_CDL[i][CNT[i] ^ {3{HF[i]}}] <= {1'b0,CH[i][31]|TPON[i],CH[i][23:0]};
+							NBG_CDL[i][{CNT[i][2:0]      } ^ {3{NHF[i]}}] <= {NPR[i],NCC[i],1'b0,NCH[i][31]|TPON[i],NCH[i][23:0]};
 						end
 						default:;
 					endcase
@@ -1318,49 +1341,47 @@ module VDP2 (
 				
 				if (BG_PIPE[3].RxCH[i]) begin
 					RCNT[i] = BG_PIPE[3].RxCH_CNT[i];
-					RPALN[i] = !RSxREG[i].BMEN ? RBG_PN_PIPE[2][i].PALN : {RSxREG[i].BMP,4'b0000};
-					RHF[i] = RBG_PN_PIPE[2][i].HF & ~RSxREG[i].BMEN;
+					RPALN[i] = !RSxREG[i].BMEN ? RBG_PN_PIPE[3][i].PALN : {RSxREG[i].BMP,4'b0000};
+					RHF[i] = RBG_PN_PIPE[3][i].HF & ~RSxREG[i].BMEN;
+					RPR[i] = !RSxREG[i].BMEN ? RBG_PN_PIPE[3][i].PR : RSxREG[i].BMPR;
+					RCC[i] = !RSxREG[i].BMEN ? RBG_PN_PIPE[3][i].CC : RSxREG[i].BMCC;
 					RCH[i] = RBG_CH_PIPE[1][i];
 					RTPON[i] = RSxREG[i].TPON;
 					case (RSxREG[i].CHCN)
 						3'b000: begin				//4bits/dot, 16 colors
 							case (RCNT[i])
-							3'b000:RBG_CDL[i][0 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][31:28]|RTPON[i],{13'h0000,RPALN[i],RCH[i][31:28]}};
-							3'b001:RBG_CDL[i][1 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][27:24]|RTPON[i],{13'h0000,RPALN[i],RCH[i][27:24]}};
-							3'b010:RBG_CDL[i][2 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][23:20]|RTPON[i],{13'h0000,RPALN[i],RCH[i][23:20]}};
-							3'b011:RBG_CDL[i][3 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][19:16]|RTPON[i],{13'h0000,RPALN[i],RCH[i][19:16]}};
-							3'b100:RBG_CDL[i][4 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][15:12]|RTPON[i],{13'h0000,RPALN[i],RCH[i][15:12]}};
-							3'b101:RBG_CDL[i][5 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][11: 8]|RTPON[i],{13'h0000,RPALN[i],RCH[i][11: 8]}};
-							3'b110:RBG_CDL[i][6 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][ 7: 4]|RTPON[i],{13'h0000,RPALN[i],RCH[i][ 7: 4]}};
-							3'b111:RBG_CDL[i][7 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][ 3: 0]|RTPON[i],{13'h0000,RPALN[i],RCH[i][ 3: 0]}};
+							3'b000:RBG_CDL[i][{         3'b000} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][31:28]|RTPON[i],{13'h0000,RPALN[i],RCH[i][31:28]}};
+							3'b001:RBG_CDL[i][{         3'b001} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][27:24]|RTPON[i],{13'h0000,RPALN[i],RCH[i][27:24]}};
+							3'b010:RBG_CDL[i][{         3'b010} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][23:20]|RTPON[i],{13'h0000,RPALN[i],RCH[i][23:20]}};
+							3'b011:RBG_CDL[i][{         3'b011} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][19:16]|RTPON[i],{13'h0000,RPALN[i],RCH[i][19:16]}};
+							3'b100:RBG_CDL[i][{         3'b100} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][15:12]|RTPON[i],{13'h0000,RPALN[i],RCH[i][15:12]}};
+							3'b101:RBG_CDL[i][{         3'b101} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][11: 8]|RTPON[i],{13'h0000,RPALN[i],RCH[i][11: 8]}};
+							3'b110:RBG_CDL[i][{         3'b110} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][ 7: 4]|RTPON[i],{13'h0000,RPALN[i],RCH[i][ 7: 4]}};
+							3'b111:RBG_CDL[i][{         3'b111} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][ 3: 0]|RTPON[i],{13'h0000,RPALN[i],RCH[i][ 3: 0]}};
 							endcase
 						end
 						3'b001: begin				//8bits/dot, 256 colors
-							case (RCNT[i])
-							3'b000:RBG_CDL[i][0 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][31:24]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][31:24]}};
-							3'b001:RBG_CDL[i][1 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][23:16]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][23:16]}};
-							3'b010:RBG_CDL[i][2 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][15: 8]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][15: 8]}};
-							3'b011:RBG_CDL[i][3 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][ 7: 0]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][ 7: 0]}};
-							3'b100:RBG_CDL[i][4 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][31:24]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][31:24]}};
-							3'b101:RBG_CDL[i][5 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][23:16]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][23:16]}};
-							3'b110:RBG_CDL[i][6 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][15: 8]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][15: 8]}};
-							3'b111:RBG_CDL[i][7 ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][ 7: 0]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][ 7: 0]}};
+							case (RCNT[i][1:0])
+							2'b00:RBG_CDL[i][{RCNT[i][2],2'b00} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][31:24]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][31:24]}};
+							2'b01:RBG_CDL[i][{RCNT[i][2],2'b01} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][23:16]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][23:16]}};
+							2'b10:RBG_CDL[i][{RCNT[i][2],2'b10} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][15: 8]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][15: 8]}};
+							2'b11:RBG_CDL[i][{RCNT[i][2],2'b11} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][ 7: 0]|RTPON[i],{13'h0000,RPALN[i][6:4],RCH[i][ 7: 0]}};
 							endcase
 						end
 						3'b010: begin				//16bits/dot, 2048 colors
 							case (RCNT[i][0])
-							1'b0:RBG_CDL[i][{RCNT[i][1:0],1'b0} ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][26:16]|RTPON[i],{13'h0000,RCH[i][26:16]}};
-							1'b1:RBG_CDL[i][{RCNT[i][1:0],1'b1} ^ {3{RHF[i]}}] <= {1'b1,|RCH[i][10: 0]|RTPON[i],{13'h0000,RCH[i][10: 0]}};
+							1'b0:RBG_CDL[i][{RCNT[i][2:1],1'b0} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][26:16]|RTPON[i],{13'h0000,RCH[i][26:16]}};
+							1'b1:RBG_CDL[i][{RCNT[i][2:1],1'b1} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b1,|RCH[i][10: 0]|RTPON[i],{13'h0000,RCH[i][10: 0]}};
 							endcase
 						end
 						3'b011: begin				//16bits/dot, 32768 colors
 							case (RCNT[i][0])
-							1'b0:RBG_CDL[i][{RCNT[i][1:0],1'b0} ^ {3{RHF[i]}}] <= {1'b0,RCH[i][31]|RTPON[i],Color555To888(RCH[i][31:16])};
-							1'b1:RBG_CDL[i][{RCNT[i][1:0],1'b1} ^ {3{RHF[i]}}] <= {1'b0,RCH[i][15]|RTPON[i],Color555To888(RCH[i][15: 0])};
+							1'b0:RBG_CDL[i][{RCNT[i][2:1],1'b0} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b0,RCH[i][31]|RTPON[i],Color555To888(RCH[i][30:16])};
+							1'b1:RBG_CDL[i][{RCNT[i][2:1],1'b1} ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b0,RCH[i][15]|RTPON[i],Color555To888(RCH[i][14: 0])};
 							endcase
 						end
 						3'b100: begin				//32bits/dot, 16M colors
-							RBG_CDL[i][RCNT[i] ^ {3{RHF[i]}}] <= {1'b0,RCH[i][31]|RTPON[i],RCH[i][23:0]};
+							     RBG_CDL[i][{RCNT[i]          } ^ {3{RHF[i]}}] <= {RPR[i],RCC[i],1'b0,RCH[i][31]|RTPON[i],RCH[i][23:0]};
 						end
 						default:;
 					endcase
@@ -1469,8 +1490,12 @@ module VDP2 (
 	wire [3:0] N2DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[2].INT[2:0]};
 	wire [3:0] N3DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[3].INT[2:0]};
 	ScreenDot_t DOT_FST, DOT_SEC, DOT_THD, DOT_FTH;
-	DotData_t SDOT, R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
+	DotData_t R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
+	SpriteDotData_t SDOT;
 	always @(posedge CLK or negedge RST_N) begin
+		bit         R0SFC, N0SFC, N1SFC, N2SFC, N3SFC;
+		bit   [2:0] SPRIN, R0PRIN, N0PRIN, N1PRIN, N2PRIN, N3PRIN;
+		bit         SCCEN, R0CCEN, N0CCEN, N1CCEN, N2CCEN, N3CCEN;
 		ScreenDot_t FST, SEC, THD, FTH;
 		bit   [2:0] FST_PRI, SEC_PRI, THD_PRI, FTH_PRI;
 		
@@ -1481,7 +1506,7 @@ module VDP2 (
 			DOT_FTH <= SD_NULL;
 		end
 		else if (DOTH_CE) begin
-			SDOT <= FBD[15] ? {1'b0,|FBD,Color555To888(FBD)} : {1'b1,|FBD,8'h00,FBD};
+			SDOT <= SpriteData(REGS.SPCTL.SPTYPE,REGS.SPCTL.SPCLMD,FBD);
 		end
 		else if (DOT_CE) begin
 			R0DOT = R0DB[R0DOTN];
@@ -1490,57 +1515,86 @@ module VDP2 (
 			N2DOT = N2DB[N2DOTN];
 			N3DOT = N3DB[N3DOTN];
 			
-			FST = {1'b0,1'b1,BACK_COL,3'b101}; FST_PRI = 3'd0;
-			SEC = {1'b0,1'b1,BACK_COL,3'b101}; SEC_PRI = 3'd0;
-			THD = {1'b0,1'b1,BACK_COL,3'b101}; THD_PRI = 3'd0;
-			FTH = {1'b0,1'b1,BACK_COL,3'b101}; FTH_PRI = 3'd0;
+			R0SFC = SFCMatch(REGS.SFSEL.R0SFCS,REGS.SFCODE,R0DOT.DC[3:0]);
+			N0SFC = SFCMatch(REGS.SFSEL.N0SFCS,REGS.SFCODE,N0DOT.DC[3:0]);
+			N1SFC = SFCMatch(REGS.SFSEL.N1SFCS,REGS.SFCODE,N1DOT.DC[3:0]);
+			N2SFC = SFCMatch(REGS.SFSEL.N2SFCS,REGS.SFCODE,N2DOT.DC[3:0]);
+			N3SFC = SFCMatch(REGS.SFSEL.N3SFCS,REGS.SFCODE,N3DOT.DC[3:0]);
+			
+			case (SDOT.PR)
+				3'h0: SPRIN = REGS.PRISA.S0PRIN;
+				3'h1: SPRIN = REGS.PRISA.S1PRIN;
+				3'h2: SPRIN = REGS.PRISB.S2PRIN;
+				3'h3: SPRIN = REGS.PRISB.S3PRIN;
+				3'h4: SPRIN = REGS.PRISC.S4PRIN;
+				3'h5: SPRIN = REGS.PRISC.S5PRIN;
+				3'h6: SPRIN = REGS.PRISD.S6PRIN;
+				3'h7: SPRIN = REGS.PRISD.S7PRIN;
+			endcase
+			R0PRIN = RSxREG[0].SPRM == 2'b01 ? {RSxREG[0].PRIN[2:1],R0DOT.PR} : RSxREG[0].SPRM == 2'b10 ? {RSxREG[0].PRIN[2:1],R0DOT.PR & R0SFC} : RSxREG[0].PRIN;
+			N0PRIN = NSxREG[0].SPRM == 2'b01 ? {NSxREG[0].PRIN[2:1],N0DOT.PR} : NSxREG[0].SPRM == 2'b10 ? {NSxREG[0].PRIN[2:1],N0DOT.PR & N0SFC} : NSxREG[0].PRIN; 
+			N1PRIN = NSxREG[1].SPRM == 2'b01 ? {NSxREG[1].PRIN[2:1],N1DOT.PR} : NSxREG[1].SPRM == 2'b10 ? {NSxREG[1].PRIN[2:1],N1DOT.PR & N1SFC} : NSxREG[1].PRIN;
+			N2PRIN = NSxREG[2].SPRM == 2'b01 ? {NSxREG[2].PRIN[2:1],N2DOT.PR} : NSxREG[2].SPRM == 2'b10 ? {NSxREG[2].PRIN[2:1],N2DOT.PR & N2SFC} : NSxREG[2].PRIN;
+			N3PRIN = NSxREG[3].SPRM == 2'b01 ? {NSxREG[3].PRIN[2:1],N3DOT.PR} : NSxREG[3].SPRM == 2'b10 ? {NSxREG[3].PRIN[2:1],N3DOT.PR & N3SFC} : NSxREG[3].PRIN;
+			
+			SCCEN = REGS.CCCTL.SPCCEN;
+			R0CCEN = RSxREG[0].SCCM == 2'b01 ? R0DOT.CC & RSxREG[0].CCEN : RSxREG[0].SCCM == 2'b10 ? R0SFC & R0DOT.CC & RSxREG[0].CCEN : RSxREG[0].CCEN;//TODO: SCCM == 2'b11
+			N0CCEN = NSxREG[0].SCCM == 2'b01 ? N0DOT.CC & NSxREG[0].CCEN : NSxREG[0].SCCM == 2'b10 ? N0SFC & N0DOT.CC & NSxREG[0].CCEN : NSxREG[0].CCEN;
+			N1CCEN = NSxREG[1].SCCM == 2'b01 ? N1DOT.CC & NSxREG[1].CCEN : NSxREG[1].SCCM == 2'b10 ? N1SFC & N1DOT.CC & NSxREG[1].CCEN : NSxREG[1].CCEN;
+			N2CCEN = NSxREG[2].SCCM == 2'b01 ? N2DOT.CC & NSxREG[2].CCEN : NSxREG[2].SCCM == 2'b10 ? N2SFC & N2DOT.CC & NSxREG[2].CCEN : NSxREG[2].CCEN;
+			N3CCEN = NSxREG[3].SCCM == 2'b01 ? N3DOT.CC & NSxREG[3].CCEN : NSxREG[3].SCCM == 2'b10 ? N3SFC & N3DOT.CC & NSxREG[3].CCEN : NSxREG[3].CCEN;
+			
+			FST = {3'b101,1'b0,1'b1,BACK_COL}; FST_PRI = 3'd0;
+			SEC = {3'b101,1'b0,1'b1,BACK_COL}; SEC_PRI = 3'd0;
+			THD = {3'b101,1'b0,1'b1,BACK_COL}; THD_PRI = 3'd0;
+			FTH = {3'b101,1'b0,1'b1,BACK_COL}; FTH_PRI = 3'd0;
 			if (REGS.TVMD.DISP) begin
-				if (SDOT.TP && REGS.PRISA.S0PRIN && SCRN_EN[5]) begin
-					FST = {SDOT,3'd5}; FST_PRI = REGS.PRISA.S0PRIN;
+				if (SDOT.TP && SPRIN && SCRN_EN[5]) begin
+					FST = {3'd5,SCCEN,SDOT.P,SDOT.DC}; FST_PRI = SPRIN;
 				end
 				
-				if (R0DOT.TP && RSxREG[0].PRIN && RSxREG[0].PRIN > FST_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
-					FST = {R0DOT,3'd4}; FST_PRI = RSxREG[0].PRIN;
-				end else if (R0DOT.TP && RSxREG[0].PRIN && RSxREG[0].PRIN > SEC_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
-					SEC = {R0DOT,3'd4}; SEC_PRI = RSxREG[0].PRIN;
+				if (R0DOT.TP && R0PRIN && R0PRIN > FST_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
+					FST = {3'd4,R0CCEN,R0DOT.P,R0DOT.DC}; FST_PRI = R0PRIN;
+				end else if (R0DOT.TP && R0PRIN && R0PRIN > SEC_PRI && RSxREG[0].ON && SCRN_EN[4]) begin
+					SEC = {3'd4,R0CCEN,R0DOT.P,R0DOT.DC}; SEC_PRI = R0PRIN;
 				end
 				
-				if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > FST_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
-					FST = {N0DOT,3'd0}; FST_PRI = NSxREG[0].PRIN;
-				end else if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > SEC_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
-					SEC = {N0DOT,3'd0}; SEC_PRI = NSxREG[0].PRIN;
-				end else if (N0DOT.TP && NSxREG[0].PRIN && NSxREG[0].PRIN > THD_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
-					THD = {N0DOT,3'd0}; THD_PRI = NSxREG[0].PRIN;
+				if          (N0DOT.TP && N0PRIN && N0PRIN > FST_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
+					FST = {3'd0,N0CCEN,N0DOT.P,N0DOT.DC}; FST_PRI = N0PRIN;
+				end else if (N0DOT.TP && N0PRIN && N0PRIN > SEC_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
+					SEC = {3'd0,N0CCEN,N0DOT.P,N0DOT.DC}; SEC_PRI = N0PRIN;
+				end else if (N0DOT.TP && N0PRIN && N0PRIN > THD_PRI && NSxREG[0].ON && SCRN_EN[0]) begin
+					THD = {3'd0,N0CCEN,N0DOT.P,N0DOT.DC}; THD_PRI = N0PRIN;
 				end
 				
-				if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > FST_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
-					FST = {N1DOT,3'd1}; FST_PRI = NSxREG[1].PRIN;
-				end else if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > SEC_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
-					SEC = {N1DOT,3'd1}; SEC_PRI = NSxREG[1].PRIN;
-				end else if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > THD_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
-					THD = {N1DOT,3'd1}; THD_PRI = NSxREG[1].PRIN;
-				end else if (N1DOT.TP && NSxREG[1].PRIN && NSxREG[1].PRIN > FTH_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
-					FTH = {N1DOT,3'd1}; FTH_PRI = NSxREG[1].PRIN;
+				if          (N1DOT.TP && N1PRIN && N1PRIN > FST_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
+					FST = {3'd1,N1CCEN,N1DOT.P,N1DOT.DC}; FST_PRI = N1PRIN;
+				end else if (N1DOT.TP && N1PRIN && N1PRIN > SEC_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
+					SEC = {3'd1,N1CCEN,N1DOT.P,N1DOT.DC}; SEC_PRI = N1PRIN;
+				end else if (N1DOT.TP && N1PRIN && N1PRIN > THD_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
+					THD = {3'd1,N1CCEN,N1DOT.P,N1DOT.DC}; THD_PRI = N1PRIN;
+				end else if (N1DOT.TP && N1PRIN && N1PRIN > FTH_PRI && NSxREG[1].ON && SCRN_EN[1]) begin
+					FTH = {3'd1,N1CCEN,N1DOT.P,N1DOT.DC}; FTH_PRI = N1PRIN;
 				end
 				
-				if (N2DOT.TP && NSxREG[2].PRIN && NSxREG[2].PRIN > FST_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
-					FST = {N2DOT,3'd2}; FST_PRI = NSxREG[2].PRIN;
-				end else if (N2DOT.TP && NSxREG[2].PRIN && NSxREG[2].PRIN > SEC_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
-					SEC = {N2DOT,3'd2}; SEC_PRI = NSxREG[2].PRIN;
-				end else if (N2DOT.TP && NSxREG[2].PRIN && NSxREG[2].PRIN > THD_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
-					THD = {N2DOT,3'd2}; THD_PRI = NSxREG[2].PRIN;
-				end else if (N2DOT.TP && NSxREG[2].PRIN && NSxREG[2].PRIN > FTH_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
-					FTH = {N2DOT,3'd2}; FTH_PRI = NSxREG[2].PRIN;
+				if          (N2DOT.TP && N2PRIN && N2PRIN > FST_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
+					FST = {3'd2,N2CCEN,N2DOT.P,N2DOT.DC}; FST_PRI = N2PRIN;
+				end else if (N2DOT.TP && N2PRIN && N2PRIN > SEC_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
+					SEC = {3'd2,N2CCEN,N2DOT.P,N2DOT.DC}; SEC_PRI = N2PRIN;
+				end else if (N2DOT.TP && N2PRIN && N2PRIN > THD_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
+					THD = {3'd2,N2CCEN,N2DOT.P,N2DOT.DC}; THD_PRI = N2PRIN;
+				end else if (N2DOT.TP && N2PRIN && N2PRIN > FTH_PRI && NSxREG[2].ON && SCRN_EN[2]) begin
+					FTH = {3'd2,N2CCEN,N2DOT.P,N2DOT.DC}; FTH_PRI = N2PRIN;
 				end
 				
-				if (N3DOT.TP && NSxREG[3].PRIN && NSxREG[3].PRIN > FST_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
-					FST = {N3DOT,3'd3}; FST_PRI = NSxREG[3].PRIN;
-				end else if (N3DOT.TP && NSxREG[3].PRIN && NSxREG[3].PRIN > SEC_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
-					SEC = {N3DOT,3'd3}; SEC_PRI = NSxREG[3].PRIN;
-				end else if (N3DOT.TP && NSxREG[3].PRIN && NSxREG[3].PRIN > THD_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
-					THD = {N3DOT,3'd3}; THD_PRI = NSxREG[3].PRIN;
-				end else if (N3DOT.TP && NSxREG[3].PRIN && NSxREG[3].PRIN > FTH_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
-					FTH = {N3DOT,3'd3}; FTH_PRI = NSxREG[3].PRIN;
+				if          (N3DOT.TP && N3PRIN && N3PRIN > FST_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
+					FST = {3'd3,N3CCEN,N3DOT.P,N3DOT.DC}; FST_PRI = N3PRIN;
+				end else if (N3DOT.TP && N3PRIN && N3PRIN > SEC_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
+					SEC = {3'd3,N3CCEN,N3DOT.P,N3DOT.DC}; SEC_PRI = N3PRIN;
+				end else if (N3DOT.TP && N3PRIN && N3PRIN > THD_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
+					THD = {3'd3,N3CCEN,N3DOT.P,N3DOT.DC}; THD_PRI = N3PRIN;
+				end else if (N3DOT.TP && N3PRIN && N3PRIN > FTH_PRI && NSxREG[3].ON && SCRN_EN[3]) begin
+					FTH = {3'd3,N3CCEN,N3DOT.P,N3DOT.DC}; FTH_PRI = N3PRIN;
 				end
 			end
 			
@@ -1583,7 +1637,7 @@ module VDP2 (
 			3'b101: CAOS = REGS.CRAOFB.SPCAOS;
 			default:CAOS = '0;
 		endcase
-		PAL_N = {CAOS,8'b00000000} + DOT.D[10:0];
+		PAL_N = {CAOS,8'b00000000} + DOT.DC[10:0];
 	end
 	
 	
@@ -1620,16 +1674,25 @@ module VDP2 (
 				PAL_COL_SEC <= PAL_COL_SEC_TEMP;
 				PAL_COL_THD <= PAL_COL_THD_TEMP;
 				case (DOT_FST.S)
-					3'b000: begin COEN <= NSxREG[0].COEN; COSL <= NSxREG[0].COSL; CCEN <= NSxREG[0].CCEN; CCRT <= NSxREG[0].CCRT; end
-					3'b001: begin COEN <= NSxREG[1].COEN; COSL <= NSxREG[1].COSL; CCEN <= NSxREG[1].CCEN; CCRT <= NSxREG[1].CCRT; end
-					3'b010: begin COEN <= NSxREG[2].COEN; COSL <= NSxREG[2].COSL; CCEN <= NSxREG[2].CCEN; CCRT <= NSxREG[2].CCRT; end
-					3'b011: begin COEN <= NSxREG[3].COEN; COSL <= NSxREG[3].COSL; CCEN <= NSxREG[3].CCEN; CCRT <= NSxREG[3].CCRT; end
-					3'b100: begin COEN <= RSxREG[0].COEN; COSL <= RSxREG[0].COSL; CCEN <= RSxREG[0].CCEN; CCRT <= RSxREG[0].CCRT; end
-					3'b101: begin COEN <= REGS.CLOFEN.SPCOEN; COSL <= REGS.CLOFSL.SPCOSL; CCEN <= REGS.CCCTL.SPCCEN; CCRT <= REGS.CCRSA.S0CCRT; end
-					default:begin COEN <= 0; COSL <= 0; CCEN <= 0; CCRT <= '0; end
+					3'b000: begin CCEN <= DOT_FST.CCEN; CCRT <= NSxREG[0].CCRT; end
+					3'b001: begin CCEN <= DOT_FST.CCEN; CCRT <= NSxREG[1].CCRT; end
+					3'b010: begin CCEN <= DOT_FST.CCEN; CCRT <= NSxREG[2].CCRT; end
+					3'b011: begin CCEN <= DOT_FST.CCEN; CCRT <= NSxREG[3].CCRT; end
+					3'b100: begin CCEN <= DOT_FST.CCEN; CCRT <= RSxREG[0].CCRT; end
+					3'b101: begin CCEN <= DOT_FST.CCEN; CCRT <= REGS.CCRSA.S0CCRT; end
+					default:begin CCEN <= 0; CCRT <= '0; end
 				endcase
-				CF <= !DOT_FST.P ? DOT_FST.D : PAL_COL_FST_TEMP;
-				CS <= !DOT_SEC.P ? DOT_SEC.D : PAL_COL_SEC_TEMP;
+				case (DOT_FST.S)
+					3'b000: begin COEN <= NSxREG[0].COEN; COSL <= NSxREG[0].COSL; end
+					3'b001: begin COEN <= NSxREG[1].COEN; COSL <= NSxREG[1].COSL; end
+					3'b010: begin COEN <= NSxREG[2].COEN; COSL <= NSxREG[2].COSL; end
+					3'b011: begin COEN <= NSxREG[3].COEN; COSL <= NSxREG[3].COSL; end
+					3'b100: begin COEN <= RSxREG[0].COEN; COSL <= RSxREG[0].COSL; end
+					3'b101: begin COEN <= REGS.CLOFEN.SPCOEN; COSL <= REGS.CLOFSL.SPCOSL; end
+					default:begin COEN <= 0; COSL <= 0; end
+				endcase
+				CF <= !DOT_FST.P ? DOT_FST.DC : PAL_COL_FST_TEMP;
+				CS <= !DOT_SEC.P ? DOT_SEC.DC : PAL_COL_SEC_TEMP;
 			end
 		end
 	end
@@ -2117,16 +2180,16 @@ module VDP2 (
 	assign VINT_N = ~VBLANK;
 	assign HINT_N = ~HBLANK;
 	
-	assign REG_DBG = REGS.TVMD^REGS.EXTEN^REGS.VRSIZE^REGS.RAMCTL^REGS.CYCA0L^REGS.CYCA0U^REGS.CYCA1L^REGS.CYCA1U^REGS.CYCB0L^
-						   REGS.CYCB0U^REGS.CYCB1L^REGS.CYCB1U^REGS.BGON^REGS.MZCTL^REGS.SFSEL^REGS.SFCODE^REGS.CHCTLA^REGS.CHCTLB^REGS.BMPNA^REGS.BMPNB^
-							REGS.PNCN0^REGS.PNCN1^REGS.PNCN2^REGS.PNCN3^REGS.PNCR^REGS.PLSZ^REGS.MPOFN^REGS.MPOFR^REGS.MPABN0^REGS.MPCDN0^REGS.MPABN1^REGS.MPCDN1^REGS.MPABN2^
-							REGS.MPCDN2^REGS.MPABN3^REGS.MPCDN3^REGS.MPABRA^REGS.MPCDRA^REGS.MPEFRA^REGS.MPGHRA^REGS.MPIJRA^REGS.MPKLRA^REGS.MPMNRA^REGS.MPOPRA^REGS.MPABRB^REGS.MPCDRB^
-							REGS.MPEFRB^REGS.MPGHRB^REGS.MPIJRB^REGS.MPKLRB^REGS.MPMNRB^REGS.MPOPRB^REGS.SCXIN0^REGS.SCXDN0^REGS.SCYIN0^REGS.SCYDN0^REGS.ZMXIN0^REGS.ZMXDN0^REGS.ZMYIN0^
-							REGS.ZMYDN0^REGS.SCXIN1^REGS.SCXDN1^REGS.SCYIN1^REGS.SCYDN1^REGS.ZMXIN1^REGS.ZMXDN1^REGS.ZMYIN1^REGS.ZMYDN1^REGS.SCXN2^REGS.SCYN2^REGS.SCXN3^REGS.SCYN3^REGS.ZMCTL^
-							REGS.SCRCTL^REGS.VCSTAU^REGS.VCSTAL^REGS.LSTA0U^REGS.LSTA0L^REGS.LSTA1U^REGS.LSTA1L^REGS.LCTAU^REGS.LCTAL^REGS.BKTAU^REGS.BKTAL^REGS.RPMD^REGS.RPRCTL^
-							REGS.KTCTL^REGS.KTAOF^REGS.OVPNRA^REGS.OVPNRB^REGS.RPTAU^REGS.RPTAL^REGS.WPSX0^REGS.WPSY0^REGS.WPEX0^REGS.WPEY0^REGS.WPSX1^REGS.WPSY1^REGS.WPEX1^
-							REGS.WPEY1^REGS.WCTLA^REGS.WCTLB^REGS.WCTLC^REGS.WCTLD^REGS.LWTA0U^REGS.LWTA0L^REGS.LWTA1U^REGS.LWTA1L^REGS.SPCTL^REGS.SDCTL^REGS.CRAOFA^REGS.CRAOFB^REGS.LNCLEN^
-							REGS.SFPRMD^REGS.CCCTL^REGS.SFCCMD^REGS.PRISA^REGS.PRISB^&REGS.PRISC^REGS.PRISD^REGS.PRINA^REGS.PRINB^REGS.PRIR^REGS.CCRSA^
-							REGS.CCRSB^REGS.CCRSC^REGS.CCRSD^REGS.CCRNA^REGS.CCRNB^REGS.CCRR^REGS.CCRLB^REGS.CLOFEN^REGS.CLOFSL^REGS.COAR^REGS.COAG^REGS.COAB^REGS.COBR^REGS.COBG^REGS.COBB;
+//	assign REG_DBG = REGS.TVMD^REGS.EXTEN^REGS.VRSIZE^REGS.RAMCTL^REGS.CYCA0L^REGS.CYCA0U^REGS.CYCA1L^REGS.CYCA1U^REGS.CYCB0L^
+//						   REGS.CYCB0U^REGS.CYCB1L^REGS.CYCB1U^REGS.BGON^REGS.MZCTL^REGS.SFSEL^REGS.SFCODE^REGS.CHCTLA^REGS.CHCTLB^REGS.BMPNA^REGS.BMPNB^
+//							REGS.PNCN0^REGS.PNCN1^REGS.PNCN2^REGS.PNCN3^REGS.PNCR^REGS.PLSZ^REGS.MPOFN^REGS.MPOFR^REGS.MPABN0^REGS.MPCDN0^REGS.MPABN1^REGS.MPCDN1^REGS.MPABN2^
+//							REGS.MPCDN2^REGS.MPABN3^REGS.MPCDN3^REGS.MPABRA^REGS.MPCDRA^REGS.MPEFRA^REGS.MPGHRA^REGS.MPIJRA^REGS.MPKLRA^REGS.MPMNRA^REGS.MPOPRA^REGS.MPABRB^REGS.MPCDRB^
+//							REGS.MPEFRB^REGS.MPGHRB^REGS.MPIJRB^REGS.MPKLRB^REGS.MPMNRB^REGS.MPOPRB^REGS.SCXIN0^REGS.SCXDN0^REGS.SCYIN0^REGS.SCYDN0^REGS.ZMXIN0^REGS.ZMXDN0^REGS.ZMYIN0^
+//							REGS.ZMYDN0^REGS.SCXIN1^REGS.SCXDN1^REGS.SCYIN1^REGS.SCYDN1^REGS.ZMXIN1^REGS.ZMXDN1^REGS.ZMYIN1^REGS.ZMYDN1^REGS.SCXN2^REGS.SCYN2^REGS.SCXN3^REGS.SCYN3^REGS.ZMCTL^
+//							REGS.SCRCTL^REGS.VCSTAU^REGS.VCSTAL^REGS.LSTA0U^REGS.LSTA0L^REGS.LSTA1U^REGS.LSTA1L^REGS.LCTAU^REGS.LCTAL^REGS.BKTAU^REGS.BKTAL^REGS.RPMD^REGS.RPRCTL^
+//							REGS.KTCTL^REGS.KTAOF^REGS.OVPNRA^REGS.OVPNRB^REGS.RPTAU^REGS.RPTAL^REGS.WPSX0^REGS.WPSY0^REGS.WPEX0^REGS.WPEY0^REGS.WPSX1^REGS.WPSY1^REGS.WPEX1^
+//							REGS.WPEY1^REGS.WCTLA^REGS.WCTLB^REGS.WCTLC^REGS.WCTLD^REGS.LWTA0U^REGS.LWTA0L^REGS.LWTA1U^REGS.LWTA1L^REGS.SPCTL^REGS.SDCTL^REGS.CRAOFA^REGS.CRAOFB^REGS.LNCLEN^
+//							REGS.SFPRMD^REGS.CCCTL^REGS.SFCCMD^REGS.PRISA^REGS.PRISB^&REGS.PRISC^REGS.PRISD^REGS.PRINA^REGS.PRINB^REGS.PRIR^REGS.CCRSA^
+//							REGS.CCRSB^REGS.CCRSC^REGS.CCRSD^REGS.CCRNA^REGS.CCRNB^REGS.CCRR^REGS.CCRLB^REGS.CLOFEN^REGS.CLOFSL^REGS.COAR^REGS.COAG^REGS.COAB^REGS.COBR^REGS.COBG^REGS.COBB;
 	
 endmodule

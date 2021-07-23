@@ -1149,6 +1149,8 @@ package VDP2_PKG;
 		bit         BMEN;
 		bit [ 1: 0] PLSZ;
 		bit [ 2: 0] BMP;
+		bit         BMPR;
+		bit         BMCC;
 		PNCNx_t     PNC;
 		bit [ 8: 6] MP;
 		bit [ 5: 0] MPA;
@@ -1170,10 +1172,12 @@ package VDP2_PKG;
 		bit         ON;
 		bit [ 2: 0] CAOS;
 		bit [ 2: 0] PRIN;
+		bit [ 1: 0] SPRM;
 		bit         COEN;
 		bit         COSL;
 		bit         CCEN;
 		bit [ 4: 0] CCRT;
+		bit [ 1: 0] SCCM;
 	} VDP2NSRegs_t;
 	typedef VDP2NSRegs_t VDP2NSxRegs_t [4];
 	
@@ -1185,14 +1189,18 @@ package VDP2_PKG;
 		bit         BMEN;
 		PNCNx_t     PNC;
 		bit [ 2: 0] BMP;
+		bit         BMPR;
+		bit         BMCC;
 		bit         TPON;
 		bit         ON;
 		bit [ 2: 0] CAOS;
 		bit [ 2: 0] PRIN;
+		bit [ 1: 0] SPRM;
 		bit         COEN;
 		bit         COSL;
 		bit         CCEN;
 		bit [ 4: 0] CCRT;
+		bit [ 1: 0] SCCM;
 	} VDP2RSRegs_t;
 	typedef VDP2RSRegs_t VDP2RSxRegs_t [2];
 	
@@ -1229,6 +1237,16 @@ package VDP2_PKG;
 		S[1].BMP = REGS.BMPNA.N1BMP;
 		S[2].BMP = '0;
 		S[3].BMP = '0;
+		
+		S[0].BMPR = REGS.BMPNA.N0BMPR;
+		S[1].BMPR = REGS.BMPNA.N1BMPR;
+		S[2].BMPR = 0;
+		S[3].BMPR = 0;
+		
+		S[0].BMCC = REGS.BMPNA.N0BMCC;
+		S[1].BMCC = REGS.BMPNA.N1BMCC;
+		S[2].BMCC = 0;
+		S[3].BMCC = 0;
 		
 		S[0].PNC = REGS.PNCN0;
 		S[1].PNC = REGS.PNCN1;
@@ -1332,6 +1350,11 @@ package VDP2_PKG;
 		S[2].PRIN = REGS.PRINB.N2PRIN;
 		S[3].PRIN = REGS.PRINB.N3PRIN;
 		
+		S[0].SPRM = REGS.SFPRMD.N0SPRM;
+		S[1].SPRM = REGS.SFPRMD.N1SPRM;
+		S[2].SPRM = REGS.SFPRMD.N2SPRM;
+		S[3].SPRM = REGS.SFPRMD.N3SPRM;
+		
 		S[0].COEN = REGS.CLOFEN.N0COEN;
 		S[1].COEN = REGS.CLOFEN.N1COEN;
 		S[2].COEN = REGS.CLOFEN.N2COEN;
@@ -1351,6 +1374,11 @@ package VDP2_PKG;
 		S[1].CCRT = REGS.CCRNA.N1CCRT;
 		S[2].CCRT = REGS.CCRNB.N2CCRT;
 		S[3].CCRT = REGS.CCRNB.N3CCRT;
+		
+		S[0].SCCM = REGS.SFCCMD.N0SCCM;
+		S[1].SCCM = REGS.SFCCMD.N1SCCM;
+		S[2].SCCM = REGS.SFCCMD.N2SCCM;
+		S[3].SCCM = REGS.SFCCMD.N3SCCM;
 		
 		return S;
 	endfunction
@@ -1376,6 +1404,12 @@ package VDP2_PKG;
 		S[0].BMP = REGS.BMPNB.R0BMP;
 		S[1].BMP = REGS.BMPNA.N0BMP;
 		
+		S[0].BMPR = REGS.BMPNB.R0BMPR;
+		S[1].BMPR = REGS.BMPNA.N1BMPR;
+		
+		S[0].BMCC = REGS.BMPNB.R0BMCC;
+		S[1].BMCC = REGS.BMPNA.N1BMCC;
+		
 		S[0].ON = REGS.BGON.R0ON;
 		S[1].ON = REGS.BGON.R1ON;
 		
@@ -1388,6 +1422,9 @@ package VDP2_PKG;
 		S[0].PRIN = REGS.PRIR.R0PRIN;
 		S[1].PRIN = REGS.PRINA.N0PRIN;
 		
+		S[0].SPRM = REGS.SFPRMD.R0SPRM;
+		S[1].SPRM = REGS.SFPRMD.N1SPRM;
+		
 		S[0].COEN = REGS.CLOFEN.R0COEN;
 		S[1].COEN = REGS.CLOFEN.N0COEN;
 		
@@ -1399,6 +1436,9 @@ package VDP2_PKG;
 		
 		S[0].CCRT = REGS.CCRR.R0CCRT;
 		S[1].CCRT = REGS.CCRNA.N0CCRT;
+		
+		S[0].SCCM = REGS.SFCCMD.R0SCCM;
+		S[1].SCCM = REGS.SFCCMD.N1SCCM;
 		
 		return S;
 	endfunction
@@ -1560,11 +1600,13 @@ package VDP2_PKG;
 	
 	typedef struct packed
 	{
+		bit         PR;
+		bit         CC;
 		bit         P;
 		bit         TP;
-		bit [23: 0] D;
+		bit [23: 0] DC;
 	} DotData_t;
-	parameter DotData_t DD_NULL = {1'b0,1'b0,24'h000000};
+	parameter DotData_t DD_NULL = {1'b0,1'b0,1'b0,1'b0,24'h000000};
 	
 	typedef DotData_t CellDotsLine_t [8];
 	typedef DotData_t DotsBuffer_t [16];
@@ -1573,10 +1615,21 @@ package VDP2_PKG;
 	{
 		bit         P;
 		bit         TP;
-		bit [23: 0] D;
+		bit         SD;
+		bit [ 2: 0] PR;
+		bit [ 2: 0] CC;
+		bit [23: 0] DC;
+	} SpriteDotData_t;
+	parameter SpriteDotData_t SDD_NULL = {1'b0,1'b0,3'b000,3'b000,15'h0000};
+	
+	typedef struct packed
+	{
 		bit [ 2: 0] S;
+		bit         CCEN;
+		bit         P;
+		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {1'b0,1'b0,24'h000000,3'b101};
+	parameter ScreenDot_t SD_NULL = {3'b101,1'b0,1'b0,24'h000000};
 	
 	typedef struct packed
 	{
@@ -1676,7 +1729,7 @@ package VDP2_PKG;
 	endfunction
 	
 	function bit [2:0] NxLSSMask(input bit [1:0] NxLSS);
-		bit [19:1] mask;
+		bit [2:0] mask;
 		
 		case (NxLSS)
 			2'b00: mask = 3'b000;
@@ -1728,7 +1781,7 @@ package VDP2_PKG;
 		return DC;
 	endfunction
 	
-	function Color_t Color555To888(input bit [15:0] DW);
+	function Color_t Color555To888(input bit [14:0] DW);
 		return {DW[14:10],3'b000,DW[9:5],3'b000,DW[4:0],3'b000}; 
 	endfunction
 	
@@ -1945,7 +1998,7 @@ package VDP2_PKG;
 			1'b1: cell_offs = { RxOFFY[3]^PNx.VF,RxOFFX[3]^PNx.HF,RxOFFY[2:0] ^ {3{PNx.VF}} };
 		endcase
 		case (RxCHCN)
-			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0};					//4bits/dot, 16 colors
+			3'b000: addr = {PNx.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],            1'b0};	//4bits/dot, 16 colors
 			3'b001: addr = {PNx.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],RxOFFX[2:2],1'b0};	//8bits/dot, 256 colors
 			3'b010,
 			3'b011: addr = {PNx.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],RxOFFX[2:1],1'b0};	//16bits/dot, 2048/32768 colors
@@ -1956,25 +2009,79 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
-	function bit [19:1] RxBMAddr(input bit [2:0] RxMP, input bit [2:0] RxCH_CNT, input bit [10:0] RxOFFX, input bit [10:0] RxOFFY, input bit [2:0] RxCHCN, input bit RxBMSZ);
+	function bit [19:1] RxBMAddr(input bit [2:0] MP, input bit [11:0] OFFX, input bit [11:0] OFFY, input bit [2:0] CHCN, input bit BMSZ);
 		bit   [19:1] addr;
-		bit   [16:0] offs;
+		bit   [20:0] offs;
 
-		case (RxBMSZ)
-			1'b0: offs = {RxMP[2:0],RxOFFY[7:0],RxOFFX[8:3]};	//512x256 dots
-			1'b1: offs = {RxMP[1:0],RxOFFY[8:0],RxOFFX[8:3]};	//512x512 dots
+		case (BMSZ)
+			1'b0: offs = {1'b0,MP[2:0],OFFY[7:0],OFFX[8:0]};	//512x256 dots
+			1'b1: offs = {     MP[2:0],OFFY[8:0],OFFX[8:0]};	//512x512 dots
 		endcase
 
-		case (RxCHCN)
-			3'b000: addr = {offs[16:0],              1'b0};	//4bits/dot, 16 colors
-			3'b001: addr = {offs[15:0],RxCH_CNT[0:0],1'b0};	//8bits/dot, 256 colors
+		case (CHCN)
+			3'b000: addr = {offs[20:3],1'b0};	//4bits/dot, 16 colors
+			3'b001: addr = {offs[19:2],1'b0};	//8bits/dot, 256 colors
 			3'b010,
-			3'b011: addr = {offs[14:0],RxCH_CNT[1:0],1'b0};	//16bits/dot, 2048/32768 colors
-			3'b100: addr = {offs[13:0],RxCH_CNT[2:0],1'b0};	//32bits/dot, 16M colors
+			3'b011: addr = {offs[18:1],1'b0};	//16bits/dot, 2048/32768 colors
+			3'b100: addr = {offs[17:0],1'b0};	//32bits/dot, 16M colors
 			default: addr = '0;
 		endcase
 	
 		return addr;
+	endfunction
+	
+	function bit SFCMatch(input bit SFCS, input SFCODE_t SFCODE, input bit [3:0] CODE);
+		bit    [7:0] sfcd;
+		bit    [7:0] match;
+
+		sfcd = !SFCS ? SFCODE.SFCDA : SFCODE.SFCDB;
+		match = {CODE[3:1] == 3'b111,
+		         CODE[3:1] == 3'b110,
+		         CODE[3:1] == 3'b101,
+		         CODE[3:1] == 3'b100,
+		         CODE[3:1] == 3'b011,
+		         CODE[3:1] == 3'b010,
+		         CODE[3:1] == 3'b001,
+		         CODE[3:1] == 3'b000};
+	
+		return |(match & sfcd);
+	endfunction
+	
+	function SpriteDotData_t SpriteData(input bit [3:0] SPTYPE, input bit SPCLMD, input bit [15:0] DATA);
+		SpriteDotData_t SDD;
+		bit          SD;
+		bit    [2:0] PR;
+		bit    [2:0] CC;
+		bit   [10:0] DC;
+		bit   [23:0] RGB;
+	
+		case (SPTYPE)
+		4'h0: SD = 1'b0    ; PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
+		4'h1: SD = 1'b0    ; PR = {DATA[15],DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
+		4'h2: SD = DATA[15]; PR = {1'b0    ,1'b0    ,DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
+		4'h3: SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
+		4'h4: SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {DATA[12],DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}};
+		4'h5: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,1'b0    ,DATA[11]}; DC = {         DATA[10:0]}};
+		4'h6: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}};
+		4'h7: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {DATA[11],DATA[10],DATA[ 9]}; DC = {2'b00   ,DATA[ 8:0]}};
+		4'h8: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {4'b0000 ,DATA[ 6:0]}};
+		4'h9: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}};
+		4'hA: SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {5'b00000,DATA[ 5:0]}};
+		4'hB: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}};
+		4'hC: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}};
+		4'hD: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}};
+		4'hE: SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}};
+		4'hF: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}};
+		endcase
+		
+		RGB = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};
+		
+		if (SPCLMD && DATA[15])
+			SDD = {1'b0,1'b1,1'b0,3'h0,3'h0,RGB          };
+		else
+			SDD = {1'b1,|DC ,SD  ,PR  ,CC  ,{13'h0000,DC}};
+
+		return SDD;
 	endfunction
 	
 endpackage
