@@ -11,6 +11,7 @@ module Saturn (
 	input      [31:0] MEM_DI,
 	output     [31:0] MEM_DO,
 	output            ROM_CS_N,
+	output            SRAM_CS_N,
 	output            RAML_CS_N,
 	output            RAMH_CS_N,
 	output      [3:0] MEM_DQM_N,
@@ -228,6 +229,7 @@ module Saturn (
 	bit         DRAMCE_N;
 	bit         ROMCE_N;
 	bit         SMPCCE_N;
+	bit         SRAMCE_N;
 	bit         MWR_N;
 	bit   [1:0] BIRL;
 	bit         MFTI;
@@ -298,8 +300,6 @@ module Saturn (
 		.IVECF_N(),
 		.BRLS_N(MSHBRLS_N),
 		.BGR_N(MSHBGR_N),
-//		.BRLS_N(CBREQ_N),
-//		.BGR_N(CBACK_N),
 		
 		.DREQ0(1'b1),
 		.DREQ1(1'b1),
@@ -318,7 +318,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(RST_N),
+		.RST_N(0/*RST_N*/),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -376,17 +376,32 @@ module Saturn (
 	assign MSHIRL_N  = CIRL_N;
 	assign SSHIRL_N  = {1'b1,BIRL,1'b1};
 	
-	assign MSHBRLS_N = SSHBREQ_N & CBREQ_N;
-	assign SSHBACK_N = MSHBGR_N;
-	assign CBACK_N   = MSHBGR_N | ~SSHBREQ_N;
+	bit SSH_ACTIVE;
+	bit SCU_ACTIVE;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			SSH_ACTIVE <= '0;
+			SCU_ACTIVE <= 0;
+		end else if (CE_R) begin
+			if (!SSHBREQ_N && !SSH_ACTIVE && !SCU_ACTIVE) SSH_ACTIVE <= 1;
+			else if (SSHBREQ_N && SSH_ACTIVE) SSH_ACTIVE <= 0;
+			
+			if (!CBREQ_N && SSHBREQ_N && !SCU_ACTIVE && !SSH_ACTIVE) SCU_ACTIVE <= 1;
+			else if (CBREQ_N && SCU_ACTIVE) SCU_ACTIVE <= 0;
+		end
+	end
+	assign MSHBRLS_N = (SSHBREQ_N | ~SSH_ACTIVE) & (CBREQ_N | ~SCU_ACTIVE);
+	assign SSHBACK_N = MSHBGR_N | ~SSH_ACTIVE;
+	assign CBACK_N   = MSHBGR_N | ~SCU_ACTIVE;
+	
 
 	assign MSHDI     = CDO;
-	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N));
-	assign SSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N));
+	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N & SRAMCE_N));
+	assign SSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N & SRAMCE_N));
 	
 	assign CA       = MSHA[24:0];
-	assign CDO      = !MSHCS3_N || !DRAMCE_N || !ROMCE_N ? MEM_DI :
-                     !SMPCCE_N                          ? {4{SMPC_DO}} :
+	assign CDO      = !MSHCS3_N || !DRAMCE_N || !ROMCE_N || !SRAMCE_N ? MEM_DI :
+                     !SMPCCE_N                                       ? {4{SMPC_DO}} :
 							SCU_DO;
 	assign CDI      = MSHDO;
 	assign CBS_N    = MSHBS_N;
@@ -525,7 +540,7 @@ module Saturn (
 		.DWE_N(),
 		
 		.ROMCE_N(ROMCE_N),
-		.SRAMCE_N(),
+		.SRAMCE_N(SRAMCE_N),
 		.SMPCCE_N(SMPCCE_N),
 		.MOE_N(),
 		.MWR_N(MWR_N)
@@ -536,6 +551,7 @@ module Saturn (
 	assign MEM_DQM_N = CDQM_N;
 	assign MEM_RD_N  = CRD_N;
 	assign ROM_CS_N  = ROMCE_N;
+	assign SRAM_CS_N = SRAMCE_N;
 	assign RAML_CS_N = DRAMCE_N;
 	assign RAMH_CS_N = MSHCS3_N;
 	

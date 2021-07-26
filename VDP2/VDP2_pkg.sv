@@ -1153,10 +1153,7 @@ package VDP2_PKG;
 		bit         BMCC;
 		PNCNx_t     PNC;
 		bit [ 8: 6] MP;
-		bit [ 5: 0] MPA;
-		bit [ 5: 0] MPB;
-		bit [ 5: 0] MPC;
-		bit [ 5: 0] MPD;
+		bit [ 5: 0] MPn[4];
 		bit [18: 0] SCX;
 		bit [18: 0] SCY;
 		bit [10: 0] ZMX;
@@ -1188,6 +1185,7 @@ package VDP2_PKG;
 		bit         BMSZ;
 		bit         BMEN;
 		PNCNx_t     PNC;
+		bit [ 5: 0] MPn[16];
 		bit [ 2: 0] BMP;
 		bit         BMPR;
 		bit         BMCC;
@@ -1258,22 +1256,22 @@ package VDP2_PKG;
 		S[2].MP = REGS.MPOFN.N2MP;
 		S[3].MP = REGS.MPOFN.N3MP;
 		
-		S[0].MPA = REGS.MPABN0.NxMPA;
-		S[1].MPA = REGS.MPABN1.NxMPA;
-		S[2].MPA = REGS.MPABN2.NxMPA;
-		S[3].MPA = REGS.MPABN3.NxMPA;
-		S[0].MPB = REGS.MPABN0.NxMPB;
-		S[1].MPB = REGS.MPABN1.NxMPB;
-		S[2].MPB = REGS.MPABN2.NxMPB;
-		S[3].MPB = REGS.MPABN3.NxMPB;
-		S[0].MPC = REGS.MPCDN0.NxMPC;
-		S[1].MPC = REGS.MPCDN1.NxMPC;
-		S[2].MPC = REGS.MPCDN2.NxMPC;
-		S[3].MPC = REGS.MPCDN3.NxMPC;
-		S[0].MPD = REGS.MPCDN0.NxMPD;
-		S[1].MPD = REGS.MPCDN1.NxMPD;
-		S[2].MPD = REGS.MPCDN2.NxMPD;
-		S[3].MPD = REGS.MPCDN3.NxMPD;
+		S[0].MPn[0] = REGS.MPABN0.NxMPA;
+		S[1].MPn[0] = REGS.MPABN1.NxMPA;
+		S[2].MPn[0] = REGS.MPABN2.NxMPA;
+		S[3].MPn[0] = REGS.MPABN3.NxMPA;
+		S[0].MPn[1] = REGS.MPABN0.NxMPB;
+		S[1].MPn[1] = REGS.MPABN1.NxMPB;
+		S[2].MPn[1] = REGS.MPABN2.NxMPB;
+		S[3].MPn[1] = REGS.MPABN3.NxMPB;
+		S[0].MPn[2] = REGS.MPCDN0.NxMPC;
+		S[1].MPn[2] = REGS.MPCDN1.NxMPC;
+		S[2].MPn[2] = REGS.MPCDN2.NxMPC;
+		S[3].MPn[2] = REGS.MPCDN3.NxMPC;
+		S[0].MPn[3] = REGS.MPCDN0.NxMPD;
+		S[1].MPn[3] = REGS.MPCDN1.NxMPD;
+		S[2].MPn[3] = REGS.MPCDN2.NxMPD;
+		S[3].MPn[3] = REGS.MPCDN3.NxMPD;
 		
 		S[0].SCX = {REGS.SCXIN0.NxSCXI,REGS.SCXDN0.NxSCXD};
 		S[1].SCX = {REGS.SCXIN1.NxSCXI,REGS.SCXDN1.NxSCXD};
@@ -1400,6 +1398,39 @@ package VDP2_PKG;
 		
 		S[0].PNC = REGS.PNCR;
 		S[1].PNC = REGS.PNCN0;
+		
+		S[0].MPn[0] = REGS.MPABRA.RxMPA;
+		S[1].MPn[0] = REGS.MPABRA.RxMPA;
+		S[0].MPn[1] = REGS.MPABRA.RxMPB;
+		S[1].MPn[1] = REGS.MPABRA.RxMPB;
+		S[0].MPn[2] = REGS.MPCDRA.RxMPC;
+		S[1].MPn[2] = REGS.MPCDRA.RxMPC;
+		S[0].MPn[3] = REGS.MPCDRA.RxMPD;
+		S[1].MPn[3] = REGS.MPCDRA.RxMPD;
+		S[0].MPn[4] = REGS.MPEFRA.RxMPE;
+		S[1].MPn[4] = REGS.MPEFRA.RxMPE;
+		S[0].MPn[5] = REGS.MPEFRA.RxMPF;
+		S[1].MPn[5] = REGS.MPEFRA.RxMPF;
+		S[0].MPn[6] = REGS.MPGHRA.RxMPG;
+		S[1].MPn[6] = REGS.MPGHRA.RxMPG;
+		S[0].MPn[7] = REGS.MPGHRA.RxMPH;
+		S[1].MPn[7] = REGS.MPGHRA.RxMPH;
+		S[0].MPn[8] = REGS.MPIJRA.RxMPI;
+		S[1].MPn[8] = REGS.MPIJRA.RxMPI;
+		S[0].MPn[9] = REGS.MPIJRA.RxMPJ;
+		S[1].MPn[9] = REGS.MPIJRA.RxMPJ;
+		S[0].MPn[10] = REGS.MPKLRA.RxMPK;
+		S[1].MPn[10] = REGS.MPKLRA.RxMPK;
+		S[0].MPn[11] = REGS.MPKLRA.RxMPL;
+		S[1].MPn[11] = REGS.MPKLRA.RxMPL;
+		S[0].MPn[12] = REGS.MPMNRA.RxMPM;
+		S[1].MPn[12] = REGS.MPMNRA.RxMPM;
+		S[0].MPn[13] = REGS.MPMNRA.RxMPN;
+		S[1].MPn[13] = REGS.MPMNRA.RxMPN;
+		S[0].MPn[14] = REGS.MPOPRA.RxMPO;
+		S[1].MPn[14] = REGS.MPOPRA.RxMPO;
+		S[0].MPn[15] = REGS.MPOPRA.RxMPP;
+		S[1].MPn[15] = REGS.MPOPRA.RxMPP;
 	
 		S[0].BMP = REGS.BMPNB.R0BMP;
 		S[1].BMP = REGS.BMPNA.N0BMP;
@@ -1481,7 +1512,6 @@ package VDP2_PKG;
 	
 	typedef struct packed
 	{
-		bit [16: 1] A;
 		bit         PN; 
 		bit         CH; 
 		bit         VS; 
@@ -1512,7 +1542,9 @@ package VDP2_PKG;
 		NxDispCoord_t NxX; 
 		NxDispCoord_t NxY; 
 		bit [11: 0] R0X; 
+		bit [11: 0] R1X; 
 		bit [11: 0] R0Y;
+		bit [11: 0] R1Y;
 		bit [ 3: 0] NxA0PN;
 		bit [ 3: 0] NxA1PN;
 		bit [ 3: 0] NxB0PN;
@@ -1626,6 +1658,9 @@ package VDP2_PKG;
 	{
 		bit [ 2: 0] S;
 		bit         CCEN;
+		bit [ 4: 0] CCRT;
+		bit         COEN;
+		bit         COSL;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
@@ -1648,30 +1683,25 @@ package VDP2_PKG;
 	} Color_t;
 	parameter Color_t C_NULL = {8'h00,8'h00,8'h00};
 	
-	function bit [19:1] NxPNAddr(input bit [10:0] NxOFFX, input bit [10:0] NxOFFY,
-	                             input bit [8:6] NxMP, input bit [5:0] NxMPA, input bit [5:0] NxMPB, input bit [5:0] NxMPC, input bit [5:0] NxMPD, 
-										  input bit [1:0] NxPLSZ, input bit NxCHSZ, input bit NxPNB);
+	function bit [19:1] NxPNAddr(input bit [10:0] OFFX, input bit [10:0] OFFY,
+	                             input bit [8:6] MP, input bit [5:0] MPn[4], 
+										  input bit [1:0] PLSZ, input bit CHSZ, input bit PNB);
 		bit [19:1] addr;
 		bit  [8:0] mpx;
 		bit  [8:0] map_addr;
 		
-		case ({NxOFFY[10],NxOFFX[10]})
-			2'b00: mpx = {NxMP,NxMPA};
-			2'b01: mpx = {NxMP,NxMPB};
-			2'b10: mpx = {NxMP,NxMPC};
-			2'b11: mpx = {NxMP,NxMPD};
-		endcase
-		case (NxPLSZ)
+		mpx = {MP,MPn[{OFFY[10],OFFX[10]}]};
+		case (PLSZ)
 			2'b00: map_addr = mpx;
-			2'b01: map_addr = {mpx[8:1],NxOFFY[9]};
+			2'b01: map_addr = {mpx[8:1],OFFY[9]};
 			2'b10,
-			2'b11: map_addr = {mpx[8:2],NxOFFY[9],NxOFFX[9]};
+			2'b11: map_addr = {mpx[8:2],OFFY[9],OFFX[9]};
 		endcase
-		case ({NxPNB,NxCHSZ})
-			2'b00: addr = {map_addr[5:0],NxOFFY[8:3],NxOFFX[8:3],1'b0};
-			2'b01: addr = {map_addr[7:0],NxOFFY[8:4],NxOFFX[8:4],1'b0};
-			2'b10: addr = {map_addr[6:0],NxOFFY[8:3],NxOFFX[8:3]};
-			2'b11: addr = {map_addr[8:0],NxOFFY[8:4],NxOFFX[8:4]};
+		case ({PNB,CHSZ})
+			2'b00: addr = {map_addr[5:0],OFFY[8:3],OFFX[8:3],1'b0};
+			2'b01: addr = {map_addr[7:0],OFFY[8:4],OFFX[8:4],1'b0};
+			2'b10: addr = {map_addr[6:0],OFFY[8:3],OFFX[8:3]};
+			2'b11: addr = {map_addr[8:0],OFFY[8:4],OFFX[8:4]};
 		endcase
 	
 		return addr;
@@ -1946,40 +1976,20 @@ package VDP2_PKG;
 	endfunction
 	
 	function bit [19:1] RxPNAddr(input bit [11:0] OFFX, input bit [11:0] OFFY,
-	                             input bit [8:6] RxMP, input bit [5:0] RxMPA, input bit [5:0] RxMPB, input bit [5:0] RxMPC, input bit [5:0] RxMPD, 
-										  input bit [5:0] RxMPE, input bit [5:0] RxMPF, input bit [5:0] RxMPG, input bit [5:0] RxMPH, 
-										  input bit [5:0] RxMPI, input bit [5:0] RxMPJ, input bit [5:0] RxMPK, input bit [5:0] RxMPL, 
-										  input bit [5:0] RxMPM, input bit [5:0] RxMPN, input bit [5:0] RxMPO, input bit [5:0] RxMPP, 
-										  input bit [1:0] RxPLSZ, input bit RxCHSZ, input bit RxPNB);
+	                             input bit [8:6] MP, input bit [5:0] MPn[16], 
+										  input bit [1:0] PLSZ, input bit CHSZ, input bit PNB);
 		bit [19:1] addr;
 		bit  [8:0] mpx;
 		bit  [8:0] map_addr;
 		
-		case ({OFFY[11:10],OFFX[11:10]})
-			4'b0000: mpx = {RxMP,RxMPA};
-			4'b0001: mpx = {RxMP,RxMPB};
-			4'b0010: mpx = {RxMP,RxMPC};
-			4'b0011: mpx = {RxMP,RxMPD};
-			4'b0100: mpx = {RxMP,RxMPE};
-			4'b0101: mpx = {RxMP,RxMPF};
-			4'b0110: mpx = {RxMP,RxMPG};
-			4'b0111: mpx = {RxMP,RxMPH};
-			4'b1000: mpx = {RxMP,RxMPI};
-			4'b1001: mpx = {RxMP,RxMPJ};
-			4'b1010: mpx = {RxMP,RxMPK};
-			4'b1011: mpx = {RxMP,RxMPL};
-			4'b1100: mpx = {RxMP,RxMPM};
-			4'b1101: mpx = {RxMP,RxMPN};
-			4'b1110: mpx = {RxMP,RxMPO};
-			4'b1111: mpx = {RxMP,RxMPP};
-		endcase
-		case (RxPLSZ)
+		mpx = {MP,MPn[{OFFY[11:10],OFFX[11:10]}]};
+		case (PLSZ)
 			2'b00: map_addr = mpx;
 			2'b01: map_addr = {mpx[8:1],OFFY[9]};
 			2'b10,
 			2'b11: map_addr = {mpx[8:2],OFFY[9],OFFX[9]};
 		endcase
-		case ({RxPNB,RxCHSZ})
+		case ({PNB,CHSZ})
 			2'b00: addr = {map_addr[5:0],OFFY[8:3],OFFX[8:3],1'b0};
 			2'b01: addr = {map_addr[7:0],OFFY[8:4],OFFX[8:4],1'b0};
 			2'b10: addr = {map_addr[6:0],OFFY[8:3],OFFX[8:3]};
@@ -2056,22 +2066,22 @@ package VDP2_PKG;
 		bit   [23:0] RGB;
 	
 		case (SPTYPE)
-		4'h0: SD = 1'b0    ; PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
-		4'h1: SD = 1'b0    ; PR = {DATA[15],DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
-		4'h2: SD = DATA[15]; PR = {1'b0    ,1'b0    ,DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
-		4'h3: SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}};
-		4'h4: SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {DATA[12],DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}};
-		4'h5: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,1'b0    ,DATA[11]}; DC = {         DATA[10:0]}};
-		4'h6: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}};
-		4'h7: SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {DATA[11],DATA[10],DATA[ 9]}; DC = {2'b00   ,DATA[ 8:0]}};
-		4'h8: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {4'b0000 ,DATA[ 6:0]}};
-		4'h9: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}};
-		4'hA: SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {5'b00000,DATA[ 5:0]}};
-		4'hB: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}};
-		4'hC: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}};
-		4'hD: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}};
-		4'hE: SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}};
-		4'hF: SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}};
+		4'h0: begin SD = 1'b0    ; PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h1: begin SD = 1'b0    ; PR = {DATA[15],DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h2: begin SD = DATA[15]; PR = {1'b0    ,1'b0    ,DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h3: begin SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h4: begin SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {DATA[12],DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
+		4'h5: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,1'b0    ,DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h6: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
+		4'h7: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {DATA[11],DATA[10],DATA[ 9]}; DC = {2'b00   ,DATA[ 8:0]}; end
+		4'h8: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {4'b0000 ,DATA[ 6:0]}; end
+		4'h9: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hA: begin SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hB: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hC: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hD: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hE: begin SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hF: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
 		endcase
 		
 		RGB = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};

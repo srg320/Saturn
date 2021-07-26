@@ -45,8 +45,7 @@ module VDP1 (
 	output     [10:0] DRAW_X_DBG,
 	output     [10:0] DRAW_Y_DBG,
 	output     [15:0] FRAMES_DBG,
-	output     [7:0] START_DRAW_CNT,
-	output     [15:0] REG_DBG
+	output     [7:0] START_DRAW_CNT
 );
 	import VDP1_PKG::*;
 	
@@ -523,7 +522,7 @@ module VDP1 (
 					LINE_DIRY <= NEW_LINE_SY[10];
 
 					DIV_A <= {1'b0,CMD.CMDSIZE.SX,3'b000};
-					DIV_B <= Abs(NEW_LINE_SX) >= Abs(NEW_LINE_SY) ? Abs(NEW_LINE_SX)+1 : Abs(NEW_LINE_SY)+1;
+					DIV_B <= Abs(NEW_LINE_SX) >= Abs(NEW_LINE_SY) ? Abs(NEW_LINE_SX) + 10'd1 : Abs(NEW_LINE_SY) + 10'd1;
 					CMD_ST <= CMDS_LINE_CALCD;
 				end
 				
@@ -1075,7 +1074,7 @@ module VDP1 (
 						default:;
 					endcase
 					if (A[5:1] == 5'h02>>1 && DI[1]) FRAME_ERASECHANGE_PEND <= 1;
-					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 1; end
+					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 8'd1; end
 					if (A[5:1] == 5'h0C>>1 && DI[1]) DRAW_TERMINATE <= 1;
 				end else if (WE_N && CE_F) begin
 					case ({A[5:1],1'b0})
@@ -1134,7 +1133,5 @@ module VDP1 (
 	assign RDY_N = ~((CPU_VRAM_SEL & CPU_VRAM_RDY) | CPU_FB_SEL | REG_SEL);
 	
 	assign IRQ_N = ~EDSR.CEF;
-
-	assign REG_DBG = TVMR;
 	
 endmodule

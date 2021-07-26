@@ -68,7 +68,7 @@ module SCU (
 	
 	output     [31:0] DBG_ASR,
 	output     [15:0] VBIN_INT_CNT,
-	output reg        IMS0_DBG
+	output reg        ADDR_ERR_DBG
 );
 	import SCU_PKG::*;
 	
@@ -552,6 +552,7 @@ module SCU (
 				end
 				
 				DS_DMA_ACCESS : begin
+					ADDR_ERR_DBG <= 1;
 					AB <= 0;
 					if (DMA_ADDR[26:20] >= 7'h20 && DMA_ADDR[26:20] < 7'h59 && !ABUS_REQ && !ABUS_SEL) begin	//A-BUS 02000000-058FFFFF
 						ABUS_A <= DMA_ADDR[26:0];
@@ -567,6 +568,7 @@ module SCU (
 						DSTA.DACSA <= 1;
 						DMA_ST <= DS_DMA_ACCESS_WAIT;
 						AB <= 1;
+						ADDR_ERR_DBG <= 0;
 					end
 					if (DMA_ADDR[26:16] >= 11'h5A0 && DMA_ADDR[26:16] < 11'h5FE && !BBUS_REQ && !BBUS_SEL) begin	//B-BUS 05A00000-05FDFFFF
 						BBUS_A <= DMA_ADDR[22:0];
@@ -588,6 +590,7 @@ module SCU (
 						DSTA.DACSB <= 1;
 						DMA_ST <= DS_DMA_ACCESS_WAIT;
 						AB <= 1;
+						ADDR_ERR_DBG <= 0;
 					end
 					if (DMA_ADDR[26:24] == 3'h6 && !CBUS_REQ) begin	//C-BUS 06000000-07FFFFFF
 						CBUS_A <= DMA_ADDR[26:0];
@@ -597,6 +600,7 @@ module SCU (
 						DMA_ST <= DS_DMA_ACCESS_WAIT;
 						
 						CBUS_RD <= ~DMA_WE;
+						ADDR_ERR_DBG <= 0;
 					end
 				end
 				
@@ -1473,10 +1477,6 @@ module SCU (
 						if (!CDQM_N[1]) IMS[15: 8] <= CDI[15: 8] & IMS_WMASK[15: 8];
 						if (!CDQM_N[2]) IMS[23:16] <= CDI[23:16] & IMS_WMASK[23:16];
 						if (!CDQM_N[3]) IMS[31:24] <= CDI[31:24] & IMS_WMASK[31:24];
-						if (!CDQM_N[0] && !CDI[0]) IMS0_DBG <= 0;
-					end
-					8'hA4: begin
-						if (!CDQM_N[0] && !CDI[0]) IMS0_DBG <= 1;
 					end
 					
 					8'hB0: begin

@@ -103,24 +103,24 @@ module SMPC (
 						MIN[7:4] <= MIN[7:4] + 4'd1;
 						if (MIN[7:4] == 4'd5) begin
 							MIN[7:4] <= 4'd0;
-							HOUR[3:0] <= HOUR[3:0] + 4'd1;
-							if (HOUR[3:0] == 4'd9) begin
-								HOUR[3:0] <= 4'd0;
-								HOUR[7:4] <= HOUR[7:4] + 4'd1;
-								if (HOUR[7:4] == 4'd2 && HOUR[3:0] == 4'd3) begin
-									HOUR[7:4] <= 4'd0;
-									HOUR[3:0] <= 4'd0;
-									DAY[3:0] <= DAY[3:0] + 4'd1;
-									if (DAY[3:0] == 4'd9) begin
-										DAY[7:4] <= DAY[7:4] + 4'd1;
-										DAY[3:0] <= 4'd0;
-										if (DAY[7:4] == 4'd3 && HOUR[3:0] == 4'd1) begin//TODO
-											DAY[7:4] <= 4'd0;
-											DAY[3:0] <= 4'd1;
-										end
-									end
-								end
-							end
+//							HOUR[3:0] <= HOUR[3:0] + 4'd1;
+//							if (HOUR[3:0] == 4'd9) begin
+//								HOUR[3:0] <= 4'd0;
+//								HOUR[7:4] <= HOUR[7:4] + 4'd1;
+//								if (HOUR[7:4] == 4'd2 && HOUR[3:0] == 4'd3) begin
+//									HOUR[7:4] <= 4'd0;
+//									HOUR[3:0] <= 4'd0;
+//									DAY[3:0] <= DAY[3:0] + 4'd1;
+//									if (DAY[3:0] == 4'd9) begin
+//										DAY[7:4] <= DAY[7:4] + 4'd1;
+//										DAY[3:0] <= 4'd0;
+//										if (DAY[7:4] == 4'd3 && HOUR[3:0] == 4'd1) begin//TODO
+//											DAY[7:4] <= 4'd0;
+//											DAY[3:0] <= 4'd1;
+//										end
+//									end
+//								end
+//							end
 						end
 					end
 				end
@@ -643,6 +643,6 @@ module SMPC (
 	
 	assign P1O = '0;
 	assign P2O = '0;
-	assign TEMP = DDR1^DDR2^IOSEL^EXLE;
+	assign TEMP = '0;//DDR1^DDR2^IOSEL^EXLE;
 
 endmodule
