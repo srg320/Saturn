@@ -315,7 +315,7 @@ module SMPC (
 							end
 							
 							default: begin
-								COMM_ST <= CS_END;
+								COMM_ST <= CS_EXEC;
 							end
 						endcase
 					end
@@ -643,6 +643,6 @@ module SMPC (
 	
 	assign P1O = '0;
 	assign P2O = '0;
-	assign TEMP = '0;//DDR1^DDR2^IOSEL^EXLE;
+	assign TEMP = DDR1^DDR2^IOSEL^EXLE;
 
 endmodule

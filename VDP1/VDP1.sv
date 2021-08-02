@@ -86,7 +86,7 @@ module VDP1 (
 	bit [17:1] FB_DISP_A;
 	bit        FB_DISP_WE;
 	bit [15:0] FB_DISP_Q;
-	bit        FRAME;
+//	bit        FRAME;
 	
 	assign FB0_A  = FB_SEL ? FB_DRAW_A : FB_DISP_A;
 	assign FB1_A  = FB_SEL ? FB_DISP_A : FB_DRAW_A;
@@ -274,34 +274,40 @@ module VDP1 (
 					if (!CMD.CMDCTRL.JP[2] && !CMD.CMDCTRL.END) begin
 						case (CMD.CMDCTRL.COMM)
 							4'h0: begin	//normal sprite
-								if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
-									CMDCOLR_LAST <= CMD.CMDCOLR;
-									CLT_READ <= 1;
-									CMD_ST <= CMDS_CLT_LOAD;
-								end else begin
-									SPR_READ <= 1;
-									CMD_ST <= CMDS_NSPR_START;
+								if (CMD.CMDSIZE.SX && CMD.CMDSIZE.SY) begin
+									if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
+										CMDCOLR_LAST <= CMD.CMDCOLR;
+										CLT_READ <= 1;
+										CMD_ST <= CMDS_CLT_LOAD;
+									end else begin
+										SPR_READ <= 1;
+										CMD_ST <= CMDS_NSPR_START;
+									end
 								end
 							end
 							
 							4'h1: begin	//scaled sprite
-								if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
-									CMDCOLR_LAST <= CMD.CMDCOLR;
-									CLT_READ <= 1;
-									CMD_ST <= CMDS_CLT_LOAD;
-								end else begin
-									CMD_ST <= CMDS_SSPR_START;
+								if (CMD.CMDSIZE.SX && CMD.CMDSIZE.SY) begin
+									if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
+										CMDCOLR_LAST <= CMD.CMDCOLR;
+										CLT_READ <= 1;
+										CMD_ST <= CMDS_CLT_LOAD;
+									end else begin
+										CMD_ST <= CMDS_SSPR_START;
+									end
 								end
 							end
 							
 							4'h2,
 							4'h3: begin	//distored sprite
-								if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
-									CMDCOLR_LAST <= CMD.CMDCOLR;
-									CLT_READ <= 1;
-									CMD_ST <= CMDS_CLT_LOAD;
-								end else begin
-									CMD_ST <= CMDS_DSPR_START;
+								if (CMD.CMDSIZE.SX && CMD.CMDSIZE.SY) begin
+									if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
+										CMDCOLR_LAST <= CMD.CMDCOLR;
+										CLT_READ <= 1;
+										CMD_ST <= CMDS_CLT_LOAD;
+									end else begin
+										CMD_ST <= CMDS_DSPR_START;
+									end
 								end
 							end
 							
@@ -1049,9 +1055,8 @@ module VDP1 (
 			FRAME_ERASECHANGE_PEND <= 0;
 			DRAW_TERMINATE <= 0;
 			
-			FRAME <= 0;
+//			FRAME <= 0;
 			FRAMES_DBG <= '0;
-			
 			START_DRAW_CNT <= '0;
 		end else if (!RES_N) begin
 				

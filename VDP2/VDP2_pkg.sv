@@ -1657,6 +1657,7 @@ package VDP2_PKG;
 	typedef struct packed
 	{
 		bit [ 2: 0] S;
+		bit [ 2: 0] CAOS;
 		bit         CCEN;
 		bit [ 4: 0] CCRT;
 		bit         COEN;

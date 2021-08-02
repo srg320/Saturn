@@ -335,6 +335,16 @@ package SCSP_PKG;
 		
 		return SCR4.MDL ? MD : '0;
 	endfunction
+
+	function bit [15:0] MDCalc2(bit [15:0] X, bit [15:0] Y, bit [3:0] MDL);
+		bit [15:0] MD;
+		bit [15:0] TEMP;
+		
+		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
+		MD = $signed(TEMP)>>>(5'd26 - MDL);
+		
+		return MDL ? MD : '0;
+	endfunction
 	
 	function bit [25:0] PhaseCalc(SCR5_t SCR5);
 		bit [25:0] P;

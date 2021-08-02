@@ -6,6 +6,7 @@ module Saturn (
 	input             SRES_N,
 	
 	input             TIME_SET,
+	input       [3:0] AREA,
 	
 	output     [24:0] MEM_A,
 	input      [31:0] MEM_DI,
@@ -80,6 +81,7 @@ module Saturn (
 	output            CD_DEMP,
 	input      [15:0] CD_D,
 	input             CD_CK,
+	input             CD_SPD,
 	output     [18:1] CD_RAM_A,
 	output     [15:0] CD_RAM_D,
 	output      [1:0] CD_RAM_WE,
@@ -255,6 +257,8 @@ module Saturn (
 	//CD
 	bit  [15:0] CD_DO;
 	bit         ARQT_N;
+	bit  [15:0] CD_SL;
+	bit  [15:0] CD_SR;
 	
 	SH7604 MSH
 	(
@@ -318,7 +322,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(0/*RST_N*/),
+		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -601,7 +605,7 @@ module Saturn (
 		.MRES_N(MRES_N),
 		.TIME_SET(TIME_SET),
 		
-		.AC(4'h4),	//North America area
+		.AC(AREA),	
 		
 		.A(CA[6:1]),
 		.DI(CDI[7:0]),
@@ -795,6 +799,9 @@ module Saturn (
 		.RAM_Q(SCSP_RAM_Q),
 		.RAM_RDY(SCSP_RAM_RDY),
 		
+		.ESL(CD_SL),
+		.ESR(CD_SR),
+		
 		.SOUND_L(SOUND_L),
 		.SOUND_R(SOUND_R)
 	);
@@ -950,7 +957,11 @@ module Saturn (
 		.DREQ1_N(DREQ1_N),
 
 		.CD_D(CD_D),
-		.CD_CK(CD_CK)
+		.CD_CK(CD_CK),
+		.CD_SPD(CD_SPD),
+		
+		.CD_SL(CD_SL),
+		.CD_SR(CD_SR)
 	);
 	
 	assign SWAIT_N = CD_RAM_RDY;
