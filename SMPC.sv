@@ -145,6 +145,7 @@ module SMPC (
 		bit        CS_N_OLD;
 		bit        IRQV_N_OLD;
 		bit [19:0] WAIT_CNT;
+		bit [19:0] INTBACK_WAIT_CNT;
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
 		bit        COMREG_SET;
@@ -202,6 +203,9 @@ module SMPC (
 				
 				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
 				
+				if (INTBACK_WAIT_CNT) INTBACK_WAIT_CNT <= INTBACK_WAIT_CNT - 20'd1;
+				if (IRQV_N && !IRQV_N_OLD) INTBACK_WAIT_CNT <= 20'd52000;
+				
 				if (!SRES_N && !RESD && !SRES_EXEC) begin
 					MSHNMI_N <= 0;
 					SSHNMI_N <= 0;
@@ -218,7 +222,6 @@ module SMPC (
 				case (COMM_ST)
 					CS_IDLE: begin
 						if (INTBACK_EXEC && !SRES_EXEC) begin
-							WAIT_CNT <= 20'd4000;
 							COMM_ST <= CS_INTBACK_WAIT;
 						end else if (COMREG_SET && !SRES_EXEC) begin
 							COMREG_SET <= 0;
@@ -282,7 +285,7 @@ module SMPC (
 							
 							8'h10: begin		//INTBACK
 								if (IREG[2] == 8'hF0)  begin
-									WAIT_CNT <= 20'd200;
+									WAIT_CNT <= 20'd1000;
 									COMM_ST <= CS_WAIT;
 								end else begin
 									COMM_ST <= CS_END;
@@ -444,7 +447,7 @@ module SMPC (
 					end
 					
 					CS_INTBACK_WAIT: begin
-						if (!WAIT_CNT) COMM_ST <= CS_INTBACK;
+						if (!INTBACK_WAIT_CNT) COMM_ST <= CS_INTBACK;
 					end
 					
 					CS_INTBACK: begin

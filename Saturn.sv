@@ -532,8 +532,8 @@ module Saturn (
 		.WTIN_N(CWATIN_N),
 		.IVECF_N(1'b1),
 		
-		.HINT_N(1'b1),
-		.VINT_N(1'b1),
+		.HINT_N(IRQH_N),
+		.VINT_N(IRQV_N),
 		.IREQ_N(BIRL),
 		
 		.MFTI(MFTI),

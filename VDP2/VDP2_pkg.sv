@@ -1532,6 +1532,7 @@ package VDP2_PKG;
 	typedef bit [10: 0] NxDispCoord_t[4];
 	typedef bit [ 1: 0] NxPNS_t[4];
 	typedef bit [ 1: 0] NxCHS_t[4];
+	typedef bit [ 1: 0] NxVSS_t[2];
 	typedef bit [ 2: 0] NxCHCNT_t[4];
 	typedef bit [ 1: 0] RxPNS_t[2];
 	typedef bit [ 1: 0] RxCHS_t[2];
@@ -1595,6 +1596,7 @@ package VDP2_PKG;
 		NxCHS_t     NxCHS;
 		NxCHCNT_t   NxCH_CNT;
 		bit [ 1: 0] NxVS;
+		NxVSS_t     NxVSS;
 		
 		bit [ 1: 0] RxPN;
 		RxPNS_t     RxPNS;
@@ -1652,7 +1654,7 @@ package VDP2_PKG;
 		bit [ 2: 0] CC;
 		bit [23: 0] DC;
 	} SpriteDotData_t;
-	parameter SpriteDotData_t SDD_NULL = {1'b0,1'b0,3'b000,3'b000,15'h0000};
+	parameter SpriteDotData_t SDD_NULL = {1'b0,1'b0,1'b0,3'b000,3'b000,15'h0000};
 	
 	typedef struct packed
 	{
@@ -2093,6 +2095,23 @@ package VDP2_PKG;
 			SDD = {1'b1,|DC ,SD  ,PR  ,CC  ,{13'h0000,DC}};
 
 		return SDD;
+	endfunction
+	
+	function bit WinTest(input bit W0HIT, input bit W1HIT, input bit WSHIT, input bit W0E, input bit W1E, input bit SWE, input bit LOG);
+		bit    log_and, log_or;
+
+		case ({SWE,W1E,W0E})
+		3'b000: begin log_and = 1     & 1     & 1    ; log_or = 1     | 1     | 1    ; end
+		3'b001: begin log_and = 1     & 1     & W0HIT; log_or = 0     | 0     | W0HIT; end
+		3'b010: begin log_and = 1     & W1HIT & 1    ; log_or = 0     | W1HIT | 1    ; end
+		3'b011: begin log_and = 1     & W1HIT & W0HIT; log_or = 0     | W1HIT | W0HIT; end
+		3'b100: begin log_and = WSHIT & 1     & 1    ; log_or = WSHIT | 0     | 0    ; end
+		3'b101: begin log_and = WSHIT & 1     & W0HIT; log_or = WSHIT | 0     | W0HIT; end
+		3'b110: begin log_and = WSHIT & W1HIT & 1    ; log_or = WSHIT | W1HIT | 0    ; end
+		3'b111: begin log_and = WSHIT & W1HIT & W0HIT; log_or = WSHIT | W1HIT | W0HIT; end
+		endcase
+	
+		return LOG ? log_and : log_or;
 	endfunction
 	
 endpackage

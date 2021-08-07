@@ -351,8 +351,8 @@ module YGR019 (
 						CDD_DATA <= CDFIFO_Q;
 						CDD_PEND <= CDD_SYNCED;
 						
-						if (!CDD_CNT[1]) CD_SL <= CDFIFO_Q;
-						if (CDD_CNT[1]) CD_SR <= CDFIFO_Q;
+						if (!CDD_CNT[1]) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
+						if (CDD_CNT[1]) CD_SR <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
 					end
 					else begin
 						CD_SL <= '0;
