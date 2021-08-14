@@ -37,9 +37,8 @@ module YGR019 (
 	output reg        SIRQL_N,
 	output reg        SIRQH_N,
 
-	input      [15:0] CD_D,
+	input      [17:0] CD_D,
 	input             CD_CK,
-	input             CD_SPD,
 	
 	output     [15:0] CD_SL,
 	output     [15:0] CD_SR,
@@ -76,7 +75,7 @@ module YGR019 (
 	
 	bit        CDFIFO_RD;
 	bit        CDFIFO_WR;
-	bit [15:0] CDFIFO_Q;
+	bit [17:0] CDFIFO_Q;
 	bit        CDFIFO_EMPTY;
 	bit        CDFIFO_FULL;
 	bit        CD_CK_OLD;
@@ -94,7 +93,7 @@ module YGR019 (
 	);
 	
 	always @(posedge CLK) if (CDD_2X_CE) CDD_CE_DIV <= ~CDD_CE_DIV;
-	wire CDD_CE = CDD_2X_CE & (CD_SPD | CDD_CE_DIV);
+//	wire CDD_CE = CDD_2X_CE & (CD_SPD | CDD_CE_DIV);
 
 	always @(posedge CLK) CD_CK_OLD <= CD_CK;
 	assign CDFIFO_WR = CD_CK & ~CD_CK_OLD;
@@ -178,7 +177,7 @@ module YGR019 (
 					SCU_REG_SEL_OLD <= SCU_REG_SEL;
 				end
 				
-				if (ABUS_WAIT_CNT_DBG < 8'h80 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 8'd1;
+				if (ABUS_WAIT_CNT_DBG < 8'hF0 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 8'd1;
 				
 				if (SCU_REG_SEL) begin
 					if ((!AWRL_N || !AWRU_N) /*&& AWR_N_OLD && !ABUS_WAIT_EN*/ && CE_R) begin
@@ -207,7 +206,6 @@ module YGR019 (
 						6'h00: begin
 							FIFO_RD_POS <= FIFO_RD_POS + 3'd1;
 							FIFO_DEC_AMOUNT <= 1;
-//							if (FIFO_RD_POS[1:0] == 2'd3) begin
 							if (FIFO_AMOUNT <= 7'd1) begin
 								FIFO_DREQ_PEND <= 1;
 							end
@@ -218,7 +216,7 @@ module YGR019 (
 				end
 				
 				if (CE_F) begin
-					if (ABUS_WAIT && (!FIFO_EMPTY /*|| TRCTL[1]*/)) begin
+					if (ABUS_WAIT && (!FIFO_EMPTY || TRCTL[3])) begin
 						ABUS_WAIT <= 0;
 						ABUS_WAIT_CNT_DBG <= 8'hFF;
 					end
@@ -247,6 +245,7 @@ module YGR019 (
 //										FIFO_FULL <= 0;
 										FIFO_EMPTY <= 1;
 										FIFO_DREQ <= 0;
+										ABUS_WAIT_CNT_DBG <= 8'hFF;
 									end
 								end
 								5'h04: MBX <= SDI;
@@ -330,8 +329,10 @@ module YGR019 (
 				
 				//DREQ0
 				CDFIFO_RD <= 0;
-				if (CDD_CE) begin
-					if (!CDFIFO_EMPTY) begin
+				if (CDD_2X_CE) begin
+					CD_SL <= '0;
+					CD_SR <= '0;
+					if (!CDFIFO_EMPTY && (CDFIFO_Q[16] | CDD_CE_DIV)) begin
 						CDFIFO_RD <= 1;
 						CDD_CNT <= CDD_CNT + 12'd2;
 						if (!CDD_SYNCED) begin
@@ -340,23 +341,20 @@ module YGR019 (
 								REG1A[7] <= 1; 
 							end
 						end else if (CDD_CNT == 12'd12) begin
-							DBG_HEADER[31:16] <= CDFIFO_Q;
+							DBG_HEADER[31:16] <= CDFIFO_Q[15:0];
 						end else if (CDD_CNT == 12'd14) begin
 							CDIRQ[4] <= 1;
-							DBG_HEADER[15:0] <= CDFIFO_Q;
+							DBG_HEADER[15:0] <= CDFIFO_Q[15:0];
 						end else if (CDD_CNT == 12'd2352-2) begin
 							CDD_SYNCED <= 0;
 							CDD_CNT <= 12'd0;
 						end
-						CDD_DATA <= CDFIFO_Q;
+						CDD_DATA <= CDFIFO_Q[15:0];
 						CDD_PEND <= CDD_SYNCED;
 						
-						if (!CDD_CNT[1]) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
-						if (CDD_CNT[1]) CD_SR <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
-					end
-					else begin
-						CD_SL <= '0;
-						CD_SR <= '0;
+						if (!CDD_CNT[1] && CDFIFO_Q[17]) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
+						if (CDD_CNT[1] && CDFIFO_Q[17]) CD_SR <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
+					end else begin
 					end
 				end
 				

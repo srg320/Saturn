@@ -1658,7 +1658,6 @@ package VDP2_PKG;
 	
 	typedef struct packed
 	{
-		bit [ 2: 0] S;
 		bit [ 2: 0] CAOS;
 		bit         CCEN;
 		bit [ 4: 0] CCRT;
@@ -1667,7 +1666,7 @@ package VDP2_PKG;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {3'b101,1'b0,1'b0,24'h000000};
+	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,5'b00000,1'b0,1'b0,1'b0,24'h000000};
 	
 	typedef struct packed
 	{
@@ -1818,7 +1817,7 @@ package VDP2_PKG;
 		return {DW[14:10],3'b000,DW[9:5],3'b000,DW[4:0],3'b000}; 
 	endfunction
 	
-	function bit [7:0] ColorCalcRatio(input bit [7:0] CA, input bit [7:0] CB, input bit [4:0] RA, input bit [4:0] RB);
+	function bit [7:0] ColorCalcRatio(input bit [7:0] CA, input bit [7:0] CB, input bit [5:0] RA, input bit [5:0] RB);
 		bit [7:0] CR;
 		bit [13:0] S;
 		
@@ -1830,9 +1829,9 @@ package VDP2_PKG;
 		Color_t CC;
 		Color_t TEMP;
 		
-		TEMP.R = ColorCalcRatio(CT.R, CS[ 7: 0], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
-		TEMP.G = ColorCalcRatio(CT.G, CS[15: 8], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
-		TEMP.B = ColorCalcRatio(CT.B, CS[23:16], ~CCRT | {5{CCMD}}, (CCRT+1) | {5{CCMD}});
+		TEMP.R = ColorCalcRatio(CT.R, CS.R, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
+		TEMP.G = ColorCalcRatio(CT.G, CS.G, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
+		TEMP.B = ColorCalcRatio(CT.B, CS.B, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
 		CC = !CCEN ? CT : TEMP; 
 		
 		return CC;
@@ -2101,13 +2100,13 @@ package VDP2_PKG;
 		bit    log_and, log_or;
 
 		case ({SWE,W1E,W0E})
-		3'b000: begin log_and = 1     & 1     & 1    ; log_or = 1     | 1     | 1    ; end
-		3'b001: begin log_and = 1     & 1     & W0HIT; log_or = 0     | 0     | W0HIT; end
-		3'b010: begin log_and = 1     & W1HIT & 1    ; log_or = 0     | W1HIT | 1    ; end
-		3'b011: begin log_and = 1     & W1HIT & W0HIT; log_or = 0     | W1HIT | W0HIT; end
-		3'b100: begin log_and = WSHIT & 1     & 1    ; log_or = WSHIT | 0     | 0    ; end
-		3'b101: begin log_and = WSHIT & 1     & W0HIT; log_or = WSHIT | 0     | W0HIT; end
-		3'b110: begin log_and = WSHIT & W1HIT & 1    ; log_or = WSHIT | W1HIT | 0    ; end
+		3'b000: begin log_and = 1'b1  & 1'b1  & 1'b1 ; log_or = 1'b1  | 1'b1  | 1'b1 ; end
+		3'b001: begin log_and = 1'b1  & 1'b1  & W0HIT; log_or = 1'b0  | 1'b0  | W0HIT; end
+		3'b010: begin log_and = 1'b1  & W1HIT & 1'b1 ; log_or = 1'b0  | W1HIT | 1'b0 ; end
+		3'b011: begin log_and = 1'b1  & W1HIT & W0HIT; log_or = 1'b0  | W1HIT | W0HIT; end
+		3'b100: begin log_and = WSHIT & 1'b1  & 1'b1 ; log_or = WSHIT | 1'b0  | 1'b0 ; end
+		3'b101: begin log_and = WSHIT & 1'b1  & W0HIT; log_or = WSHIT | 1'b0  | W0HIT; end
+		3'b110: begin log_and = WSHIT & W1HIT & 1'b1 ; log_or = WSHIT | W1HIT | 1'b0 ; end
 		3'b111: begin log_and = WSHIT & W1HIT & W0HIT; log_or = WSHIT | W1HIT | W0HIT; end
 		endcase
 	

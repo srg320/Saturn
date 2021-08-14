@@ -79,9 +79,8 @@ module Saturn (
 	input             CD_COMREQ_N,
 	input             CD_COMSYNC_N,
 	output            CD_DEMP,
-	input      [15:0] CD_D,
+	input      [17:0] CD_D,
 	input             CD_CK,
-	input             CD_SPD,
 	output     [18:1] CD_RAM_A,
 	output     [15:0] CD_RAM_D,
 	output      [1:0] CD_RAM_WE,
@@ -105,7 +104,9 @@ module Saturn (
 	input      [15:0] JOY1,
 	
 	input       [5:0] SCRN_EN,
+	input       [1:0] SND_EN,
 	input             PAUSE_EN,
+	input             SSH_EN,
 	
 	output      [7:0] DBG_WAIT_CNT,
 	output reg        DBG_HOOK,
@@ -322,7 +323,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(RST_N),
+		.RST_N(RST_N & SSH_EN),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -803,7 +804,9 @@ module Saturn (
 		.ESR(CD_SR),
 		
 		.SOUND_L(SOUND_L),
-		.SOUND_R(SOUND_R)
+		.SOUND_R(SOUND_R),
+		
+		.SND_EN(SND_EN)
 	);
 	
 	fx68k M68K
@@ -958,7 +961,6 @@ module Saturn (
 
 		.CD_D(CD_D),
 		.CD_CK(CD_CK),
-		.CD_SPD(CD_SPD),
 		
 		.CD_SL(CD_SL),
 		.CD_SR(CD_SR)

@@ -340,8 +340,8 @@ package SCSP_PKG;
 		bit [15:0] MD;
 		bit [15:0] TEMP;
 		
-		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
-		MD = $signed(TEMP)>>>(5'd26 - MDL);
+		TEMP = {X[15],X[15:1]} + {Y[15],Y[15:1]}; 
+		MD = TEMP>>>(~MDL);
 		
 		return MDL ? MD : '0;
 	endfunction
@@ -405,6 +405,34 @@ package SCSP_PKG;
 		RES = ENV>>>TL[7:4];
 		
 		return RES;
+	endfunction
+	
+	function bit [15:0] LevelCalc(bit [15:0] WAVE, bit [2:0] SDL);
+		return SDL ? WAVE>>>(~SDL) : '0;
+	endfunction
+	
+	function bit [15:0] PanLCalc(bit [15:0] WAVE, bit [4:0] PAN);
+		return !PAN[4] ? WAVE>>>PAN[3:0] : WAVE;
+	endfunction
+	
+	function bit [15:0] PanRCalc(bit [15:0] WAVE, bit [4:0] PAN);
+		return  PAN[4] ? WAVE>>>PAN[3:0] : WAVE;
+	endfunction
+	
+	function bit [15:0] MVolCalc(bit [15:0] WAVE, bit [3:0] MVOL);
+		return WAVE>>>(~MVOL);
+	endfunction
+	
+	function bit [7:0] LFOWave(bit [7:0] POS, bit [7:0] NOISE, bit [1:0] LFOWS);
+		bit [7:0] WAVE;
+		
+		case (LFOWS)
+			2'b00: WAVE = POS;
+			2'b01: WAVE = {8{POS[7]}};
+			2'b10: WAVE = {POS[6:0],1'b0} ^ {8{POS[7]}};
+			2'b11: WAVE = NOISE;
+		endcase
+		return WAVE;
 	endfunction
 	
 endpackage

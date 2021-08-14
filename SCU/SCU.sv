@@ -661,7 +661,7 @@ module SCU (
 				end
 				
 				DS_DMA_READ_END : begin
-					if (AB && DMA_BUF_AMOUNT <= 4'd3) begin
+					if (AB && DMA_BUF_AMOUNT <= 4'd3 && DMA_TN[DMA_CH] > 20'd2) begin/////////
 						if (DMA_RA[DMA_CH][0]) 
 							DMA_RA[DMA_CH] <= DMA_RA[DMA_CH] + 27'd1;
 						else
@@ -724,11 +724,12 @@ module SCU (
 						CBUS_A <= DMA_WADDR[26:0];
 						CBUS_WE <= '0;
 						if (DMA_WE) begin
-							if (DMA_WADDR[1:0]) begin
+							if (DMA_WADDR[1:0] || DMA_TN[DMA_CH] <= 20'd3) begin
 								case (DMA_WADDR[1:0])
-									2'b01: begin CBUS_D <= {4{DMA_BUF_Q[23:16]}}; CBUS_WE <= 4'b0100; end
-									2'b10: begin CBUS_D <= {4{DMA_BUF_Q[15: 8]}}; CBUS_WE <= 4'b0010; end
-									2'b11: begin CBUS_D <= {4{DMA_BUF_Q[ 7: 0]}}; CBUS_WE <= 4'b0001; end
+									2'b00: begin CBUS_D <= {4{DMA_BUF[DMA_BUF_WCNT]}}; CBUS_WE <= 4'b1000; end
+									2'b01: begin CBUS_D <= {4{DMA_BUF[DMA_BUF_WCNT]}}; CBUS_WE <= 4'b0100; end
+									2'b10: begin CBUS_D <= {4{DMA_BUF[DMA_BUF_WCNT]}}; CBUS_WE <= 4'b0010; end
+									2'b11: begin CBUS_D <= {4{DMA_BUF[DMA_BUF_WCNT]}}; CBUS_WE <= 4'b0001; end
 									default:;
 								endcase
 								DMA_BUF_WCNT <= DMA_BUF_WCNT + 3'd1;
@@ -774,13 +775,14 @@ module SCU (
 				end
 				
 				DS_DMA_WRITE_END : begin
-					if ((!AB && DMA_WA[DMA_CH][1:0]) || (AB && DMA_WA[DMA_CH][0])) begin
+					if ((!AB && (DMA_WA[DMA_CH][1:0] || DMA_TN[DMA_CH] <= 20'd3)) || 
+					    ( AB && (DMA_WA[DMA_CH][0]   || DMA_TN[DMA_CH] <= 20'd1)))
 						DMA_WA[DMA_CH] <= DMA_WA[DMA_CH] + 27'd1;
-					end else if (DAD[DMA_CH].DWA)  begin
+					else if (DAD[DMA_CH].DWA)
 						DMA_WA[DMA_CH] <= DMA_WA[DMA_CH] + (27'd1 << DAD[DMA_CH].DWA);
-					end
 					
-					if ((!AB && DMA_WA[DMA_CH][1:0]) || (AB && DMA_WA[DMA_CH][0]))
+					if ((!AB && (DMA_WA[DMA_CH][1:0] || DMA_TN[DMA_CH] <= 20'd3)) || 
+					    ( AB && (DMA_WA[DMA_CH][0]   || DMA_TN[DMA_CH] <= 20'd1)))
 						DMA_TN_NEXT = DMA_TN[DMA_CH] - 20'd1;
 					else
 						DMA_TN_NEXT = DMA_TN[DMA_CH] - (AB ? 20'd2 : 20'd4);
@@ -801,7 +803,7 @@ module SCU (
 						end
 					end else if (AB && DMA_BUF_AMOUNT >= 4'd2) begin
 						DMA_ST <= DS_DMA_WRITE_START;
-					end else if (!AB && DMA_WA[DMA_CH][1:0]) begin
+					end else if (!AB && (DMA_WA[DMA_CH][1:0] || DMA_TN[DMA_CH] <= 20'd3)) begin
 						DMA_ST <= DS_DMA_WRITE_START;
 					end else begin
 						DMA_WE <= 0;

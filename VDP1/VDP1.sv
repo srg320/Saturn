@@ -45,7 +45,11 @@ module VDP1 (
 	output     [10:0] DRAW_X_DBG,
 	output     [10:0] DRAW_Y_DBG,
 	output     [15:0] FRAMES_DBG,
-	output     [7:0] START_DRAW_CNT
+	output     [7:0] START_DRAW_CNT,
+	output     [18:1] DBG_CMD_ADDR16,
+	output     [18:1] DBG_CMD_ADDR_LAST,
+	output CMDSRCA_t DBG_CMD_CMDSRCA_LAST,
+	output     [7:0] DBG_CMD_CNT
 );
 	import VDP1_PKG::*;
 	
@@ -328,6 +332,10 @@ module VDP1 (
 							4'h9: SYS_CLIP <= {10'h000,9'h000,CMD.CMDXC.COORD[9:0],CMD.CMDYC.COORD[8:0]};
 							4'hA: LOC_COORD <= {CMD.CMDXA.COORD[9:0],CMD.CMDYA.COORD[8:0]};
 						endcase
+						if (DBG_CMD_CNT == 16) begin
+							DBG_CMD_ADDR16 <= CMD_ADDR;
+							
+						end
 					end
 				end
 				
@@ -748,9 +756,13 @@ module VDP1 (
 					
 					if (CMD.CMDCTRL.END) begin
 						CMD_ST <= CMDS_IDLE;
+						DBG_CMD_CNT <= '0;
 					end else begin
 						CMD_READ <= 1;
 						CMD_ST <= CMDS_READ;
+						DBG_CMD_CNT <= DBG_CMD_CNT + 1;
+						DBG_CMD_ADDR_LAST <= CMD_ADDR;
+						DBG_CMD_CMDSRCA_LAST <= CMD.CMDSRCA;
 					end
 				end
 			endcase
@@ -872,6 +884,7 @@ module VDP1 (
 			CMD_READ_PEND <= 0;
 			SPR_READ_PEND <= 0;
 			CLT_READ_PEND <= 0;
+			IO_DATA_PEND <= 0;
 			CMD <= '0;
 		end
 		else  begin

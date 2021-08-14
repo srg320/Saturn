@@ -282,11 +282,11 @@ package VDP1_PKG;
 			3'b000: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end
 			3'b001: begin A = '0;                              B = BACK[15] ? BACK_HALF : BACK_ONE; MSB = BACK[15]; end
 			3'b010: begin A = ORIG_HALF;                       B = '0;                              MSB = ORIG[15]; end
-			3'b011: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15]; end
+			3'b011: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = ORIG[15]; end
 			3'b100: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end//TODO Gouraud
 			3'b101: begin A = '0;                              B = BACK_ONE;                        MSB = BACK[15]; end
 			3'b110: begin A = ORIG_HALF;                       B = '0;                              MSB = ORIG[15]; end//TODO Gouraud
-			3'b111: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15]; end//TODO Gouraud
+			3'b111: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = ORIG[15]; end//TODO Gouraud
 		endcase
 		
 		CC = {MSB,ColorAdd(A,B)};		

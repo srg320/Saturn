@@ -48,9 +48,12 @@ module SCSP (
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
 	
+	input       [1:0] SND_EN,
+	
 	output            SLOT_EN_DBG,
 	output     [23:0] SCA_DBG,
 	output     [15:0] EVOL_DBG,
+	output SCR0_t     SCR0_DBG_,
 	output SCR0_t     SCR0_DBG,
 	output SA_t       SA_DBG,
 	output LSA_t      LSA_DBG,
@@ -62,7 +65,8 @@ module SCSP (
 	output SCR5_t     SCR5_DBG,
 	output SCR6_t     SCR6_DBG,
 	output SCR7_t     SCR7_DBG,
-	output SCR8_t     SCR8_DBG
+	output SCR8_t     SCR8_DBG,
+	output     [19:0] ADP_DBG
 );
 	import SCSP_PKG::*;
 	
@@ -87,6 +91,7 @@ module SCSP (
 	CR17_t     CR17;
 	CR18_t     CR18;
 	CR19_t     CR19;
+	SCR0_t     SCR0_;
 	SCR0_t     SCR0;
 	SA_t       SA;
 	LSA_t      LSA;
@@ -158,6 +163,14 @@ module SCSP (
 	assign SLOT_CE = SLOT_EN & CYCLE_CE;
 	assign DSP_CE = DSP_EN & CYCLE_CE;
 	
+	OPPipe_t    OP2_PIPE;
+	OPPipe_t    OP3_PIPE;
+	OPPipe_t    OP4_PIPE;
+	OPPipe_t    OP5_PIPE;
+	OPPipe_t    OP6_PIPE;
+	OPPipe_t    OP7_PIPE;
+	
+	assign SCR0_ = SCR[OP2_PIPE.SLOT].SCR0;
 	assign SCR0 = SCR_SCR0_Q;
 	assign SA   = SCR_SA_Q;
 	assign LSA  = SCR_LSA_Q;
@@ -171,19 +184,13 @@ module SCSP (
 	assign SCR7 = SCR_SCR7_Q;
 	assign SCR8 = SCR_SCR8_Q;
 	
-	
-	OPPipe_t    OP2_PIPE;
-	OPPipe_t    OP3_PIPE;
-	OPPipe_t    OP4_PIPE;
-	OPPipe_t    OP5_PIPE;
-	OPPipe_t    OP6_PIPE;
-	OPPipe_t    OP7_PIPE;
-	
+
 	//Operation 1: PG, KEY ON/OFF
 	wire KYONEX_SET = REG_CS & (MEM_A[11:10] == 2'b00) & (MEM_A[4:1] == 4'b0000) & MEM_D[12] & MEM_WE[1];
 	bit        KEYON[32];
 	bit  [4:0] SLOT;
 	bit [25:0] PHASE;
+	bit  [7:0] LFOP[32];//LFO position
 	always @(posedge CLK or negedge RST_N) begin
 		bit       KYONEX;
 		bit       KEYON_OLD[32];
@@ -206,71 +213,95 @@ module SCSP (
 			end
 			
 			if (SLOT_CE) begin
-				PHASE <= PhaseCalc(/*SCR[SLOT].*/SCR5);
+				PHASE <= PhaseCalc(SCR5);
+				
+				OP2_PLFO <= LFOWave(LFOP[SLOT],8'h00,SCR6.PLFOWS) ^ 8'h80;
 				
 				KEYON_OLD[SLOT] <= KEYON[SLOT];
-				SLOT <= SLOT + 5'd1;
-				
 				OP2_PIPE.SLOT <= SLOT;
 				OP2_PIPE.KON <= KEYON[SLOT] & ~KEYON_OLD[SLOT];
 				OP2_PIPE.KOFF <= ~KEYON[SLOT] & KEYON_OLD[SLOT];
+				SLOT <= SLOT + 5'd1;
 			end
 		end
 	end
 	
 	//Operation 2: MD read, ADP
-	OP2State_t OP2_STATE[32];
+	bit  [7:0] OP2_PLFO;	//Pitch LFO data
+	bit [25:0] SAO;
+//	bit [25:0] SAO_Q;
+//	SCSP_SPRAM SAOI(CLK, OP2_PIPE.SLOT, NEW_SA_INT, {2{SLOT_CE}}, OP2_PIPE.SLOT, SAO_Q[25:10]);
+//	SCSP_SPRAM SAOF(CLK, OP2_PIPE.SLOT, NEW_SA_FRAC, {2{SLOT_CE}}, OP2_PIPE.SLOT, SAO_Q[ 9: 0]);z
 	bit [15:0] SAOI[32];//Sample address offset integer
 	bit  [9:0] SAOF[32];//Sample address offset fractional
-//	bit [17:0] PHASE_ACC[32];
+	bit        SADIR[32];//Sample address direction
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
-		bit [17:0] NEW_PHASE_FRAC;
-		bit [15:0] NEW_PHASE_INT;
+		bit [15:0] LL;
+		bit [15:0] MD;
 		bit [15:0] NEW_SA_INT;
 		bit  [9:0] NEW_SA_FRAC;
-		bit [15:0] LL;
 		
 		if (!RST_N) begin
 			WD_READ <= 0;
 			SAOI <= '{32{'0}};
 			SAOF <= '{32{'0}};
+			SADIR <= '{32{0}};
 			OP3_PIPE <= OP_PIPE_RESET;
 		end
 		else begin
 			S = OP2_PIPE.SLOT;
-						
-			{NEW_SA_INT,NEW_SA_FRAC} = {SAOI[S],SAOF[S]} + PHASE;
 			
-			LL = /*SCR[S].*/LEA - /*SCR[S].*/LSA;
-			WD_READ <= 0;
+			MD = MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+			
+			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? {SAOI[S],SAOF[S]} + (PHASE + {MD,10'h000}) : {SAOI[S],SAOF[S]} - (PHASE + {MD,10'h000});
+			
+			LL = LEA - LSA;
 			if (SLOT_CE) begin
+				WD_READ <= 0;
 				if (EVOL[S] != 10'h3FF) begin
-					case (SCR[S].SCR0.LPCTL)
+					case (SCR0_.LPCTL)
 					2'b00:
-						if (NEW_SA_INT < /*SCR[S].*/LEA) begin
-							{SAOI[S],SAOF[S]} <= {NEW_SA_INT,NEW_SA_FRAC};
+						if (NEW_SA_INT < LEA) begin
+							SAO = {NEW_SA_INT,NEW_SA_FRAC};
 						end else begin
 //							EVOL[S] <= 10'h3FF;
 						end
 					2'b01:
-						if (NEW_SA_INT < /*SCR[S].*/LEA) begin
-							{SAOI[S],SAOF[S]} <= {NEW_SA_INT,NEW_SA_FRAC};
+						if (NEW_SA_INT < LEA) begin
+							SAO = {NEW_SA_INT,NEW_SA_FRAC};
 						end else begin
-							{SAOI[S],SAOF[S]} <= {NEW_SA_INT - LL,NEW_SA_FRAC};//{SCR[S].LSA,10'h000};
+							SAO = {NEW_SA_INT - LL,NEW_SA_FRAC};//{LSA,10'h000};
 						end
-					2'b10:;
+					2'b10:
+						if (!SADIR[S]) begin
+							if (NEW_SA_INT < LEA) begin
+								SAO = {NEW_SA_INT,NEW_SA_FRAC};
+							end else begin
+								SAO = {LEA,10'h000};
+								SADIR[S] <= 1;
+							end
+						end else begin
+							if (NEW_SA_INT > LSA) begin
+								SAO = {NEW_SA_INT,NEW_SA_FRAC};
+							end else begin
+								SAO = {LEA,10'h000};
+								SADIR[S] <= 1;
+							end
+						end
 					2'b11:;
 					endcase
+					{SAOI[S],SAOF[S]} <= SAO;
 					WD_READ <= 1;
 				end
 				
 				if (OP2_PIPE.KON) begin
 					{SAOI[S],SAOF[S]} <= '0;
+					SADIR[S] <= 0;
 				end
 				
-//				OP3_MD <= MDCalc(STACK0, SCR[S].SCR4);
-				OP3_MD <= MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+
+				OP3_MD <= MD;//MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
 				OP3_PIPE <= OP2_PIPE;
 			end
 		end
@@ -278,8 +309,8 @@ module SCSP (
 	
 	//Operation 3:  
 	bit [15:0] OP3_MD;	//Modulation data
-	wire [19:0] SOFFS = {4'b0000,SAOI[OP3_PIPE.SLOT]} + {{4{OP3_MD[15]}},OP3_MD};
-	assign ADP = {/*SCR[OP3_PIPE.SLOT].*/SCR0.SAH,/*SCR[OP3_PIPE.SLOT].*/SA} + (!SCR0.PCM8B ? SOFFS<<1 : SOFFS);
+	wire [19:0] SOFFS = {4'b0000,SAOI[OP3_PIPE.SLOT]} /*+ {{4{OP3_MD[15]}},OP3_MD}*/;
+	assign ADP = {SCR0.SAH,SA} + (!SCR0.PCM8B ? SOFFS<<1 : SOFFS);
 	
 	always @(posedge CLK or negedge RST_N) begin
 //		bit [ 4:0] S;
@@ -316,7 +347,7 @@ module SCSP (
 			if (SLOT_CE) begin
 				case (EGST[S])
 					EGS_ATTACK: begin
-						VOL_NEXT = EVOL[S] - {/*SCR[S].*/SCR2.AR,5'b11111} + 11'd1;
+						VOL_NEXT = EVOL[S] - {SCR2.AR,5'b11111} + 11'd1;
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
@@ -327,8 +358,8 @@ module SCSP (
 					end
 					
 					EGS_DECAY1: begin
-						VOL_NEXT = EVOL[S] + {/*SCR[S].*/SCR2.D1R,5'b00000};
-						if (VOL_NEXT[9:5] < /*SCR[S].*/SCR1.DL) begin
+						VOL_NEXT = EVOL[S] + {SCR2.D1R,5'b00000};
+						if (VOL_NEXT[9:5] < SCR1.DL) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
 							EVOL[S] <= VOL_NEXT[9:0];//{SCR[S].SCR1.DL,5'b00000};
@@ -338,7 +369,7 @@ module SCSP (
 					end
 					
 					EGS_DECAY2: begin
-						VOL_NEXT = EVOL[S] + {/*SCR[S].*/SCR2.D2R,5'b00000};
+						VOL_NEXT = EVOL[S] + {SCR2.D2R,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
@@ -348,7 +379,7 @@ module SCSP (
 					end
 					
 					EGS_RELEASE: begin
-						VOL_NEXT = EVOL[S] + {/*SCR[S].*/SCR1.RR,5'b00000};
+						VOL_NEXT = EVOL[S] + {SCR1.RR,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
 						end else begin
@@ -380,7 +411,7 @@ module SCSP (
 		end
 		else begin
 			S = OP5_PIPE.SLOT;
-			TL = /*SCR[S].*/SCR3.TL;
+			TL = SCR3.TL;
 			if (SLOT_CE) begin
 				TEMP = VolCalc(OP5_WD, TL);
 				OP6_SD <= EVOL[S] != 10'h3FF ? TEMP : '0;
@@ -415,6 +446,8 @@ module SCSP (
 //	bit        DIR_OUT;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
+		bit [15:0] TEMP;
+		bit [15:0] TEMP_L,TEMP_R;
 		
 		if (!RST_N) begin
 //			DIR_OUT <= 0;
@@ -423,12 +456,15 @@ module SCSP (
 			S = OP7_PIPE.SLOT;
 			
 			if (SLOT_CE) begin
+				TEMP = LevelCalc(OP7_SD,SCR8.DISDL);
+				TEMP_L = PanLCalc(TEMP,SCR8.DIPAN);
+				TEMP_R = PanRCalc(TEMP,SCR8.DIPAN);
 				if (S == 5'd0) begin
-					DIR_ACC_L <= {{2{OP7_SD[15]}},OP7_SD[15:2]};
-					DIR_ACC_R <= {{2{OP7_SD[15]}},OP7_SD[15:2]};
+					DIR_ACC_L <= {{2{TEMP_L[15]}},TEMP_L[15:2]};
+					DIR_ACC_R <= {{2{TEMP_R[15]}},TEMP_R[15:2]};
 				end else begin
-					DIR_ACC_L <= DIR_ACC_L + {{2{OP7_SD[15]}},OP7_SD[15:2]};
-					DIR_ACC_R <= DIR_ACC_R + {{2{OP7_SD[15]}},OP7_SD[15:2]};
+					DIR_ACC_L <= DIR_ACC_L + {{2{TEMP_L[15]}},TEMP_L[15:2]};
+					DIR_ACC_R <= DIR_ACC_R + {{2{TEMP_R[15]}},TEMP_R[15:2]};
 				end
 			end
 		end
@@ -438,6 +474,8 @@ module SCSP (
 	bit [15:0] EFF_ACC_L,EFF_ACC_R;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
+		bit [15:0] TEMP;
+		bit [15:0] TEMP_L,TEMP_R;
 		
 		if (!RST_N) begin
 			
@@ -446,15 +484,23 @@ module SCSP (
 			S = OP7_PIPE.SLOT;
 			
 			if (DSP_CE) begin
-				if (S == 5'd0) begin
-					EFF_ACC_L <= '0;
-					EFF_ACC_R <= '0;
+				TEMP = '0;
+				if (S <= 5'd15) begin
+					
 				end else if (S == 5'd16) begin
-					EFF_ACC_L <= EFF_ACC_L + ESL;
-//					EFF_ACC_R <= EFF_ACC_R + ESR;
+					TEMP = LevelCalc(ESL,3'h7/*SCR8.EFSDL*/);
 				end else if (S == 5'd17) begin
-//					EFF_ACC_L <= EFF_ACC_L + ESL;
-					EFF_ACC_R <= EFF_ACC_R + ESR;
+					TEMP = LevelCalc(ESR,3'h7/*SCR8.EFSDL*/);
+				end
+				TEMP_L = PanLCalc(TEMP,5'h0F/*SCR8.EFPAN*/);
+				TEMP_R = PanRCalc(TEMP,5'h1F/*SCR8.EFPAN*/);
+				
+				if (S == 5'd0) begin
+					EFF_ACC_L <= {{2{TEMP_L[15]}},TEMP_L[15:2]};
+					EFF_ACC_R <= {{2{TEMP_R[15]}},TEMP_R[15:2]};
+				end else begin
+					EFF_ACC_L <= EFF_ACC_L + {{2{TEMP_L[15]}},TEMP_L[15:2]};
+					EFF_ACC_R <= EFF_ACC_R + {{2{TEMP_R[15]}},TEMP_R[15:2]};
 				end
 			end
 		end
@@ -464,23 +510,21 @@ module SCSP (
 	bit [15:0] DIR_L,DIR_R;
 	bit [15:0] EFF_L,EFF_R;
 	always @(posedge CLK or negedge RST_N) begin
-		
-		
 		if (!RST_N) begin
 			DIR_L <= '0;
 			DIR_R <= '0;
 		end
 		else begin
 			if (SAMPLE_CE) begin
-				DIR_L <= DIR_ACC_L;
-				DIR_R <= DIR_ACC_R;
-				EFF_L <= EFF_ACC_L;
-				EFF_R <= EFF_ACC_R;
+				DIR_L <= SND_EN[0] ? DIR_ACC_L : '0;
+				DIR_R <= SND_EN[0] ? DIR_ACC_R : '0;
+				EFF_L <= SND_EN[1] ? EFF_ACC_L : '0;
+				EFF_R <= SND_EN[1] ? EFF_ACC_R : '0;
 			end
 		end
 	end
-	assign SOUND_L = {DIR_L[15],DIR_L[15:1]} + {EFF_L[15],EFF_L[15:1]};
-	assign SOUND_R = {DIR_R[15],DIR_R[15:1]} + {EFF_R[15],EFF_R[15:1]};
+	assign SOUND_L = MVolCalc(DIR_L + EFF_L,CR0.MVOL);
+	assign SOUND_R = MVolCalc(DIR_R + EFF_R,CR0.MVOL);
 	
 	
 	//Timers
@@ -554,6 +598,7 @@ module SCSP (
 	always @(posedge CLK or negedge RST_N) begin
 		bit SCU_SEL_OLD;
 		bit WD_READ_OLD;
+		bit CYCLE_START;
 		
 		if (!RST_N) begin
 			MEM_ST <= MS_IDLE;
@@ -577,9 +622,10 @@ module SCSP (
 			WD_READ_OLD <= WD_READ;
 			if (WD_READ && !WD_READ_OLD && !WD_PEND) WD_PEND <= 1;
 			
+			CYCLE_START <= CYCLE_CE;
 			case (MEM_ST)
-				MS_IDLE: begin
-					if (SLOT_EN) begin
+				MS_IDLE: if (CYCLE_START) begin
+					if (WD_READ && SLOT_EN) begin
 						MEM_A <= {2'b00,ADP[18:1]};
 						MEM_D <= '0;
 						MEM_WE <= '0;
@@ -630,7 +676,7 @@ module SCSP (
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
-						MEM_ST <= MS_END;
+						MEM_ST <= MS_IDLE;
 					end
 				end
 				
@@ -640,31 +686,31 @@ module SCSP (
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
-						MEM_ST <= MS_END;
+						MEM_ST <= MS_IDLE;
 					end else if (REG_CS && REG_RDY) begin
 						MEM_Q <= REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						REG_CS <= 0;
-						MEM_ST <= MS_END;
+						MEM_ST <= MS_IDLE;
 					end
 				end
 				
 				MS_SCPU_WAIT: begin
 					if (MEM_CS && RAM_RDY) begin
 						SCDTACK_N <= 0;
-						MEM_Q <= RAM_Q;
+						SCDO <= RAM_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
-						MEM_ST <= MS_SCPU_END;
+						MEM_ST <= MS_IDLE;
 					end else if (REG_CS && REG_RDY) begin
 						SCDTACK_N <= 0;
-						MEM_Q <= REG_Q;
+						SCDO <= REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						REG_CS <= 0;
-						MEM_ST <= MS_SCPU_END;
+						MEM_ST <= MS_IDLE;
 					end
 				end
 				
@@ -677,20 +723,20 @@ module SCSP (
 				
 				MS_SCU_WAIT: begin
 					if (MEM_CS && RAM_RDY) begin
-						MEM_Q <= RAM_Q;
+						DO <= RAM_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
 						SCU_PEND <= 0;
-						MEM_ST <= MS_END;
+						MEM_ST <= MS_IDLE;
 //						if (MEM_A == 20'h00700>>1) MEM_Q[15:8] <= '0;
 					end else if (REG_CS && REG_RDY) begin
-						MEM_Q <= REG_Q;
+						DO <= REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						REG_CS <= 0;
 						SCU_PEND <= 0;
-						MEM_ST <= MS_END;
+						MEM_ST <= MS_IDLE;
 					end
 				end
 				
@@ -701,6 +747,9 @@ module SCSP (
 				default:;
 			endcase
 			
+			if (SCAS_N && !SCDTACK_N) begin
+				SCDTACK_N <= 1;
+			end
 		end
 	end
 	
@@ -990,7 +1039,7 @@ module SCSP (
 				end
 				
 				if (OP2_PIPE.SLOT == CR4.MSLC && SLOT_CE) begin
-					CR4.CA <= SAOI[OP2_PIPE.SLOT][15:12];
+					CR4.CA <= SAO[25:22];
 				end
 				
 //				if (SLOT_CE) begin
@@ -1002,12 +1051,12 @@ module SCSP (
 	end
 	
 	bit [15:0] STACK0X_Q,STACK0Y_Q,STACK1_Q;
-	SCSP_SPRAM STACK0X(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, SCR4.MDXSL,    STACK0X_Q);
-	SCSP_SPRAM STACK0Y(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, SCR4.MDYSL,    STACK0Y_Q);
-	SCSP_SPRAM STACK1 (CLK, OP7_PIPE.SLOT, OP7_SD,   {2{SLOT_CE}}, OP7_PIPE.SLOT, STACK1_Q);
+	SCSP_SPRAM STACK1 (CLK, OP7_PIPE.SLOT, OP7_SD,   {2{SLOT_CE}}, OP7_PIPE.SLOT             , STACK1_Q);
+	SCSP_SPRAM STACK0X(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, OP2_PIPE.SLOT + SCR4.MDXSL, STACK0X_Q);
+	SCSP_SPRAM STACK0Y(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, OP2_PIPE.SLOT + SCR4.MDYSL, STACK0Y_Q);
 	
 	wire       SCR_SEL = MEM_A[11:10] == 2'b00;
-	wire       SCR_RDEN = ~SLOT_EN;
+	wire       SCR_RDEN = REG_CS;//~(SLOT_EN | DSP_EN);
 	
 	wire       SCR_SCR0_SEL  = SCR_SEL & (MEM_A[4:1] == 5'h00>>1) & REG_CS;
 	bit [15:0] SCR_SCR0_Q;
@@ -1055,7 +1104,7 @@ module SCSP (
 	
 	wire       SCR_SCR8_SEL = SCR_SEL & (MEM_A[4:1] == 5'h16>>1) & REG_CS;
 	bit [15:0] SCR_SCR8_Q;
-	SCSP_SPRAM SCR_SCR8(CLK, MEM_A[9:5], MEM_D & SCR8_MASK, (MEM_WE & {2{SCR_SCR8_SEL}}), (SCR_RDEN ? MEM_A[9:5] :          SLOT), SCR_SCR8_Q);
+	SCSP_SPRAM SCR_SCR8(CLK, MEM_A[9:5], MEM_D & SCR8_MASK, (MEM_WE & {2{SCR_SCR8_SEL}}), (SCR_RDEN ? MEM_A[9:5] : OP7_PIPE.SLOT), SCR_SCR8_Q);
 	
 	
 	
@@ -1071,16 +1120,17 @@ module SCSP (
 		else                                      ILV = 3'b000;
 	end
 	
-	assign DO = MEM_Q;
+//	assign DO = MEM_Q;
 	assign RDY_N = ~(SCU_SEL & ~SCU_PEND);
 	assign INT_N = ~|(CR18.MCIPD & CR17.MCIEB);
 	
 	assign SCIPL_N = ~ILV;
-	assign SCDO = MEM_Q;
+//	assign SCDO = MEM_Q;
 	assign SCAVEC_N = ~&SCFC;
 	
 	assign SLOT_EN_DBG = SLOT_EN;
 	assign SCA_DBG = {SCA,1'b0};
+	assign SCR0_DBG_ = SCR0_;
 	assign SCR0_DBG = SCR0;
 	assign SA_DBG   = SA;
 	assign LSA_DBG  = LSA;
@@ -1093,6 +1143,7 @@ module SCSP (
 	assign SCR6_DBG = SCR6;
 	assign SCR7_DBG = SCR7;
 	assign SCR8_DBG = SCR8;
+	assign ADP_DBG = ADP;
 	
 endmodule
 
