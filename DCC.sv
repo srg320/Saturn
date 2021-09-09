@@ -44,13 +44,27 @@ module DCC (
 	output            MWR_N
 );
 
+	bit SSH_ACTIVE;
+	bit SCU_ACTIVE;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			SSH_ACTIVE <= '0;
+			SCU_ACTIVE <= 0;
+		end else if (CE_R) begin
+			if (!BREQ_N && !SSH_ACTIVE && !SCU_ACTIVE) SSH_ACTIVE <= 1;
+			else if (BREQ_N && SSH_ACTIVE) SSH_ACTIVE <= 0;
+			
+			if (!EXBREQ_N && BREQ_N && !SCU_ACTIVE && !SSH_ACTIVE) SCU_ACTIVE <= 1;
+			else if (EXBREQ_N && SCU_ACTIVE) SCU_ACTIVE <= 0;
+		end
+	end
+	assign BRLS_N = (BREQ_N | ~SSH_ACTIVE) & (EXBREQ_N | ~SCU_ACTIVE);
+	assign BACK_N = BGR_N | ~SSH_ACTIVE;
+	assign EXBACK_N = BGR_N | ~SCU_ACTIVE;
+	
 	assign WAIT_N = WTIN_N;///////////////////////
 	
-	assign BRLS_N = 1;
-	assign BACK_N = 1;
-	assign EXBACK_N = 1;
-	
-	assign IREQ_N = {VINT_N,HINT_N};////////////////
+	assign IREQ_N = 2'b11;//{VINT_N,HINT_N};////////////////
 	
 	assign ROMCE_N = ~(A[24:20] == 5'b00000) | CS0_N;
 	assign SMPCCE_N = ~(A[24:19] == 6'b000010) | CS0_N;
@@ -80,8 +94,8 @@ module DCC (
 			
 			WE_N_OLD <= &WE_N;
 			if (!(&WE_N) && WE_N_OLD) begin
-				MFTI <= ~SINIT_SEL;
-				SFTI <= ~MINIT_SEL;
+				if (SINIT_SEL) MFTI <= 0;
+				if (MINIT_SEL) SFTI <= 0;
 			end
 		end
 	end

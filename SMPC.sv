@@ -103,24 +103,24 @@ module SMPC (
 						MIN[7:4] <= MIN[7:4] + 4'd1;
 						if (MIN[7:4] == 4'd5) begin
 							MIN[7:4] <= 4'd0;
-//							HOUR[3:0] <= HOUR[3:0] + 4'd1;
-//							if (HOUR[3:0] == 4'd9) begin
-//								HOUR[3:0] <= 4'd0;
-//								HOUR[7:4] <= HOUR[7:4] + 4'd1;
-//								if (HOUR[7:4] == 4'd2 && HOUR[3:0] == 4'd3) begin
-//									HOUR[7:4] <= 4'd0;
-//									HOUR[3:0] <= 4'd0;
-//									DAY[3:0] <= DAY[3:0] + 4'd1;
-//									if (DAY[3:0] == 4'd9) begin
-//										DAY[7:4] <= DAY[7:4] + 4'd1;
-//										DAY[3:0] <= 4'd0;
-//										if (DAY[7:4] == 4'd3 && HOUR[3:0] == 4'd1) begin//TODO
-//											DAY[7:4] <= 4'd0;
-//											DAY[3:0] <= 4'd1;
-//										end
-//									end
-//								end
-//							end
+							HOUR[3:0] <= HOUR[3:0] + 4'd1;
+							if (HOUR[3:0] == 4'd9) begin
+								HOUR[3:0] <= 4'd0;
+								HOUR[7:4] <= HOUR[7:4] + 4'd1;
+								if (HOUR[7:4] == 4'd2 && HOUR[3:0] == 4'd3) begin
+									HOUR[7:4] <= 4'd0;
+									HOUR[3:0] <= 4'd0;
+									DAY[3:0] <= DAY[3:0] + 4'd1;
+									if (DAY[3:0] == 4'd9) begin
+										DAY[7:4] <= DAY[7:4] + 4'd1;
+										DAY[3:0] <= 4'd0;
+										if (DAY[7:4] == 4'd3 && HOUR[3:0] == 4'd1) begin//TODO
+											DAY[7:4] <= 4'd0;
+											DAY[3:0] <= 4'd1;
+										end
+									end
+								end
+							end
 						end
 					end
 				end
@@ -204,7 +204,7 @@ module SMPC (
 				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
 				
 				if (INTBACK_WAIT_CNT) INTBACK_WAIT_CNT <= INTBACK_WAIT_CNT - 20'd1;
-				if (IRQV_N && !IRQV_N_OLD) INTBACK_WAIT_CNT <= 20'd52000;
+				if (IRQV_N && !IRQV_N_OLD) INTBACK_WAIT_CNT <= 20'd2000;
 				
 				if (!SRES_N && !RESD && !SRES_EXEC) begin
 					MSHNMI_N <= 0;
@@ -221,9 +221,11 @@ module SMPC (
 				
 				case (COMM_ST)
 					CS_IDLE: begin
-						if (INTBACK_EXEC && !SRES_EXEC) begin
-							COMM_ST <= CS_INTBACK_WAIT;
-						end else if (COMREG_SET && !SRES_EXEC) begin
+						if (INTBACK_EXEC && CONT && !INTBACK_WAIT_CNT && !SRES_EXEC && IRQV_N && IRQV_N_OLD) begin
+//							WAIT_CNT <= 20'd200;
+							CONT <= 0;
+							COMM_ST <= CS_INTBACK/*_WAIT*/;
+						end else if (COMREG_SET && !SRES_EXEC && !IRQV_N) begin
 							COMREG_SET <= 0;
 							COMM_ST <= CS_START;
 						end
@@ -284,9 +286,18 @@ module SMPC (
 							end
 							
 							8'h10: begin		//INTBACK
-								if (IREG[2] == 8'hF0)  begin
-									WAIT_CNT <= 20'd1000;
-									COMM_ST <= CS_WAIT;
+								if (IREG[2] == 8'hF0) begin
+									if (!IREG[0][0] && IREG[1][3]) begin
+										INTBACK_EXEC <= 1;
+										CONT <= 1;
+//										WAIT_CNT <= 20'd200;
+										COMM_ST <= CS_END;
+									end else /*if (IREG[0][0])*/ begin
+										WAIT_CNT <= 20'd500;
+										COMM_ST <= CS_WAIT;
+									/*end else begin
+										COMM_ST <= CS_END;*/
+									end
 								end else begin
 									COMM_ST <= CS_END;
 								end
@@ -411,7 +422,7 @@ module SMPC (
 									SR[7:5] <= {2'b01,IREG[1][3]};
 									if (IREG[1][3]) begin
 										INTBACK_EXEC <= 1;
-										SF <= 1;
+										//SF <= 1;
 									end
 									PDL <= 1;
 									MIRQ_N <= 0;
@@ -447,7 +458,7 @@ module SMPC (
 					end
 					
 					CS_INTBACK_WAIT: begin
-						if (!INTBACK_WAIT_CNT) COMM_ST <= CS_INTBACK;
+						if (!WAIT_CNT) COMM_ST <= CS_INTBACK;
 					end
 					
 					CS_INTBACK: begin
@@ -469,9 +480,9 @@ module SMPC (
 							OREG[14] <= 8'h00;
 							OREG[15] <= 8'h00;
 							SR[7:5] <= {1'b1,1'b1,1'b0};
-							PDL <= ~INTBACK_EXEC;
+							PDL <= 0;
 							SF <= 0;
-							INTBACK_EXEC <= 0;
+//							INTBACK_EXEC <= 0;
 							MIRQ_N <= 0;
 							COMM_ST <= CS_IDLE;
 						end else  begin
@@ -575,6 +586,7 @@ module SMPC (
 								SR[7:5] <= 3'b000;
 							end else if (DI[7]) begin
 								CONT <= 1;
+								SF <= 1;
 							end
 						end else
 							IREG[0] <= DI;

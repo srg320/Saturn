@@ -86,7 +86,7 @@ module YGR019 (
 	CEGen CDD_CEGen
 	(
 		.CLK(CLK),
-		.RST_N(RST_N),
+		.RST_N(1/*RST_N*/),
 		.IN_CLK(53693175),
 		.OUT_CLK(44100*2*2),
 		.CE(CDD_2X_CE)

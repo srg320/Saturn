@@ -60,7 +60,7 @@ package SCU_PKG;
 	parameter bit [31:0] DSTP_RMASK = 32'h00000000;
 	parameter bit [31:0] DSTP_INIT = 32'h00000000;
 	
-	typedef struct packed		//R,25FE0070
+	typedef struct packed		//R,25FE007C
 	{
 		bit [ 8: 0] UNSIGNED;
 		bit         DACSD;		//R

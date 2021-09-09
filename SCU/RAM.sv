@@ -174,7 +174,6 @@ module DSP_SPRAM
 	altdpram	altdpram_component (
 				.data (DATA),
 				.inclock (CLK),
-				.outclock (CLK),
 				.rdaddress (ADDR),
 				.wraddress (ADDR),
 				.wren (WREN),
@@ -182,7 +181,6 @@ module DSP_SPRAM
 				.aclr (1'b0),
 				.byteena (1'b1),
 				.inclocken (1'b1),
-				.outclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 //				.sclr (1'b0),
@@ -212,4 +210,57 @@ module DSP_SPRAM
 	
 `endif
 	
+endmodule
+
+
+module SCU_DMA_FIFO (
+	CLK,
+	DATA,
+	WRREQ,
+	RDREQ,
+	Q,
+	EMPTY,
+	FULL);
+
+	input	  CLK;
+	input	[36:0]  DATA;
+	input	  RDREQ;
+	input	  WRREQ;
+	output	  EMPTY;
+	output	  FULL;
+	output	[36:0] Q;
+
+	wire  sub_wire0;
+	wire  sub_wire1;
+	wire [36:0] sub_wire2;
+	wire  EMPTY = sub_wire0;
+	wire  FULL = sub_wire1;
+	wire [36:0] Q = sub_wire2[36:0];
+
+	scfifo	scfifo_component (
+				.clock (CLK),
+				.data (DATA),
+				.rdreq (RDREQ),
+				.wrreq (WRREQ),
+				.empty (sub_wire0),
+				.full (sub_wire1),
+				.q (sub_wire2),
+				.aclr (),
+				.almost_empty (),
+				.almost_full (),
+				.sclr (),
+				.usedw ());
+	defparam
+		scfifo_component.add_ram_output_register = "OFF",
+		scfifo_component.intended_device_family = "Cyclone V",
+		scfifo_component.lpm_hint = "RAM_BLOCK_TYPE=MLAB",
+		scfifo_component.lpm_numwords = 64,
+		scfifo_component.lpm_showahead = "ON",
+		scfifo_component.lpm_type = "scfifo",
+		scfifo_component.lpm_width = 37,
+		scfifo_component.lpm_widthu = 6,
+		scfifo_component.overflow_checking = "OFF",
+		scfifo_component.underflow_checking = "OFF",
+		scfifo_component.use_eab = "ON";
+
 endmodule

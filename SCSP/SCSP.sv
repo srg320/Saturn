@@ -16,7 +16,7 @@ module SCSP (
 	input             CS_N,
 	input             AD_N,
 	input             DTEN_N,
-	input       [1:0] WE_N,
+//	input       [1:0] WE_N,
 	output            RDY_N,
 	output            INT_N,
 	
@@ -123,7 +123,7 @@ module SCSP (
 	} MemState_t;
 	MemState_t MEM_ST;
 	
-	bit [20:1] MEM_A;
+	bit [18:1] MEM_A;
 	bit [15:0] MEM_D;
 	bit [15:0] MEM_Q;
 	bit  [1:0] MEM_WE;
@@ -141,7 +141,9 @@ module SCSP (
 	bit        DMA_WR;
 	bit        DMA_EXEC;
 	
-	bit [20:0] SCU_A;
+	bit [20:1] SCU_A;
+	bit        SCU_WE_N;
+	bit  [1:0] SCU_DQM;
 	
 	bit  [1:0] CLK_CNT;
 	always @(posedge CLK) if (CE) CLK_CNT <= CLK_CNT + 2'd1;
@@ -228,12 +230,9 @@ module SCSP (
 	
 	//Operation 2: MD read, ADP
 	bit  [7:0] OP2_PLFO;	//Pitch LFO data
-	bit [25:0] SAO;
-//	bit [25:0] SAO_Q;
-//	SCSP_SPRAM SAOI(CLK, OP2_PIPE.SLOT, NEW_SA_INT, {2{SLOT_CE}}, OP2_PIPE.SLOT, SAO_Q[25:10]);
-//	SCSP_SPRAM SAOF(CLK, OP2_PIPE.SLOT, NEW_SA_FRAC, {2{SLOT_CE}}, OP2_PIPE.SLOT, SAO_Q[ 9: 0]);z
-	bit [15:0] SAOI[32];//Sample address offset integer
-	bit  [9:0] SAOF[32];//Sample address offset fractional
+	bit [25:0] NEW_SAO;
+//	bit [15:0] SAOI[32];//Sample address offset integer
+//	bit  [9:0] SAOF[32];//Sample address offset fractional
 	bit        SADIR[32];//Sample address direction
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
@@ -244,17 +243,18 @@ module SCSP (
 		
 		if (!RST_N) begin
 			WD_READ <= 0;
-			SAOI <= '{32{'0}};
-			SAOF <= '{32{'0}};
+//			SAOI <= '{32{'0}};
+//			SAOF <= '{32{'0}};
 			SADIR <= '{32{0}};
 			OP3_PIPE <= OP_PIPE_RESET;
 		end
 		else begin
 			S = OP2_PIPE.SLOT;
 			
-			MD = MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+			MD <= MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
 			
-			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? {SAOI[S],SAOF[S]} + (PHASE + {MD,10'h000}) : {SAOI[S],SAOF[S]} - (PHASE + {MD,10'h000});
+//			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? {SAOI[S],SAOF[S]} + (PHASE + {MD,10'h000}) : {SAOI[S],SAOF[S]} - (PHASE + {MD,10'h000});
+			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? SAO_Q + (PHASE + {MD,10'h000}) : SAO_Q - (PHASE + {MD,10'h000});
 			
 			LL = LEA - LSA;
 			if (SLOT_CE) begin
@@ -263,54 +263,60 @@ module SCSP (
 					case (SCR0_.LPCTL)
 					2'b00:
 						if (NEW_SA_INT < LEA) begin
-							SAO = {NEW_SA_INT,NEW_SA_FRAC};
+							NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
 						end else begin
 //							EVOL[S] <= 10'h3FF;
+							NEW_SAO = SAO_Q;
 						end
 					2'b01:
 						if (NEW_SA_INT < LEA) begin
-							SAO = {NEW_SA_INT,NEW_SA_FRAC};
+							NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
 						end else begin
-							SAO = {NEW_SA_INT - LL,NEW_SA_FRAC};//{LSA,10'h000};
+							NEW_SAO = {NEW_SA_INT - LL,NEW_SA_FRAC};//{LSA,10'h000};
 						end
 					2'b10:
 						if (!SADIR[S]) begin
 							if (NEW_SA_INT < LEA) begin
-								SAO = {NEW_SA_INT,NEW_SA_FRAC};
+								NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
 							end else begin
-								SAO = {LEA,10'h000};
+								NEW_SAO = {LEA,10'h000};
 								SADIR[S] <= 1;
 							end
 						end else begin
 							if (NEW_SA_INT > LSA) begin
-								SAO = {NEW_SA_INT,NEW_SA_FRAC};
+								NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
 							end else begin
-								SAO = {LEA,10'h000};
+								NEW_SAO = {LEA,10'h000};
 								SADIR[S] <= 1;
 							end
 						end
-					2'b11:;
+					2'b11: NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
 					endcase
-					{SAOI[S],SAOF[S]} <= SAO;
+					
 					WD_READ <= 1;
 				end
 				
 				if (OP2_PIPE.KON) begin
-					{SAOI[S],SAOF[S]} <= '0;
+					NEW_SAO = '0;
 					SADIR[S] <= 0;
 				end
 				
-
-				OP3_MD <= MD;//MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+//				{SAOI[S],SAOF[S]} <= NEW_SAO;
+				OP3_SAOI <= NEW_SAO[25:10];
+				
+//				OP3_MD <= MD;//MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
 				OP3_PIPE <= OP2_PIPE;
 			end
 		end
 	end
+	bit [25:0] SAO_Q;
+	SCSP_SAO SAO(CLK, OP2_PIPE.SLOT, NEW_SAO, SLOT_CE, OP2_PIPE.SLOT, SAO_Q);
 	
 	//Operation 3:  
-	bit [15:0] OP3_MD;	//Modulation data
-	wire [19:0] SOFFS = {4'b0000,SAOI[OP3_PIPE.SLOT]} /*+ {{4{OP3_MD[15]}},OP3_MD}*/;
-	assign ADP = {SCR0.SAH,SA} + (!SCR0.PCM8B ? SOFFS<<1 : SOFFS);
+//	bit [15:0] OP3_MD;	//Modulation data
+	bit [15:0] OP3_SAOI;	//Sample address offset integer
+//	wire [19:0] SOFFS = {4'b0000,OP3_SAOI};
+	assign ADP = {SCR0.SAH,SA} + (!SCR0.PCM8B ? {3'b000,OP3_SAOI,1'b0} : {4'b0000,OP3_SAOI});
 	
 	always @(posedge CLK or negedge RST_N) begin
 //		bit [ 4:0] S;
@@ -469,7 +475,6 @@ module SCSP (
 			end
 		end
 	end
-	assign SAMPLE_CE = (OP7_PIPE.SLOT == 5'd0) & SLOT_CE;
 	
 	bit [15:0] EFF_ACC_L,EFF_ACC_R;
 	always @(posedge CLK or negedge RST_N) begin
@@ -492,8 +497,8 @@ module SCSP (
 				end else if (S == 5'd17) begin
 					TEMP = LevelCalc(ESR,3'h7/*SCR8.EFSDL*/);
 				end
-				TEMP_L = PanLCalc(TEMP,5'h0F/*SCR8.EFPAN*/);
-				TEMP_R = PanRCalc(TEMP,5'h1F/*SCR8.EFPAN*/);
+				TEMP_L = PanLCalc(TEMP,5'h1F/*SCR8.EFPAN*/);
+				TEMP_R = PanRCalc(TEMP,5'h0F/*SCR8.EFPAN*/);
 				
 				if (S == 5'd0) begin
 					EFF_ACC_L <= {{2{TEMP_L[15]}},TEMP_L[15:2]};
@@ -506,7 +511,9 @@ module SCSP (
 		end
 	end
 	
+	
 	//Direct out
+	assign SAMPLE_CE = (OP7_PIPE.SLOT == 5'd31) && CYCLE_NUM[1:0] == 2'b11 && CYCLE_CE;
 	bit [15:0] DIR_L,DIR_R;
 	bit [15:0] EFF_L,EFF_R;
 	always @(posedge CLK or negedge RST_N) begin
@@ -607,13 +614,21 @@ module SCSP (
 			MEM_WE <= '0;
 			MEM_RD <= 0;
 			SCU_A <= '0;
+			SCU_WE_N <= 1;
+			SCU_DQM <= '1;
 			SCDTACK_N <= 1;
 			SCU_PEND <= 0;
 			WD_PEND <= 0;
 		end
 		else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
-				SCU_A <= {SCU_A[4:0],DI};
+				if (!DI[15]) begin
+					SCU_A[20:9] <= DI[11:0];
+					SCU_WE_N <= DI[14];
+				end else begin
+					SCU_A[8:1] <= DI[7:0];
+					SCU_DQM <= DI[13:12];
+				end
 			end
 			
 			SCU_SEL_OLD <= SCU_SEL;
@@ -626,7 +641,7 @@ module SCSP (
 			case (MEM_ST)
 				MS_IDLE: if (CYCLE_START) begin
 					if (WD_READ && SLOT_EN) begin
-						MEM_A <= {2'b00,ADP[18:1]};
+						MEM_A <= ADP[18:1];
 						MEM_D <= '0;
 						MEM_WE <= '0;
 						MEM_RD <= 1;
@@ -635,14 +650,14 @@ module SCSP (
 						MEM_ST <= MS_WD_WAIT;
 					end else if (DMA_EXEC) begin
 						if (DMA_WR) begin
-							MEM_A <= {2'b00,DMA_MA[18:1]};
+							MEM_A <= DMA_MA[18:1];
 							MEM_D <= '0;
 							MEM_WE <= '0;
 							MEM_RD <= 1;
 							MEM_CS <= 1;
 							REG_CS <= 0;
 						end else begin
-							MEM_A <= {9'b100000000,DMA_RA};
+							MEM_A <= {7'b0000000,DMA_RA};
 							MEM_D <= DMA_DAT;
 							MEM_WE <= '1;
 							MEM_RD <= 0;
@@ -651,15 +666,15 @@ module SCSP (
 						end
 						MEM_ST <= MS_DMA_WAIT;
 					end else if (SCU_PEND) begin
-						MEM_A <= SCU_A[20:1];
+						MEM_A <= SCU_A[18:1];
 						MEM_D <= DI;
-						MEM_WE <= ~WE_N;
-						MEM_RD <= &WE_N;
+						MEM_WE <= ~{2{SCU_WE_N}} & ~SCU_DQM;
+						MEM_RD <= SCU_WE_N;
 						MEM_CS <= ~SCU_A[20];
 						REG_CS <= SCU_A[20];
 						MEM_ST <= MS_SCU_WAIT;
 					end else if (!SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N /*&& SCCE_F*/) begin
-						MEM_A <= SCA[20:1];
+						MEM_A <= SCA[18:1];
 						MEM_D <= SCDI;
 						MEM_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
 						MEM_RD <= SCRW_N;
@@ -753,7 +768,7 @@ module SCSP (
 		end
 	end
 	
-	assign RAM_A = MEM_A[18:1];
+	assign RAM_A = MEM_A;
 	assign RAM_D = MEM_D;
 	assign RAM_WE = MEM_WE;
 	assign RAM_RD = MEM_RD;
@@ -1039,7 +1054,7 @@ module SCSP (
 				end
 				
 				if (OP2_PIPE.SLOT == CR4.MSLC && SLOT_CE) begin
-					CR4.CA <= SAO[25:22];
+					CR4.CA <= NEW_SAO[25:22];
 				end
 				
 //				if (SLOT_CE) begin
@@ -1147,7 +1162,7 @@ module SCSP (
 	
 endmodule
 
-module SCSP_STACK (
+module SCSP_SAO (
 	CLK,
 	WRADDR,
 	DATA,
@@ -1156,11 +1171,11 @@ module SCSP_STACK (
 	Q);
 
 	input	  CLK;
-	input	[15:0] DATA;
+	input	[25:0] DATA;
 	input	[4:0]  RDADDR;
 	input	[4:0]  WRADDR;
 	input	  WREN;
-	output	[15:0]  Q;
+	output	[25:0]  Q;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
@@ -1169,13 +1184,12 @@ module SCSP_STACK (
 // synopsys translate_on
 `endif
 
-	wire [15:0] sub_wire0;
-	wire [15:0] Q = sub_wire0[15:0];
+	wire [25:0] sub_wire0;
+	wire [25:0] Q = sub_wire0[25:0];
 
 	altdpram	altdpram_component (
 				.data (DATA),
 				.inclock (CLK),
-				.outclock (CLK),
 				.rdaddress (RDADDR),
 				.wraddress (WRADDR),
 				.wren (WREN),
@@ -1183,7 +1197,6 @@ module SCSP_STACK (
 				.aclr (1'b0),
 				.byteena (1'b1),
 				.inclocken (1'b1),
-				.outclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 				//.sclr (1'b0),
@@ -1202,7 +1215,7 @@ module SCSP_STACK (
 		altdpram_component.rdcontrol_aclr = "OFF",
 		altdpram_component.rdcontrol_reg = "UNREGISTERED",
 		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component.width = 16,
+		altdpram_component.width = 26,
 		altdpram_component.widthad = 5,
 		altdpram_component.width_byteena = 1,
 		altdpram_component.wraddress_aclr = "OFF",
@@ -1242,7 +1255,6 @@ module SCSP_SPRAM
 	altdpram	altdpram_component_l (
 				.data (DATA[7:0]),
 				.inclock (CLK),
-				.outclock (CLK),
 				.rdaddress (RADDR),
 				.wraddress (WADDR),
 				.wren (WREN[0]),
@@ -1250,7 +1262,6 @@ module SCSP_SPRAM
 				.aclr (1'b0),
 				.byteena (1'b1),
 				.inclocken (1'b1),
-				.outclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 //				.sclr (1'b0),
@@ -1279,7 +1290,6 @@ module SCSP_SPRAM
 	altdpram	altdpram_component_h (
 				.data (DATA[15:8]),
 				.inclock (CLK),
-				.outclock (CLK),
 				.rdaddress (RADDR),
 				.wraddress (WADDR),
 				.wren (WREN[1]),
@@ -1287,7 +1297,6 @@ module SCSP_SPRAM
 				.aclr (1'b0),
 				.byteena (1'b1),
 				.inclocken (1'b1),
-				.outclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 //				.sclr (1'b0),

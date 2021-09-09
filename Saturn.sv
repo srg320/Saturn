@@ -98,6 +98,11 @@ module Saturn (
 	output reg        HBL_N,
 	output reg        VBL_N,
 	
+	output            FIELD,
+	output            INTERLACE,
+	output      [1:0] HRES,
+	output      [1:0] VRES,
+	
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
 	
@@ -105,20 +110,40 @@ module Saturn (
 	
 	input       [5:0] SCRN_EN,
 	input       [1:0] SND_EN,
-	input             PAUSE_EN,
 	input             SSH_EN,
+	input             DBG_PAUSE,
+	input             DBG_BREAK,
+	input             DBG_RUN,
 	
 	output      [7:0] DBG_WAIT_CNT,
-	output reg        DBG_HOOK,
-	output reg  [7:0] DBG_CD_CNT
+	output reg        DBG_HOOK
 );
 
+	bit BREAK,START;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			BREAK <= 0;
+			START <= 0;
+		end
+		else begin
+			if (VDP1_START) begin
+				BREAK <= DBG_BREAK;
+				START <= 1;
+			end else if (VDP1_CMD_END && START) begin
+				BREAK <= DBG_BREAK;
+			end else if (DBG_RUN) begin
+				BREAK <= 0;
+			end 
+		end
+	end
+	wire PAUSE = DBG_PAUSE | BREAK;
+	
 	bit MCLK;
 	always @(posedge CLK) begin
-		if (!PAUSE_EN && CE) MCLK <= ~MCLK;
+		if (!PAUSE && CE) MCLK <= ~MCLK;
 	end
-	wire CE_R =  MCLK & ~PAUSE_EN;
-	wire CE_F = ~MCLK & ~PAUSE_EN;
+	wire CE_R =  MCLK & ~PAUSE;
+	wire CE_F = ~MCLK & ~PAUSE;
 	
 	bit         SYSRES_N;
 	
@@ -171,7 +196,6 @@ module Saturn (
 	bit  [15:0] BDO;
 	bit         BADDT_N;
 	bit         BDTEN_N;
-	bit   [1:0] BWE_N;
 	bit         BCS1_N;
 	bit         BRDY1_N;
 	bit         IRQ1_N;
@@ -323,7 +347,7 @@ module Saturn (
 	SH7604 SSH
 	(
 		.CLK(CLK),
-		.RST_N(RST_N & SSH_EN),
+		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
 		
@@ -380,25 +404,6 @@ module Saturn (
 	
 	assign MSHIRL_N  = CIRL_N;
 	assign SSHIRL_N  = {1'b1,BIRL,1'b1};
-	
-	bit SSH_ACTIVE;
-	bit SCU_ACTIVE;
-	always @(posedge CLK or negedge RST_N) begin
-		if (!RST_N) begin
-			SSH_ACTIVE <= '0;
-			SCU_ACTIVE <= 0;
-		end else if (CE_R) begin
-			if (!SSHBREQ_N && !SSH_ACTIVE && !SCU_ACTIVE) SSH_ACTIVE <= 1;
-			else if (SSHBREQ_N && SSH_ACTIVE) SSH_ACTIVE <= 0;
-			
-			if (!CBREQ_N && SSHBREQ_N && !SCU_ACTIVE && !SSH_ACTIVE) SCU_ACTIVE <= 1;
-			else if (CBREQ_N && SCU_ACTIVE) SCU_ACTIVE <= 0;
-		end
-	end
-	assign MSHBRLS_N = (SSHBREQ_N | ~SSH_ACTIVE) & (CBREQ_N | ~SCU_ACTIVE);
-	assign SSHBACK_N = MSHBGR_N | ~SSH_ACTIVE;
-	assign CBACK_N   = MSHBGR_N | ~SCU_ACTIVE;
-	
 
 	assign MSHDI     = CDO;
 	assign MSHWAIT_N = CWAIT_N & (MEM_WAIT_N | (MSHCS3_N & DRAMCE_N & ROMCE_N & SRAMCE_N));
@@ -430,9 +435,7 @@ module Saturn (
 	                  !BCS2_N ? VDP2_DO :
 							!BCSS_N ? SCSP_DO : 16'h0000;
 	assign IRQL_N   = 1;
-	
-	
-	bit [20:0] BA;
+
 	SCU SCU
 	(
 		.CLK(CLK),
@@ -487,7 +490,6 @@ module Saturn (
 		.BDO(BDO),
 		.BADDT_N(BADDT_N),
 		.BDTEN_N(BDTEN_N),
-		.BWE_N(BWE_N),
 		.BCS1_N(BCS1_N),
 		.BRDY1_N(BRDY1_N),
 		.IRQ1_N(IRQ1_N),
@@ -523,12 +525,12 @@ module Saturn (
 		.RD_N(CRD_N),
 		.WAIT_N(CWAIT_N),
 		
-		.BRLS_N(),
-		.BGR_N(1'b1),
-		.BREQ_N(1'b1),
-		.BACK_N(),
-		.EXBREQ_N(1'b1),
-		.EXBACK_N(),
+		.BRLS_N(MSHBRLS_N),
+		.BGR_N(MSHBGR_N),
+		.BREQ_N(SSHBREQ_N),
+		.BACK_N(SSHBACK_N),
+		.EXBREQ_N(CBREQ_N),
+		.EXBACK_N(CBACK_N),
 		
 		.WTIN_N(CWATIN_N),
 		.IVECF_N(1'b1),
@@ -639,13 +641,14 @@ module Saturn (
 		.JOY1(JOY1)
 	);
 	
-
+	bit VDP1_CMD_END,VDP1_START;
 	VDP1 VDP1
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
+		.EN(1/*~PAUSE*/),
 		
 		.RES_N(SYSRES_N),
 		
@@ -654,7 +657,7 @@ module Saturn (
 		.CS_N(BCS1_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-		.WE_N(BWE_N),
+//		.WE_N(BWE_N),
 		.RDY_N(BRDY1_N),
 		
 		.IRQ_N(IRQ1_N), 
@@ -682,7 +685,10 @@ module Saturn (
 		.FB1_D(VDP1_FB1_D),
 		.FB1_WE(VDP1_FB1_WE),
 		.FB1_RD(VDP1_FB1_RD),
-		.FB1_Q(VDP1_FB1_Q)
+		.FB1_Q(VDP1_FB1_Q),
+		
+		.DBG_START(VDP1_START),
+		.DBG_CMD_END(VDP1_CMD_END)
 	);
 	
 	VDP2 VDP2
@@ -699,7 +705,7 @@ module Saturn (
 		.CS_N(BCS2_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-		.WE_N(BWE_N),
+//		.WE_N(BWE_N),
 		.RDY_N(BRDY2_N),
 		
 		.VINT_N(IRQV_N),
@@ -708,6 +714,8 @@ module Saturn (
 		.HTIM_N(HTIM_N),
 		.VTIM_N(VTIM_N),
 		.FBD(VOUT),
+		
+		.PAL(0),
 		
 		.RA0_A(VDP2_RA0_A),
 		.RA0_D(VDP2_RA0_D),
@@ -741,6 +749,11 @@ module Saturn (
 		.HS_N(HS_N),
 		.HBL_N(HBL_N),
 		.VBL_N(VBL_N),
+	
+		.FIELD(FIELD),
+		.INTERLACE(INTERLACE),
+		.HRES(HRES),
+		.VRES(VRES),
 		
 		.SCRN_EN(SCRN_EN)
 	);
@@ -774,7 +787,7 @@ module Saturn (
 		.CS_N(BCSS_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-		.WE_N(BWE_N),
+//		.WE_N(BWE_N),
 		.RDY_N(BRDYS_N),
 		.INT_N(IRQS_N),
 		
@@ -973,20 +986,6 @@ module Saturn (
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
-	
-	always @(posedge CLK or negedge RST_N) begin
-		bit SWR_OLD;
-		if (!RST_N) begin
-			DBG_CD_CNT <= '0;
-		end else if (SHCE_R) begin
-			SWR_OLD <= ~SWRL_N || ~SWRH_N;
-			if ((!SWRL_N || !SWRH_N) && !SWR_OLD) begin
-				if (!SCS1_N && SA[18:1] == 18'h3AC0C) begin
-					DBG_CD_CNT <= DBG_CD_CNT + 8'd1;
-				end
-			end
-		end
-	end
 	
 	
 endmodule
