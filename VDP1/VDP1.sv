@@ -3,6 +3,7 @@ module VDP1 (
 	input             RST_N,
 	input             CE_R,
 	input             CE_F,
+	input             EN,
 	
 	input             RES_N,
 
@@ -11,7 +12,7 @@ module VDP1 (
 	input             CS_N,
 	input             AD_N,
 	input             DTEN_N,
-	input       [1:0] WE_N,
+//	input       [1:0] WE_N,
 	output            RDY_N,
 	
 	output            IRQ_N,
@@ -41,15 +42,21 @@ module VDP1 (
 	output            FB1_WE,
 	output            FB1_RD,
 	
+	output            DBG_START,
+	output            DBG_CMD_END,
 	output     [15:0] ORIG_C_DBG,
 	output     [10:0] DRAW_X_DBG,
 	output     [10:0] DRAW_Y_DBG,
+	output            DBG_LINE_OVER,
+	output            DBG_DRAW_OVER,
 	output     [15:0] FRAMES_DBG,
 	output     [7:0] START_DRAW_CNT,
 	output     [18:1] DBG_CMD_ADDR16,
 	output     [18:1] DBG_CMD_ADDR_LAST,
 	output CMDSRCA_t DBG_CMD_CMDSRCA_LAST,
-	output     [7:0] DBG_CMD_CNT
+	output     [7:0] DBG_CMD_CNT,
+	output     [7:0] DBG_CMD_WAIT_CNT,
+	output     [7:0] CPU_VRAM_RDY_CNT
 );
 	import VDP1_PKG::*;
 	
@@ -70,16 +77,11 @@ module VDP1 (
 	bit        DRAW_TERMINATE;
 	
 	//Color lookup table
-	bit  [3:1] CLT_WA;
-	bit [31:0] CLT_D;
+	bit  [3:0] CLT_WA;
+	bit [15:0] CLT_D;
 	bit        CLT_WE;
 	bit  [3:0] CLT_RA;
 	bit [15:0] CLT_Q;
-	
-	bit        TEXT_FIFO_FULL;
-	bit        TEXT_FIFO_RD;
-	bit [15:0] TEXT_FIFO_Q;
-	
 	
 	//Frame buffers
 	bit        FB_SEL;
@@ -104,22 +106,35 @@ module VDP1 (
 	assign FB_DRAW_Q = FB_SEL ? FB0_Q : FB1_Q;
 	assign FB_DISP_Q = FB_SEL ? FB1_Q : FB0_Q;
 	
-	bit [20:0] A;
+	bit [20:1] A;
+	bit        WE_N;
+	bit  [1:0] DQM;
+	bit        BURST;
 	
-	typedef enum bit [7:0] {
-		VS_IDLE     = 8'b00000001,  
-		VS_CPU_READ = 8'b00000010,
-		VS_CMD_READ = 8'b00000100,
-		VS_CMD_WRITE= 8'b00001000,
-		VS_PAT_READ = 8'b00010000,
-		VS_CLT_READ = 8'b00100000,
-		VS_CLT_WRITE= 8'b01000000,
-		VS_END      = 8'b10000000
+	typedef enum bit [10:0] {
+		VS_IDLE          = 11'b00000000001,  
+		VS_CPU_WRITE     = 11'b00000000010,
+		VS_CPU_WRITE_END = 11'b00000000100,
+		VS_CPU_READ      = 11'b00000001000,
+		VS_CPU_READ_END  = 11'b00000010000,
+		VS_CMD_READ      = 11'b00000100000,
+		VS_CMD_END       = 11'b00001000000,
+		VS_PAT_READ      = 11'b00010000000,
+		VS_PAT_END       = 11'b00100000000,
+		VS_CLT_READ      = 11'b01000000000,
+		VS_CLT_END       = 11'b10000000000
 	} VRAMState_t;
 	VRAMState_t VRAM_ST;
+	bit [18:1] IO_VRAM_RA;
+	bit [18:1] IO_VRAM_WA;
+	bit [15:0] IO_VRAM_D;
+	bit  [1:0] IO_VRAM_WE;
 	bit [15:0] IO_VRAM_DO;
+	bit        CPU_VRAM_READ_PEND;
+	bit        CPU_VRAM_WRITE_PEND;
+	bit        CPU_VRAM_RRDY;
+	bit        CPU_VRAM_WRDY;
 	bit        VRAM_DONE;
-	bit        VRAM_ACCESS_PEND;
 	
 	typedef enum bit [4:0] {
 		CMDS_IDLE,  
@@ -151,38 +166,33 @@ module VDP1 (
 	bit        CMD_READ;
 	bit [18:1] SPR_ADDR;
 	bit        SPR_READ;
-	bit [31:0] PAT;
+	bit [15:0] SPR_DATA;
 	bit [18:1] CLT_ADDR;
 	bit        CLT_READ;
 	
 	//Divider
-	bit  [9:0] DIV_A;
-	bit  [9:0] DIV_B;
-	bit  [19:0] DIV_R;
-	bit  [19:0] DIV_Q;
-	VDP1_DIV DIV(/*.clock(CLK), */.numer({DIV_A,10'h000}), .denom(DIV_B), .quotient(DIV_R));
+	bit [10:0] DIV_A;
+	bit [10:0] DIV_B;
+	bit [21:0] DIV_R;
+	VDP1_DIV DIV(.numer({DIV_A,11'h000}), .denom(DIV_B), .quotient(DIV_R));
 	
 	CMDTBL_t   CMD;
 	Clip_t     SYS_CLIP;
 	Clip_t     USR_CLIP;
 	Coord_t    LOC_COORD;
-	bit [18:0] TEXT_X;
-	bit [18:0] TEXT_Y;
-	bit [18:0] TEXT_DX;
-	bit [18:0] TEXT_DY;
+	bit [19:0] TEXT_X;
+	bit [19:0] TEXT_Y;
+	bit [19:0] TEXT_DX;
+	bit [19:0] TEXT_DY;
 	bit [15:0] TEXT_PAT;
-	bit  [8:0] SPR_X;
-	bit  [7:0] SPR_Y;
-	bit  [9:0] SPR_SX;
-	bit  [9:0] SPR_SY;
-	bit  [9:0] POLY_LSX;
-	bit  [9:0] POLY_LSY;
-	bit  [9:0] POLY_RSX;
-	bit  [9:0] POLY_RSY;
-	bit  [9:0] POLY_LDX;
-	bit  [9:0] POLY_LDY;
-	bit  [9:0] POLY_RDX;
-	bit  [9:0] POLY_RDY;
+	bit [10:0] POLY_LSX;
+	bit [10:0] POLY_LSY;
+	bit [10:0] POLY_RSX;
+	bit [10:0] POLY_RSY;
+	bit [10:0] POLY_LDX;
+	bit [10:0] POLY_LDY;
+	bit [10:0] POLY_RDX;
+	bit [10:0] POLY_RDY;
 	bit  [1:0] POLY_S;
 	bit        POLY_LDIRX;
 	bit        POLY_LDIRY;
@@ -193,38 +203,46 @@ module VDP1 (
 	Vertex_t   LINE_VERTB;
 	Vertex_t   LEFT_VERT;
 	Vertex_t   RIGHT_VERT;
-	bit  [9:0] LINE_SX;
-	bit  [9:0] LINE_SY;
+	bit [10:0] LINE_SX;
+	bit [10:0] LINE_SY;
 	bit        LINE_DIRX;
 	bit        LINE_DIRY;
 	bit        LINE_S;
-	bit  [9:0] LINE_D;
-	bit  [9:0] NEXT_LINE_D;
+	bit [10:0] LINE_D;
+	bit [10:0] NEXT_LINE_D;
 	bit [10:0] AA_X;
 	bit [10:0] AA_Y;
 	bit [10:0] DRAW_X;////
 	bit [10:0] DRAW_Y;////
 	bit        SCLIP;////
 	bit        UCLIP;////
-	bit [15:0] PAT_C;////
+	Pattern_t  PAT;////
 	always @(posedge CLK or negedge RST_N) begin
-	   bit [18:1] NEXT_ADDR;
+//	   bit        FRAME_START_PEND;
+		bit [18:1] NEXT_ADDR;
 		bit [18:1] CMD_JRET;
 		CMDCOLR_t  CMDCOLR_LAST;
-		bit [10:0] NEW_LINE_SX;
-		bit [10:0] NEW_LINE_SY;
-		bit [10:0] NEW_POLY_LSX;
-		bit [10:0] NEW_POLY_LSY;
-		bit [10:0] NEW_POLY_RSX;
-		bit [10:0] NEW_POLY_RSY;
-		bit  [9:0] NEXT_POLY_LDX;
-		bit  [9:0] NEXT_POLY_LDY;
-		bit  [9:0] NEXT_POLY_RDX;
-		bit  [9:0] NEXT_POLY_RDY;
+		bit [10:0] CMDXA_CLIP;
+		bit [10:0] CMDXB_CLIP;
+		bit [10:0] CMDXC_CLIP;
+		bit [10:0] CMDXD_CLIP;
+		bit [10:0] RIGHT_VERT_X_CLIP;
+		bit [10:0] RIGHT_VERT_Y_CLIP;
+		bit [11:0] NEW_LINE_SX;
+		bit [11:0] NEW_LINE_SY;
+		bit [11:0] NEW_POLY_LSX;
+		bit [11:0] NEW_POLY_LSY;
+		bit [11:0] NEW_POLY_RSX;
+		bit [11:0] NEW_POLY_RSY;
+		bit [10:0] NEXT_POLY_LDX;
+		bit [10:0] NEXT_POLY_LDY;
+		bit [10:0] NEXT_POLY_RDX;
+		bit [10:0] NEXT_POLY_RDY;
 		bit        DIV_WAIT;
-		bit [18:0] NEXT_TEXT_X;
-		bit [18:0] NEXT_TEXT_Y;
+		bit [19:0] NEXT_TEXT_X;
+		bit [19:0] NEXT_TEXT_Y;
 		bit        AA;
+		bit        EC_FIND;
 		bit  [8:0] XMASK;
 		
 		if (!RST_N) begin
@@ -250,26 +268,38 @@ module VDP1 (
 			SPR_READ <= 0;
 			CLT_READ <= 0;
 			CMD_ST <= CMDS_IDLE;
-		end else begin
+		end else if (EN) begin
 			case (CMD.CMDPMOD.CM)
 				3'b000,
-				3'b001: XMASK = 9'b111111000;
+				3'b001: XMASK = 9'b111111100;
 				3'b010,
 				3'b011,
-				3'b100: XMASK = 9'b111111100;
-				default:XMASK = 9'b111111110;
+				3'b100: XMASK = 9'b111111110;
+				default:XMASK = 9'b111111111;
 			endcase
+			
+//			if (FRAME_START && CMD_ST != CMDS_IDLE) FRAME_START_PEND <= 1;
 					
 			case (CMD_ST) 
 				CMDS_IDLE: begin
+//					if (FRAME_START || FRAME_START_PEND) begin
+//						FRAME_START_PEND <= 0;
+//						CMD_ADDR <= '0;
+//						CMD_READ <= 1;
+//						SPR_READ <= 0;
+//						CLT_READ <= 0;
+//						CMD_ST <= CMDS_READ;
+//					end
 				end
 					
 				CMDS_READ: begin
+					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
 					CMD_READ <= 0;
 					if (VRAM_DONE) begin 
 						LOPR <= COPR;
 						COPR <= CMD_ADDR[18:3];
 						CMD_ST <= CMDS_EXEC;
+						DBG_CMD_WAIT_CNT <= '0;
 					end
 				end
 					
@@ -316,7 +346,7 @@ module VDP1 (
 							end
 							
 							4'h4: begin	//polygon
-								CMD_ST <= CMDS_POLYGON_START;
+								CMD_ST <= CMDS_DSPR_START/*CMDS_POLYGON_START*/;
 							end
 							
 							4'h5,
@@ -328,9 +358,9 @@ module VDP1 (
 								CMD_ST <= CMDS_LINE_START;
 							end
 							
-							4'h8: USR_CLIP <= {CMD.CMDXA.COORD[9:0],CMD.CMDYA.COORD[8:0],CMD.CMDXC.COORD[9:0],CMD.CMDYC.COORD[8:0]};
-							4'h9: SYS_CLIP <= {10'h000,9'h000,CMD.CMDXC.COORD[9:0],CMD.CMDYC.COORD[8:0]};
-							4'hA: LOC_COORD <= {CMD.CMDXA.COORD[9:0],CMD.CMDYA.COORD[8:0]};
+							4'h8: USR_CLIP <= {{1'b0,CMD.CMDXA.COORD[9:0]},{2'b00,CMD.CMDYA.COORD[8:0]},{1'b0,CMD.CMDXC.COORD[9:0]},{2'b00,CMD.CMDYC.COORD[8:0]}};
+							4'h9: SYS_CLIP <= {11'h000,11'h000,{1'b0,CMD.CMDXC.COORD[9:0]},{2'b00,CMD.CMDYC.COORD[8:0]}};
+							4'hA: LOC_COORD <= {CMD.CMDXA.COORD,CMD.CMDYA.COORD};
 						endcase
 						if (DBG_CMD_CNT == 16) begin
 							DBG_CMD_ADDR16 <= CMD_ADDR;
@@ -340,6 +370,7 @@ module VDP1 (
 				end
 				
 				CMDS_CLT_LOAD: begin
+					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
 					CLT_READ <= 0;
 					if (VRAM_DONE) begin 
 						if (CMD.CMDCTRL.COMM == 4'h0) begin
@@ -350,17 +381,18 @@ module VDP1 (
 						end else begin
 							CMD_ST <= CMDS_DSPR_START;
 						end
+						DBG_CMD_WAIT_CNT <= '0;
 					end
 				end
 				
 				CMDS_NSPR_START: begin
 					LINE_VERTA <= {CMD.CMDXA.COORD,CMD.CMDYA.COORD};
-					LINE_VERTB.X <= CMD.CMDXA.COORD + {1'b0,CMD.CMDSIZE.SX,3'b000} - 10'd1;
-					LINE_VERTB.Y <= CMD.CMDYA.COORD + {2'b00,CMD.CMDSIZE.SY} - 10'd1;
+					LINE_VERTB.X <= CMD.CMDXA.COORD + {2'b00,CMD.CMDSIZE.SX,3'b000} - 11'd1;
+					LINE_VERTB.Y <= CMD.CMDYA.COORD + {3'b000,CMD.CMDSIZE.SY} - 11'd1;
 					TEXT_X <= '0;
 					TEXT_Y <= '0;
-					TEXT_DX <= {9'h001,10'h000};
-					TEXT_DY <= {9'h001,10'h000};
+					TEXT_DX <= {9'h001,11'h000};
+					TEXT_DY <= {9'h001,11'h000};
 					CMD_ST <= CMDS_SPR_READ;
 				end
 				
@@ -368,22 +400,22 @@ module VDP1 (
 					case (CMD.CMDCTRL.ZP[1:0])
 						2'b00: begin LINE_VERTA.X <= CMD.CMDXA.COORD;                       LINE_VERTB.X <= CMD.CMDXC.COORD; end
 						2'b01: begin LINE_VERTA.X <= CMD.CMDXA.COORD;                       LINE_VERTB.X <= CMD.CMDXA.COORD + CMD.CMDXB.COORD; end
-						2'b10: begin LINE_VERTA.X <= CMD.CMDXA.COORD-(CMD.CMDXB.COORD>>>1); LINE_VERTB.X <= CMD.CMDXA.COORD+((CMD.CMDXB.COORD+10'd1)>>>1); end
+						2'b10: begin LINE_VERTA.X <= CMD.CMDXA.COORD-(CMD.CMDXB.COORD>>>1); LINE_VERTB.X <= CMD.CMDXA.COORD+((CMD.CMDXB.COORD+11'd1)>>>1); end
 						2'b11: begin LINE_VERTA.X <= CMD.CMDXA.COORD-CMD.CMDXB.COORD;       LINE_VERTB.X <= CMD.CMDXA.COORD; end
 					endcase
 					case (CMD.CMDCTRL.ZP[3:2])
 						2'b00: begin LINE_VERTA.Y <= CMD.CMDYA.COORD;                       LINE_VERTB.Y <= CMD.CMDYC.COORD; end
 						2'b01: begin LINE_VERTA.Y <= CMD.CMDYA.COORD;                       LINE_VERTB.Y <= CMD.CMDYA.COORD + CMD.CMDYB.COORD; end
-						2'b10: begin LINE_VERTA.Y <= CMD.CMDYA.COORD-(CMD.CMDYB.COORD>>>1); LINE_VERTB.Y <= CMD.CMDYA.COORD+((CMD.CMDYB.COORD+10'd1)>>>1); end
+						2'b10: begin LINE_VERTA.Y <= CMD.CMDYA.COORD-(CMD.CMDYB.COORD>>>1); LINE_VERTB.Y <= CMD.CMDYA.COORD+((CMD.CMDYB.COORD+11'd1)>>>1); end
 						2'b11: begin LINE_VERTA.Y <= CMD.CMDYA.COORD-CMD.CMDYB.COORD;       LINE_VERTB.Y <= CMD.CMDYA.COORD; end
 					endcase
 					TEXT_X <= '0;
 					TEXT_Y <= '0;
-					DIV_A <= {1'b0,CMD.CMDSIZE.SX,3'b000};
+					DIV_A <= {2'b00,CMD.CMDSIZE.SX,3'b000};
 					if (!CMD.CMDCTRL.ZP) begin
-						DIV_B <= CMD.CMDXC.COORD-CMD.CMDXA.COORD;
+						DIV_B <= CMD.CMDXC.COORD - CMD.CMDXA.COORD;
 					end else begin
-						DIV_B <= CMD.CMDXB.COORD[9:0] + 10'd1;
+						DIV_B <= CMD.CMDXB.COORD + 11'd1;
 					end
 					CMD_ST <= CMDS_SPR_CALCX;
 				end
@@ -391,31 +423,33 @@ module VDP1 (
 				CMDS_SPR_CALCX: begin
 					DIV_WAIT <= ~DIV_WAIT;
 					if (DIV_WAIT) begin
-					TEXT_DX <= DIV_R[18:0];
-					DIV_A <= {2'b00,CMD.CMDSIZE.SY};
-					if (!CMD.CMDCTRL.ZP) begin
-						DIV_B <= CMD.CMDYC.COORD-CMD.CMDYA.COORD;
-					end else begin
-						DIV_B <= CMD.CMDYB.COORD[9:0] + 10'd1;
-					end
-					CMD_ST <= CMDS_SPR_CALCY;
+						TEXT_DX <= DIV_R[19:0];
+						DIV_A <= {3'b000,CMD.CMDSIZE.SY};
+						if (!CMD.CMDCTRL.ZP) begin
+							DIV_B <= CMD.CMDYC.COORD - CMD.CMDYA.COORD;
+						end else begin
+							DIV_B <= CMD.CMDYB.COORD + 11'd1;
+						end
+						CMD_ST <= CMDS_SPR_CALCY;
 					end
 				end
 				
 				CMDS_SPR_CALCY: begin
 					DIV_WAIT <= ~DIV_WAIT;
 					if (DIV_WAIT) begin
-					TEXT_DY <= DIV_R[18:0];
-					SPR_READ <= 1;
-					CMD_ST <= CMDS_SPR_READ;
+						TEXT_DY <= DIV_R[19:0];
+						SPR_READ <= 1;
+						CMD_ST <= CMDS_SPR_READ;
 					end
 				end
 				
 				CMDS_SPR_READ: begin
+					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
 					SPR_READ <= 0;
 					if (VRAM_DONE) begin 
 						if (CMD.CMDCTRL.COMM == 4'h2) CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
 						else CMD_ST <= CMDS_SPR_DRAW;
+					DBG_CMD_WAIT_CNT <= '0;
 					end
 				end
 				
@@ -427,14 +461,14 @@ module VDP1 (
 						NEXT_TEXT_Y = TEXT_Y + TEXT_DY;
 					end
 					
-					if (((TEXT_X[18:10] & XMASK) != (NEXT_TEXT_X[18:10] & XMASK) || TEXT_Y[18:10] != NEXT_TEXT_Y[18:10])) begin
+					if (((TEXT_X[19:11] & XMASK) != (NEXT_TEXT_X[19:11] & XMASK) || TEXT_Y[19:11] != NEXT_TEXT_Y[19:11])) begin
 						SPR_READ <= 1;
 						CMD_ST <= CMDS_SPR_READ;
 					end
 					TEXT_X <= NEXT_TEXT_X;
 					TEXT_Y <= NEXT_TEXT_Y;
 					
-					LINE_VERTA.X <= LINE_VERTA.X + 10'd1;
+					LINE_VERTA.X <= LINE_VERTA.X + 11'd1;
 					if (LINE_VERTA.X == LINE_VERTB.X) begin
 						if (CMD.CMDCTRL.COMM == 4'd0) begin
 							LINE_VERTA.X <= CMD.CMDXA.COORD;
@@ -446,7 +480,7 @@ module VDP1 (
 								2'b11: begin LINE_VERTA.X <= CMD.CMDXA.COORD-CMD.CMDXB.COORD; end
 							endcase
 						end
-						LINE_VERTA.Y <= LINE_VERTA.Y + 10'd1;
+						LINE_VERTA.Y <= LINE_VERTA.Y + 11'd1;
 						if (LINE_VERTA.Y == LINE_VERTB.Y) begin
 							SPR_READ <= 0;
 							CMD_ST <= CMDS_END;
@@ -455,6 +489,18 @@ module VDP1 (
 				end
 				
 				CMDS_DSPR_START: begin
+					CMDXA_CLIP <= $signed(CMD.CMDXA.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+					               $signed(CMD.CMDXA.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+					               CMD.CMDXA.COORD;
+					CMDXB_CLIP <= $signed(CMD.CMDXB.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+					               $signed(CMD.CMDXB.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+					               CMD.CMDXB.COORD;
+					CMDXC_CLIP <= $signed(CMD.CMDXC.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+					               $signed(CMD.CMDXC.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+					               CMD.CMDXC.COORD;
+					CMDXD_CLIP <= $signed(CMD.CMDXD.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+					               $signed(CMD.CMDXD.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+					               CMD.CMDXD.COORD;
 					TEXT_X <= '0;
 					TEXT_Y <= '0;
 					CMD_ST <= CMDS_POLYGON_START;
@@ -463,19 +509,19 @@ module VDP1 (
 				CMDS_POLYGON_START: begin
 					LEFT_VERT <= {CMD.CMDXA.COORD,CMD.CMDYA.COORD};
 					RIGHT_VERT <= {CMD.CMDXB.COORD,CMD.CMDYB.COORD};
-					NEW_POLY_LSX = CMD.CMDXD.COORD - CMD.CMDXA.COORD;
-					NEW_POLY_LSY = CMD.CMDYD.COORD - CMD.CMDYA.COORD;
-					NEW_POLY_RSX = CMD.CMDXC.COORD - CMD.CMDXB.COORD;
-					NEW_POLY_RSY = CMD.CMDYC.COORD - CMD.CMDYB.COORD;
+					NEW_POLY_LSX = {CMD.CMDXD.COORD[10],CMD.CMDXD.COORD} - /*{CMDXA_CLIP[10],CMDXA_CLIP}*/{CMD.CMDXA.COORD[10],CMD.CMDXA.COORD};
+					NEW_POLY_LSY = {CMD.CMDYD.COORD[10],CMD.CMDYD.COORD} - {CMD.CMDYA.COORD[10],CMD.CMDYA.COORD};
+					NEW_POLY_RSX = {CMD.CMDXC.COORD[10],CMD.CMDXC.COORD} - /*{CMDXB_CLIP[10],CMDXB_CLIP}*/{CMD.CMDXB.COORD[10],CMD.CMDXB.COORD};
+					NEW_POLY_RSY = {CMD.CMDYC.COORD[10],CMD.CMDYC.COORD} - {CMD.CMDYB.COORD[10],CMD.CMDYB.COORD};
 					
 					POLY_LSX <= Abs(NEW_POLY_LSX);
 					POLY_LSY <= Abs(NEW_POLY_LSY);
 					POLY_RSX <= Abs(NEW_POLY_RSX);
 					POLY_RSY <= Abs(NEW_POLY_RSY);
-					POLY_LDIRX <= NEW_POLY_LSX[10];
-					POLY_LDIRY <= NEW_POLY_LSY[10];
-					POLY_RDIRX <= NEW_POLY_RSX[10];
-					POLY_RDIRY <= NEW_POLY_RSY[10];
+					POLY_LDIRX <= NEW_POLY_LSX[11];
+					POLY_LDIRY <= NEW_POLY_LSY[11];
+					POLY_RDIRX <= NEW_POLY_RSX[11];
+					POLY_RDIRY <= NEW_POLY_RSY[11];
 										
 					CMD_ST <= CMDS_POLYGON_CALCD;
 				end
@@ -484,16 +530,16 @@ module VDP1 (
 					DIV_A <= {3'b000,CMD.CMDSIZE.SY};
 					if (POLY_LSX >= POLY_LSY && POLY_LSX >= POLY_RSX && POLY_LSX >= POLY_RSY) begin
 						POLY_S <= 2'b00;
-						DIV_B <= POLY_LSX+10'd1;
+						DIV_B <= POLY_LSX + 11'd1;
 					end else if (POLY_LSY >= POLY_LSX && POLY_LSY >= POLY_RSX && POLY_LSY >= POLY_RSY) begin
 						POLY_S <= 2'b01;
-						DIV_B <= POLY_LSY+10'd1;
+						DIV_B <= POLY_LSY + 11'd1;
 					end else if (POLY_RSX >= POLY_LSX && POLY_RSX >= POLY_LSY && POLY_RSX >= POLY_RSY) begin
 						POLY_S <= 2'b10;
-						DIV_B <= POLY_RSX+10'd1;
+						DIV_B <= POLY_RSX + 11'd1;
 					end else begin
 						POLY_S <= 2'b11;
-						DIV_B <= POLY_RSY+10'd1;
+						DIV_B <= POLY_RSY + 11'd1;
 					end
 					
 					POLY_LDX <= '0;
@@ -507,8 +553,8 @@ module VDP1 (
 				CMDS_POLYGON_CALCTDY: begin
 					DIV_WAIT <= ~DIV_WAIT;
 					if (DIV_WAIT) begin
-					TEXT_DY <= DIV_R[18:0];
-					CMD_ST <= CMDS_LINE_CALC;
+						TEXT_DY <= DIV_R[19:0];
+						CMD_ST <= CMDS_LINE_CALC;
 					end
 				end
 				
@@ -526,41 +572,50 @@ module VDP1 (
 				end
 				
 				CMDS_LINE_CALC: begin
+					RIGHT_VERT_X_CLIP = $signed(RIGHT_VERT.X) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+					                    $signed(RIGHT_VERT.X) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+					                    RIGHT_VERT.X;
+					RIGHT_VERT_Y_CLIP = $signed(RIGHT_VERT.Y) < $signed(SYS_CLIP.Y1 - LOC_COORD.Y) ? SYS_CLIP.Y1 - LOC_COORD.Y : 
+					                    $signed(RIGHT_VERT.Y) > $signed(SYS_CLIP.Y2 - LOC_COORD.Y) ? SYS_CLIP.Y2 - LOC_COORD.Y : 
+					                    RIGHT_VERT.Y;
 					LINE_VERTA <= LEFT_VERT;
-					LINE_VERTB <= RIGHT_VERT;
-					NEW_LINE_SX = RIGHT_VERT.X - LEFT_VERT.X;
-					NEW_LINE_SY = RIGHT_VERT.Y - LEFT_VERT.Y;
+					LINE_VERTB <= RIGHT_VERT;//{RIGHT_VERT_X_CLIP,RIGHT_VERT_Y_CLIP};
+					NEW_LINE_SX = {RIGHT_VERT.X[10],RIGHT_VERT.X} - {LEFT_VERT.X[10],LEFT_VERT.X};
+					NEW_LINE_SY = {RIGHT_VERT.Y[10],RIGHT_VERT.Y} - {LEFT_VERT.Y[10],LEFT_VERT.Y};
 					LINE_SX <= Abs(NEW_LINE_SX);
 					LINE_SY <= Abs(NEW_LINE_SY);
-					LINE_DIRX <= NEW_LINE_SX[10];
-					LINE_DIRY <= NEW_LINE_SY[10];
+					LINE_DIRX <= NEW_LINE_SX[11];
+					LINE_DIRY <= NEW_LINE_SY[11];
 
-					DIV_A <= {1'b0,CMD.CMDSIZE.SX,3'b000};
-					DIV_B <= Abs(NEW_LINE_SX) >= Abs(NEW_LINE_SY) ? Abs(NEW_LINE_SX) + 10'd1 : Abs(NEW_LINE_SY) + 10'd1;
+					DIV_A <= {2'b00,CMD.CMDSIZE.SX,3'b000};
+					DIV_B <= Abs(NEW_LINE_SX) >= Abs(NEW_LINE_SY) ? Abs(NEW_LINE_SX) + 11'd1 : Abs(NEW_LINE_SY) + 11'd1;
 					CMD_ST <= CMDS_LINE_CALCD;
 				end
 				
 				CMDS_LINE_CALCD: begin
 					DIV_WAIT <= ~DIV_WAIT;
 					if (DIV_WAIT) begin
-					LINE_S <= ~(LINE_SX >= LINE_SY);
-					LINE_D <= '0;
-					AA <= 0;
-					
-					TEXT_DX <= DIV_R[18:0];
-					if (CMD.CMDCTRL.COMM <= 4'h3) begin
-						SPR_READ <= 1;
-						CMD_ST <= CMDS_SPR_READ;
-					end else begin
-						CMD_ST <= CMDS_LINE_DRAW;
-					end
+						LINE_S <= ~(LINE_SX >= LINE_SY);
+						LINE_D <= '0;
+						AA <= 0;
+						
+						TEXT_DX <= DIV_R[19:0];
+						if (CMD.CMDCTRL.COMM <= 4'h3) begin
+							SPR_READ <= 1;
+							CMD_ST <= CMDS_SPR_READ;
+						end else begin
+							CMD_ST <= CMDS_LINE_DRAW;
+						end
+						
+						EC_FIND <= 0;
 					end
 				end
 				
 				CMDS_LINE_DRAW: begin
+					if (CMD.CMDCTRL.COMM <= 4'h3 && !CMD.CMDPMOD.ECD && PAT.EC) EC_FIND <= 1;
 					NEXT_TEXT_X = TEXT_X + TEXT_DX;
 					NEXT_TEXT_Y = TEXT_Y;
-					if ((LINE_VERTA.X == LINE_VERTB.X && !LINE_S) || (LINE_VERTA.Y == LINE_VERTB.Y && LINE_S)) begin
+					if ((LINE_VERTA.X == LINE_VERTB.X && !LINE_S) || (LINE_VERTA.Y == LINE_VERTB.Y && LINE_S) || (CMD.CMDCTRL.COMM <= 4'h3 && !CMD.CMDPMOD.ECD && PAT.EC && EC_FIND)) begin
 						NEXT_TEXT_X = '0;
 						NEXT_TEXT_Y = TEXT_Y + TEXT_DY;
 					end
@@ -595,13 +650,14 @@ module VDP1 (
 					TEXT_X <= NEXT_TEXT_X;
 					TEXT_Y <= NEXT_TEXT_Y;
 					
-					if (CMD.CMDCTRL.COMM <= 4'h3 && ((TEXT_X[18:10] & XMASK) != (NEXT_TEXT_X[18:10] & XMASK) || TEXT_Y[18:10] != NEXT_TEXT_Y[18:10])) begin
+					if (CMD.CMDCTRL.COMM <= 4'h3 && ((TEXT_X[19:11] & XMASK) != (NEXT_TEXT_X[19:11] & XMASK) || TEXT_Y[19:11] != NEXT_TEXT_Y[19:11]) && SCLIP) begin
 						SPR_READ <= 1;
 						CMD_ST <= CMDS_SPR_READ;
 					end
-					if ((LINE_VERTA.X == LINE_VERTB.X && !LINE_S) || (LINE_VERTA.Y == LINE_VERTB.Y && LINE_S)) begin
+					if ((LINE_VERTA.X == LINE_VERTB.X && !LINE_S) || (LINE_VERTA.Y == LINE_VERTB.Y && LINE_S) || (CMD.CMDCTRL.COMM <= 4'h3 && !CMD.CMDPMOD.ECD && PAT.EC && EC_FIND)) begin
 						CMD_ST <= CMDS_LINE_NEXT;
 						SPR_READ <= 0;
+						EC_FIND <= 0;
 					end
 				end
 				
@@ -657,7 +713,7 @@ module VDP1 (
 							end
 							POLY_RDY <= NEXT_POLY_RDY;
 							
-							if (LEFT_VERT.X == CMD.CMDXD.COORD) begin
+							if (LEFT_VERT.X == /*CMDXD_CLIP*/CMD.CMDXD.COORD) begin
 								CMD_ST <= CMDS_END;
 							end
 						end else if (POLY_S == 2'b01) begin
@@ -711,7 +767,7 @@ module VDP1 (
 							end
 							POLY_RDY <= NEXT_POLY_RDY;
 							
-							if (RIGHT_VERT.X == CMD.CMDXC.COORD) begin
+							if (RIGHT_VERT.X == /*CMDXC_CLIP*/CMD.CMDXC.COORD) begin
 								CMD_ST <= CMDS_END;
 							end
 						end else begin
@@ -754,13 +810,13 @@ module VDP1 (
 						2'b11: begin CMD_ADDR <= CMD_JRET; end
 					endcase
 					
-					if (CMD.CMDCTRL.END) begin
+					if (CMD.CMDCTRL.END /*|| FRAME_START_PEND*/) begin
 						CMD_ST <= CMDS_IDLE;
 						DBG_CMD_CNT <= '0;
 					end else begin
 						CMD_READ <= 1;
 						CMD_ST <= CMDS_READ;
-						DBG_CMD_CNT <= DBG_CMD_CNT + 1;
+						DBG_CMD_CNT <= DBG_CMD_CNT + 1'd1;
 						DBG_CMD_ADDR_LAST <= CMD_ADDR;
 						DBG_CMD_CMDSRCA_LAST <= CMD.CMDSRCA;
 					end
@@ -768,56 +824,67 @@ module VDP1 (
 			endcase
 		end
 	end
+	
+	assign DBG_START = (CMD_ST == CMDS_IDLE && (FRAME_START /*|| FRAME_START_PEND*/));
+	assign DBG_CMD_END = (CMD_ST == CMDS_END);
+	assign DBG_LINE_OVER = LINE_SX > 11'd200 || LINE_SY > 11'd200;
 		
-	assign TEXT_PAT = !SPR_ADDR[1] ? PAT[31:16] : PAT[15:0];
+	assign TEXT_PAT = SPR_DATA;
 		
 	bit [15:0] ORIG_C;//////
 	always_comb begin
 		bit        TP;
+		bit        EC;
 		bit [15:0] CALC_C;
+		bit        MESH;
 		
-		PAT_C = GetPattern(TEXT_PAT, CMD.CMDPMOD.CM, TEXT_X[11:10] ^ {2{CMD.CMDCTRL.DIR[0]}});
+		PAT = GetPattern(TEXT_PAT, CMD.CMDPMOD.CM, TEXT_X[12:11] ^ {2{CMD.CMDCTRL.DIR[0]}});
 		if (!CMD.CMDCTRL.COMM[2]) begin
 			case (CMD.CMDPMOD.CM)
-				3'b000: ORIG_C = {CMD.CMDCOLR[15:4],PAT_C[3:0]};
+				3'b000: ORIG_C = {CMD.CMDCOLR[15:4],PAT.C[3:0]};
 				3'b001: ORIG_C = CLT_Q;
-				3'b010: ORIG_C = {CMD.CMDCOLR[15:6],PAT_C[5:0]};
-				3'b011: ORIG_C = {CMD.CMDCOLR[15:7],PAT_C[6:0]};
-				3'b100: ORIG_C = {CMD.CMDCOLR[15:8],PAT_C[7:0]};
-				3'b101: ORIG_C = PAT_C;
+				3'b010: ORIG_C = {CMD.CMDCOLR[15:6],PAT.C[5:0]};
+				3'b011: ORIG_C = {CMD.CMDCOLR[15:7],PAT.C[6:0]};
+				3'b100: ORIG_C = {CMD.CMDCOLR[15:8],PAT.C[7:0]};
+				3'b101: ORIG_C = PAT.C;
 				default:ORIG_C = '0;
 			endcase
-			TP = ~|PAT_C;
+			TP = PAT.TP;
+			EC = PAT.EC;
 		end else begin
 			ORIG_C = CMD.CMDCOLR;
-			TP = 1;
+			TP = 0;
+			EC = 0;
 		end
 		CALC_C = ColorCalc(ORIG_C,FB_DRAW_Q,CMD.CMDPMOD.CCB);
 					
 		if (CMD_ST == CMDS_AA_DRAW && (LINE_DIRX^LINE_DIRY)) begin
-			DRAW_X = {1'b0,LOC_COORD.X} + AA_X;
+			DRAW_X = LOC_COORD.X + AA_X;
 		end else begin
-			DRAW_X = {1'b0,LOC_COORD.X} + LINE_VERTA.X;
+			DRAW_X = LOC_COORD.X + LINE_VERTA.X;
 		end
 		if (CMD_ST == CMDS_AA_DRAW && !(LINE_DIRX^LINE_DIRY)) begin
-			DRAW_Y = {2'b00,LOC_COORD.Y} + AA_Y;
+			DRAW_Y = LOC_COORD.Y + AA_Y;
 		end else begin
-			DRAW_Y = {2'b00,LOC_COORD.Y} + LINE_VERTA.Y;
+			DRAW_Y = LOC_COORD.Y + LINE_VERTA.Y;
 		end
 			
-		SCLIP = !DRAW_X[10] && DRAW_X[9:0] <= SYS_CLIP.X2 && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] <= SYS_CLIP.Y2;
-		UCLIP = !DRAW_X[10] && DRAW_X[9:0] >= USR_CLIP.X1 && DRAW_X[9:0] <= USR_CLIP.X2 && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] >= USR_CLIP.Y1 && DRAW_Y[8:0] <= USR_CLIP.Y2;
+		SCLIP = !DRAW_X[10] && DRAW_X[9:0] <= SYS_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] <= SYS_CLIP.Y2[8:0];
+		UCLIP = !DRAW_X[10] && DRAW_X[9:0] >= USR_CLIP.X1[9:0] && DRAW_X[9:0] <= USR_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] >= USR_CLIP.Y1[8:0] && DRAW_Y[8:0] <= USR_CLIP.Y2[8:0];
+		MESH = ~(DRAW_X[0] ^ DRAW_Y[0]);
 		FB_DRAW_A = {DRAW_Y[7:0],DRAW_X[8:0]};
 		FB_DRAW_D = CALC_C;
-		FB_DRAW_WE = (CMD_ST == CMDS_SPR_DRAW || CMD_ST == CMDS_LINE_DRAW || CMD_ST == CMDS_AA_DRAW) & (~TP | CMD.CMDPMOD.SPD) & SCLIP & (UCLIP | ~CMD.CMDPMOD.CLIP);
+		FB_DRAW_WE = (CMD_ST == CMDS_SPR_DRAW || CMD_ST == CMDS_LINE_DRAW || CMD_ST == CMDS_AA_DRAW) & (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & (UCLIP | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH);
 		
-		SPR_ADDR = SprAddr(TEXT_X[18:10],TEXT_Y[18:10],CMD.CMDSIZE,CMD.CMDCTRL.DIR,CMD.CMDSRCA,CMD.CMDPMOD.CM);
+		SPR_ADDR = SprAddr(TEXT_X[19:11],TEXT_Y[19:11],CMD.CMDSIZE,CMD.CMDCTRL.DIR,CMD.CMDSRCA,CMD.CMDPMOD.CM);
 		CLT_ADDR = {CMD.CMDCOLR,2'b00};
-		CLT_RA = PAT_C[3:0];
+		CLT_RA = PAT.C[3:0];
 	end
 	assign ORIG_C_DBG = ORIG_C;
 	assign DRAW_X_DBG = DRAW_X;
 	assign DRAW_Y_DBG = DRAW_Y;
+	
+	assign DBG_DRAW_OVER = DRAW_X[10:8] == 3'b011 || DRAW_X[10:8] == 3'b101 || DRAW_Y[10:8] == 2'b011 || DRAW_Y[10:8] == 3'b101;
 	
 	//FB out
 	bit [8:0] OUT_X;
@@ -837,15 +904,18 @@ module VDP1 (
 			end
 			
 			HTIM_N_OLD <= HTIM_N;
-			if (HTIM_N && !HTIM_N_OLD && VTIM_N) begin
+			if (HTIM_N && !HTIM_N_OLD /*&& VTIM_N*/) begin
 				OUT_X <= '0;
 				OUT_Y <= OUT_Y + 9'd1;
+				if (!VTIM_N) begin
+					OUT_Y <= '0;
+				end
 			end
 			
-			VTIM_N_OLD <= VTIM_N;
-			if (VTIM_N && !VTIM_N_OLD) begin
-				OUT_Y <= '0;
-			end
+//			VTIM_N_OLD <= VTIM_N;
+//			if (VTIM_N && !VTIM_N_OLD) begin
+//				OUT_Y <= '0;
+//			end
 		end
 	end
 	
@@ -859,18 +929,13 @@ module VDP1 (
 	wire CPU_VRAM_SEL = (A[20:19] == 2'b00) & ~DTEN_N & ~AD_N & ~CS_N;	//000000-07FFFF
 	wire CPU_FB_SEL = (A[20:19] == 2'b01) & ~DTEN_N & ~AD_N & ~CS_N;	//080000-0FFFFF
 	bit [18:1] VRAM_LAST_A;
-		bit        IO_DATA_PEND;
-		bit        CLT_DATA_PEND;
-		bit  [3:0] CLT_DATA_POS;
 	always @(posedge CLK or negedge RST_N) begin
-		bit        VRAM_SEL_OLD;
 		bit        CMD_READ_PEND;
 		bit        SPR_READ_PEND;
 		bit        CLT_READ_PEND;
 		bit        LAST_DATA;
 		bit        CMD_DATA_PEND;
 		bit  [3:0] CMD_DATA_POS;
-		bit        PAT_DATA_PEND;
 		bit        VRAM_DRDY_OLD;
 		
 		if (!RST_N) begin
@@ -880,29 +945,37 @@ module VDP1 (
 			VRAM_WE <= '0;
 			VRAM_RD <= 0;
 			VRAM_DONE <= 0;
-			VRAM_ACCESS_PEND <= 0;
 			CMD_READ_PEND <= 0;
 			SPR_READ_PEND <= 0;
 			CLT_READ_PEND <= 0;
-			IO_DATA_PEND <= 0;
 			CMD <= '0;
-		end
-		else  begin
-			VRAM_SEL_OLD <= CPU_VRAM_SEL;
-			if (CPU_VRAM_SEL && !VRAM_SEL_OLD) VRAM_ACCESS_PEND <= 1;
+		end 
+//		else if (FRAME_START) begin
+//			CMD_READ_PEND <= 0;
+//			SPR_READ_PEND <= 0;
+//			CLT_READ_PEND <= 0;
+//			VRAM_WE <= '0;
+//			VRAM_RD <= 0;
+//			CMD_ST <= VS_IDLE;
+		else begin
 			if (CMD_READ && !CMD_READ_PEND) CMD_READ_PEND <= 1;
 			if (SPR_READ && !SPR_READ_PEND) SPR_READ_PEND <= 1;
 			if (CLT_READ && !CLT_READ_PEND) CLT_READ_PEND <= 1;
 			
 			VRAM_DONE <= 0;
+			CLT_WE <= 0;
 			case (VRAM_ST)
 				VS_IDLE: begin
-					if (VRAM_ACCESS_PEND) begin
-//						VRAM_ACCESS_PEND <= 0;
-						VRAM_A <= A[18:1];
-						VRAM_D <= DI;
-						VRAM_WE <= ~WE_N;
-						VRAM_RD <= &WE_N;
+					if (CPU_VRAM_WRITE_PEND) begin
+//						VRAM_A <= IO_VRAM_WA;
+//						VRAM_D <= IO_VRAM_D;
+//						VRAM_WE <= IO_VRAM_WE;
+//						VRAM_RD <= 0;
+						VRAM_ST <= VS_CPU_WRITE;
+					end else if (CPU_VRAM_READ_PEND) begin
+						VRAM_A <= IO_VRAM_RA;
+						VRAM_WE <= '0;
+						VRAM_RD <= 1;
 						VRAM_ST <= VS_CPU_READ;
 					end else if (CMD_READ_PEND) begin
 						CMD_READ_PEND <= 0;
@@ -912,17 +985,11 @@ module VDP1 (
 						VRAM_ST <= VS_CMD_READ;
 					end else if (SPR_READ_PEND) begin
 						SPR_READ_PEND <= 0;
-						PAT_DATA_PEND <= 0;
-						VRAM_A <= {SPR_ADDR[18:2],1'b0};
+						VRAM_A <= SPR_ADDR[18:1];
 						VRAM_WE <= '0;
-//						if (VRAM_A[18:2] != SPR_ADDR[18:2]) begin
-							VRAM_RD <= 1;
-							VRAM_ST <= VS_PAT_READ;
-//						end else begin
-//							VRAM_DONE <= 1;
-//						end
+						VRAM_RD <= 1;
+						VRAM_ST <= VS_PAT_READ;
 					end else if (CLT_READ_PEND) begin
-						CLT_DATA_PEND <= 0;
 						CLT_READ_PEND <= 0;
 						VRAM_A <= CLT_ADDR;
 						VRAM_WE <= '0;
@@ -931,113 +998,170 @@ module VDP1 (
 					end
 				end
 				
-				VS_CPU_READ: begin
-					if (VRAM_ARDY) begin
-						VRAM_WE <= '0;
+				VS_CPU_WRITE: begin
+					if (CPU_VRAM_WRITE_PEND) begin
+						VRAM_A <= IO_VRAM_WA;
+						VRAM_D <= IO_VRAM_D;
+						VRAM_WE <= IO_VRAM_WE;
 						VRAM_RD <= 0;
-						VRAM_ACCESS_PEND <= 0;
-						IO_DATA_PEND <= 1;
+						VRAM_ST <= VS_CPU_WRITE_END;
+					end
+				end
+				
+				VS_CPU_WRITE_END: begin
+					if (VRAM_DRDY) begin
+						VRAM_WE <= '0;
+						if (BURST && !AD_N) begin
+							VRAM_ST <= VS_CPU_WRITE;
+						end else 
+							VRAM_ST <= VS_IDLE;
+					end
+				end
+				
+				VS_CPU_READ: begin
+					VRAM_ST <= VS_CPU_READ_END;
+				end
+				
+				VS_CPU_READ_END: begin
+					if (VRAM_DRDY) begin
+						IO_VRAM_DO <= VRAM_Q[31:16];
+						VRAM_RD <= 0;
 						VRAM_ST <= VS_IDLE;
 					end
 				end
 					
 				VS_CMD_READ: begin
-					if (VRAM_ARDY && !CMD_DATA_PEND) begin
-						VRAM_A <= VRAM_A + 18'd2;
+					VRAM_RD <= 0;
+					VRAM_ST <= VS_CMD_END;
+				end
+				
+				VS_CMD_END: begin
+					if (FRAME_START) begin
+						VRAM_RD <= 0;
+						VRAM_ST <= VS_IDLE;
+					end else if (VRAM_DRDY) begin
+						case (VRAM_A[4:1])
+							4'h0: CMD.CMDCTRL <= VRAM_Q[31:16];
+							4'h1: CMD.CMDLINK <= VRAM_Q[31:16];
+							4'h2: CMD.CMDPMOD <= VRAM_Q[31:16];
+							4'h3: CMD.CMDCOLR <= VRAM_Q[31:16];
+							4'h4: CMD.CMDSRCA <= VRAM_Q[31:16];
+							4'h5: CMD.CMDSIZE <= VRAM_Q[31:16];
+							4'h6: CMD.CMDXA <= VRAM_Q[31:16];
+							4'h7: CMD.CMDYA <= VRAM_Q[31:16];
+							4'h8: CMD.CMDXB <= VRAM_Q[31:16];
+							4'h9: CMD.CMDYB <= VRAM_Q[31:16];
+							4'hA: CMD.CMDXC <= VRAM_Q[31:16];
+							4'hB: CMD.CMDYC <= VRAM_Q[31:16];
+							4'hC: CMD.CMDXD <= VRAM_Q[31:16];
+							4'hD: CMD.CMDYD <= VRAM_Q[31:16];
+							4'hE: CMD.CMDGRDA <= VRAM_Q[31:16];
+						endcase
+						VRAM_A <= VRAM_A + 18'd1;
+						VRAM_RD <= 1;
+						VRAM_ST <= VS_CMD_READ;
 						if ({VRAM_A[4:1],1'b0} == 5'h1C) begin
-							LAST_DATA <= 1;
 							VRAM_RD <= 0;
+							VRAM_DONE <= 1;
 							VRAM_ST <= VS_IDLE;
 						end
-						CMD_DATA_POS <= VRAM_A[4:1];
-						CMD_DATA_PEND <= 1;
 					end
 				end
 				
 				VS_CLT_READ: begin
-					if (VRAM_ARDY && !CLT_DATA_PEND) begin
-						VRAM_A <= VRAM_A + 18'd2;
-						if ({VRAM_A[4:1],1'b0} == 5'h1C) begin
-							LAST_DATA <= 1;
+					VRAM_ST <= VS_CLT_END;
+					VRAM_RD <= 0;
+				end
+				
+				VS_CLT_END: begin
+					if (FRAME_START) begin
+						VRAM_RD <= 0;
+						VRAM_ST <= VS_IDLE;
+					end else if (VRAM_DRDY) begin
+						VRAM_A <= VRAM_A + 18'd1;
+						VRAM_RD <= 1;
+						VRAM_ST <= VS_CLT_READ;
+						if ({VRAM_A[4:1],1'b0} == 5'h1E) begin
 							VRAM_RD <= 0;
+							VRAM_DONE <= 1;
 							VRAM_ST <= VS_IDLE;
 						end
-						CLT_DATA_POS <= VRAM_A[4:1];
-						CLT_DATA_PEND <= 1;
+						CLT_WA <= VRAM_A[4:1];
+						CLT_D <= VRAM_Q[31:16];
+						CLT_WE <= 1;
 					end
 				end
 				
 				VS_PAT_READ: begin
-					if (VRAM_ARDY && !PAT_DATA_PEND) begin
+					VRAM_RD <= 0;
+					VRAM_ST <= VS_PAT_END;
+				end
+				
+				VS_PAT_END: begin
+					if (FRAME_START) begin
+						VRAM_WE <= '0;
 						VRAM_RD <= 0;
-						PAT_DATA_PEND <= 1;
-						LAST_DATA <= 1;
+						VRAM_ST <= VS_IDLE;
+					end else if (VRAM_DRDY) begin
+						SPR_DATA <= VRAM_Q[31:16];
+						VRAM_RD <= 0;
+						VRAM_DONE <= 1;
 						VRAM_ST <= VS_IDLE;
 					end
 				end
 			endcase
 			
-			VRAM_DRDY_OLD <= VRAM_DRDY;
-			if (VRAM_DRDY && !VRAM_DRDY_OLD) begin
-				if (IO_DATA_PEND) begin
-					IO_VRAM_DO <= VRAM_Q[31:16];
-					IO_DATA_PEND <= 0;
-				end else if (CMD_DATA_PEND) begin
-					case ({CMD_DATA_POS[3:1],1'b0})
-						4'h0: {CMD.CMDCTRL,CMD.CMDLINK} <= VRAM_Q;
-						4'h2: {CMD.CMDPMOD,CMD.CMDCOLR} <= VRAM_Q;
-						4'h4: {CMD.CMDSRCA,CMD.CMDSIZE} <= VRAM_Q;
-						4'h6: {CMD.CMDXA,CMD.CMDYA} <= VRAM_Q;
-						4'h8: {CMD.CMDXB,CMD.CMDYB} <= VRAM_Q;
-						4'hA: {CMD.CMDXC,CMD.CMDYC} <= VRAM_Q;
-						4'hC: {CMD.CMDXD,CMD.CMDYD} <= VRAM_Q;
-						4'hE: CMD.CMDGRDA <= VRAM_Q[31:16];
-					endcase
-					CMD_DATA_PEND <= 0;
-					VRAM_DONE <= LAST_DATA;
-					LAST_DATA <= 0;
-				end else if (CLT_DATA_PEND) begin
-					CLT_DATA_PEND <= 0;
-					VRAM_DONE <= LAST_DATA;
-					LAST_DATA <= 0;
-				end else if (PAT_DATA_PEND) begin
-					PAT <= VRAM_Q;
-					PAT_DATA_PEND <= 0;
-					VRAM_DONE <= LAST_DATA;
-					LAST_DATA <= 0;
-				end
-			end
-			
-			if (FRAME_START) begin
-				CMD_READ_PEND <= 0;
-				SPR_READ_PEND <= 0;
-				CLT_READ_PEND <= 0;
-				VRAM_ST <= VS_IDLE;
-			end
+//			if (FRAME_START) begin
+//				CMD_READ_PEND <= 0;
+//				SPR_READ_PEND <= 0;
+//				CLT_READ_PEND <= 0;
+//			end
 		end
 	end
 	
-	assign CLT_WA = CLT_DATA_POS[3:1];
-	assign CLT_D = VRAM_Q;
-	assign CLT_WE = (CLT_DATA_PEND && VRAM_DRDY);
 	COL_TBL CLT(.CLK(CLK), .WRADDR(CLT_WA), .DATA(CLT_D), .WREN(CLT_WE), .RDADDR(CLT_RA), .Q(CLT_Q));
 
-
-	bit CPU_VRAM_RDY;
 	always @(posedge CLK or negedge RST_N) begin
 		bit VRAM_SEL_OLD;
-		bit IO_PEND_OLD;
 		
 		if (!RST_N) begin
-			CPU_VRAM_RDY <= 1;
+			CPU_VRAM_RRDY <= 1;
+			CPU_VRAM_WRDY <= 1;
+			CPU_VRAM_READ_PEND <= 0;
+			CPU_VRAM_WRITE_PEND <= 0;
 		end
 		else begin
 			VRAM_SEL_OLD <= CPU_VRAM_SEL;
-			IO_PEND_OLD <= IO_DATA_PEND;
-			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && CPU_VRAM_RDY) 
-				CPU_VRAM_RDY <= 0;
-			else if (!IO_DATA_PEND && IO_PEND_OLD && !CPU_VRAM_RDY) 
-				CPU_VRAM_RDY <= 1;
+			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && WE_N && !CPU_VRAM_READ_PEND) begin
+				IO_VRAM_RA <= A[18:1];
+				CPU_VRAM_READ_PEND <= 1;
+			end else if (VRAM_ST == VS_CPU_READ_END && VRAM_DRDY && !VRAM_WE && CPU_VRAM_READ_PEND && !CPU_VRAM_WRITE_PEND) begin
+				CPU_VRAM_READ_PEND <= 0;
+			end
+			
+			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && WE_N && CPU_VRAM_RRDY) begin
+				CPU_VRAM_RRDY <= 0;
+			end else if (VRAM_ST == VS_CPU_READ_END && VRAM_DRDY && !VRAM_WE && !CPU_VRAM_RRDY) begin
+				CPU_VRAM_RRDY <= 1;
+			end
+			
+			if (CPU_VRAM_SEL && !WE_N && !CPU_VRAM_WRITE_PEND && !CPU_VRAM_READ_PEND && CE_R) begin
+				IO_VRAM_WA <= A[18:1];
+				IO_VRAM_D <= DI;
+				IO_VRAM_WE <= ~{2{WE_N}} & ~DQM;
+				CPU_VRAM_WRITE_PEND <= 1;
+			end else if (VRAM_ST == VS_CPU_WRITE && CPU_VRAM_WRITE_PEND) begin
+				CPU_VRAM_WRITE_PEND <= 0;
+			end
+			
+			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && !WE_N && CPU_VRAM_WRDY && CPU_VRAM_WRITE_PEND && CE_F) begin
+				CPU_VRAM_WRDY <= 0;
+			end else if (VRAM_ST == VS_CPU_WRITE && !CPU_VRAM_WRDY) begin
+				CPU_VRAM_WRDY <= 1;
+			end
+			
+//			if (!CPU_VRAM_RDY) CPU_VRAM_RDY_CNT <= CPU_VRAM_RDY_CNT + 1'd1;
+//			else CPU_VRAM_RDY_CNT <= '0;
 		end
 	end
 
@@ -1061,9 +1185,13 @@ module VDP1 (
 			EWLR <= 16'h0000;
 			EWRR <= 16'h4EFF;
 			EDSR <= '0;
+			IRQ_N <= 1;
 			
 			REG_DO <= '0;
 			A <= '0;
+			WE_N <= 1;
+			DQM <= '1;
+			BURST <= 0;
 			
 			FRAME_ERASECHANGE_PEND <= 0;
 			DRAW_TERMINATE <= 0;
@@ -1075,13 +1203,24 @@ module VDP1 (
 				
 		end else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
-				A <= {A[4:0],DI};
+				if (!DI[15]) begin
+					A[20:9] <= DI[11:0];
+					WE_N <= DI[14];
+					BURST <= DI[13];
+				end else begin
+					A[8:1] <= DI[7:0];
+					DQM <= DI[13:12];
+				end
+			end else if (!CS_N && !DTEN_N && !AD_N && BURST && CE_R) begin
+				if ((CPU_VRAM_SEL && CPU_VRAM_RRDY && CPU_VRAM_WRDY) || CPU_FB_SEL || REG_SEL) begin
+					A <= A + 20'd1;
+				end
 			end
 			
 			START_DRAW_PEND <= 0;
 			DRAW_TERMINATE <= 0;
 			if (REG_SEL) begin
-				if (!(&WE_N) && CE_R) begin
+				if (!WE_N && CE_R) begin
 					case ({A[5:1],1'b0})
 						5'h00: TVMR <= DI & TVMR_MASK;
 						5'h02: FBCR <= DI & FBCR_MASK;
@@ -1140,16 +1279,19 @@ module VDP1 (
 			end
 			
 			
-			if (CMD_ST == CMDS_END && CMD.CMDCTRL.END && !EDSR.CEF) begin
+			if (CMD_ST == CMDS_END && CMD.CMDCTRL.END /*&& !EDSR.CEF*/) begin
 				EDSR.CEF <= 1;
+				IRQ_N <= 0;
 //				FRAMES_DBG <= 16'd0;
 			end
+			
+			if (!IRQ_N && CE_R) IRQ_N <= 1;
 		end
 	end
 	
 	assign DO = REG_SEL ? REG_DO : IO_VRAM_DO;
-	assign RDY_N = ~((CPU_VRAM_SEL & CPU_VRAM_RDY) | CPU_FB_SEL | REG_SEL);
+	assign RDY_N = ~((CPU_VRAM_SEL & CPU_VRAM_RRDY & CPU_VRAM_WRDY) | CPU_FB_SEL | REG_SEL);
 	
-	assign IRQ_N = ~EDSR.CEF;
+//	assign IRQ_N = ~EDSR.CEF;
 	
 endmodule

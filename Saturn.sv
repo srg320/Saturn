@@ -114,6 +114,10 @@ module Saturn (
 	input             DBG_PAUSE,
 	input             DBG_BREAK,
 	input             DBG_RUN,
+	input             H320_END_INC,
+	input             H320_END_DEC,
+	input             H352_END_INC,
+	input             H352_END_DEC,
 	
 	output      [7:0] DBG_WAIT_CNT,
 	output reg        DBG_HOOK
@@ -755,7 +759,11 @@ module Saturn (
 		.HRES(HRES),
 		.VRES(VRES),
 		
-		.SCRN_EN(SCRN_EN)
+		.SCRN_EN(SCRN_EN),
+		.H320_END_INC(H320_END_INC),
+		.H320_END_DEC(H320_END_DEC),
+		.H352_END_INC(H352_END_INC),
+		.H352_END_DEC(H352_END_DEC)
 	);
 	
 	

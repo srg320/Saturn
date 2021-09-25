@@ -42,15 +42,15 @@ module VDP1_DIV (
 	quotient,
 	remain);
 
-	input	[9:0]  denom;
-	input	[19:0]  numer;
-	output	[19:0]  quotient;
-	output	[9:0]  remain;
+	input	[10:0]  denom;
+	input	[21:0]  numer;
+	output	[21:0]  quotient;
+	output	[10:0]  remain;
 
-	wire [19:0] sub_wire0;
-	wire [9:0] sub_wire1;
-	wire [19:0] quotient = sub_wire0[19:0];
-	wire [9:0] remain = sub_wire1[9:0];
+	wire [21:0] sub_wire0;
+	wire [10:0] sub_wire1;
+	wire [21:0] quotient = sub_wire0[21:0];
+	wire [10:0] remain = sub_wire1[10:0];
 
 	lpm_divide	LPM_DIVIDE_component (
 				.denom (denom),
@@ -65,8 +65,8 @@ module VDP1_DIV (
 		LPM_DIVIDE_component.lpm_hint = "LPM_REMAINDERPOSITIVE=TRUE",
 		LPM_DIVIDE_component.lpm_nrepresentation = "UNSIGNED",
 		LPM_DIVIDE_component.lpm_type = "LPM_DIVIDE",
-		LPM_DIVIDE_component.lpm_widthd = 10,
-		LPM_DIVIDE_component.lpm_widthn = 20;
+		LPM_DIVIDE_component.lpm_widthd = 11,
+		LPM_DIVIDE_component.lpm_widthn = 22;
 
 
 endmodule

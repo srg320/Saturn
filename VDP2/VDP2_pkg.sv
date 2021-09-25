@@ -1445,7 +1445,7 @@ package VDP2_PKG;
 		S[1].ON = REGS.BGON.R1ON;
 		
 		S[0].TPON = REGS.BGON.R0TPON;
-		S[1].TPON = 0;
+		S[1].TPON = REGS.BGON.N0TPON;
 		
 		S[0].CAOS = REGS.CRAOFB.R0CAOS;
 		S[1].CAOS = REGS.CRAOFA.N0CAOS;
@@ -1580,11 +1580,9 @@ package VDP2_PKG;
 		bit   [6:2] RPA_POS;
 		bit         BS;
 		bit         LN;
-		bit [16: 1] VRAMA0_A; 
-		bit [16: 1] VRAMA1_A; 
-		bit [16: 1] VRAMB0_A; 
-		bit [16: 1] VRAMB1_A;
-		NxCHCNT_t   NxCH_CNT;
+		bit         RBG;
+		bit         W0_HIT; 
+		bit         W1_HIT;
 	} VRAMAccessState_t;
 	typedef VRAMAccessState_t VRAMAccessPipeline_t [5];
 	
@@ -2100,7 +2098,7 @@ package VDP2_PKG;
 		bit    log_and, log_or;
 
 		case ({SWE,W1E,W0E})
-		3'b000: begin log_and = 1'b1  & 1'b1  & 1'b1 ; log_or = 1'b1  | 1'b1  | 1'b1 ; end
+		3'b000: begin log_and = 1'b0  & 1'b0  & 1'b0 ; log_or = 1'b0  | 1'b0  | 1'b0 ; end
 		3'b001: begin log_and = 1'b1  & 1'b1  & W0HIT; log_or = 1'b0  | 1'b0  | W0HIT; end
 		3'b010: begin log_and = 1'b1  & W1HIT & 1'b1 ; log_or = 1'b0  | W1HIT | 1'b0 ; end
 		3'b011: begin log_and = 1'b1  & W1HIT & W0HIT; log_or = 1'b0  | W1HIT | W0HIT; end

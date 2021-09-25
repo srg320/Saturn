@@ -165,19 +165,19 @@ package VDP1_PKG;
 	
 	typedef struct packed
 	{
-		bit [ 9: 0] X1;
-		bit [ 8: 0] Y1;
-		bit [ 9: 0] X2;
-		bit [ 8: 0] Y2;
+		bit [10: 0] X1;
+		bit [10: 0] Y1;
+		bit [10: 0] X2;
+		bit [10: 0] Y2;
 	} Clip_t;
-	parameter Clip_t CLIP_NULL = {10'h000,9'h000,10'h000,9'h000};
+	parameter Clip_t CLIP_NULL = {11'h000,11'h000,11'h000,11'h000};
 	
 	typedef struct packed
 	{
-		bit [ 9: 0] X;
-		bit [ 8: 0] Y;
+		bit [10: 0] X;
+		bit [10: 0] Y;
 	} Coord_t;
-	parameter Coord_t COORD_NULL = {10'h000,9'h000};
+	parameter Coord_t COORD_NULL = {11'h000,11'h000};
 	
 	typedef struct packed
 	{
@@ -213,7 +213,42 @@ package VDP1_PKG;
 		return ADDR;
 	endfunction
 	
-	function bit [15:0] GetPattern(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
+	typedef struct packed
+	{
+		bit [15: 0] C;
+		bit         TP;
+		bit         EC;
+	} Pattern_t;
+	parameter Pattern_t PATTERN_NULL = {16'h0000,1'b0,1'b0};
+	
+	function Pattern_t GetPattern(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
+		bit [15:0] C;
+		bit        TP;
+		bit        EC;
+		
+		case (CM)
+			3'b000,
+			3'b001:
+				case (OFFSX)
+					2'b00: begin C = {12'h000,DATA[15:12]}; TP = ~|DATA[15:12]; EC = &DATA[15:12]; end
+					2'b01: begin C = {12'h000,DATA[11: 8]}; TP = ~|DATA[11: 8]; EC = &DATA[11: 8]; end
+					2'b10: begin C = {12'h000,DATA[ 7: 4]}; TP = ~|DATA[ 7: 4]; EC = &DATA[ 7: 4]; end
+					2'b11: begin C = {12'h000,DATA[ 3: 0]}; TP = ~|DATA[ 3: 0]; EC = &DATA[ 3: 0]; end
+				endcase
+			3'b010,
+			3'b011,
+			3'b100:
+				case (OFFSX[0])
+					1'b0: begin C = {8'h00,DATA[15: 8]}; TP = ~|DATA[15: 8]; EC = &DATA[15: 8]; end
+					1'b1: begin C = {8'h00,DATA[ 7: 0]}; TP = ~|DATA[ 7: 0]; EC = &DATA[ 7: 0]; end
+				endcase
+			default: begin C = DATA; TP = ~|DATA; EC = DATA == 16'h7FFF; end
+		endcase
+
+		return {C,TP,EC};
+	endfunction
+	
+	function bit [15:0] GetEC(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
 		bit [15:0] P;
 		
 		case (CM)
@@ -294,8 +329,11 @@ package VDP1_PKG;
 	endfunction
 
 	
-	function bit [10:0] Abs(input bit [10:0] C);
-		return $signed(C) >= 0 ? $signed(C) : -$signed(C);
+	function bit [10:0] Abs(input bit [11:0] C);
+		bit [11:0] abs; 
+		
+		abs = $signed(C) >= 0 ? $signed(C) : -$signed(C);
+		return abs[10:0];
 	endfunction
 	
 endpackage

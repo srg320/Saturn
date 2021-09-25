@@ -13,7 +13,7 @@ module VDP2 (
 	input             CS_N,
 	input             AD_N,
 	input             DTEN_N,
-	input       [1:0] WE_N,
+//	input       [1:0] WE_N,
 	output            RDY_N,
 	
 	output            VINT_N,
@@ -22,6 +22,8 @@ module VDP2 (
 	output            HTIM_N,
 	output            VTIM_N,
 	input      [15:0] FBD,
+	
+	input             PAL,
 	
 	output     [16:1] RA0_A,
 	output     [15:0] RA0_D,
@@ -56,7 +58,16 @@ module VDP2 (
 	output reg        HBL_N,
 	output reg        VBL_N,
 	
+	output            FIELD,
+	output            INTERLACE,
+	output      [1:0] HRES,
+	output      [1:0] VRES,
+	
 	input       [5:0] SCRN_EN,
+	input             H320_END_INC,
+	input             H320_END_DEC,
+	input             H352_END_INC,
+	input             H352_END_DEC,
 	
 	output VRAMAccessState_t VA_PIPE0,
 	output NVRAMAccess_t NBG_A0VA_DBG,
@@ -84,16 +95,21 @@ module VDP2 (
 	//H 427/455
 	//V 263/313
 	parameter HRES_320  = 9'd427;
-	parameter HRES_352  = 9'd427;//
+	parameter HRES_352  = 9'd455;//
 	parameter HS_START  = 9'd369;
 	parameter HS_END    = HS_START + 9'd32;
-	parameter HBL_START = 9'd320;
+	parameter HBL_START_320 = 9'd312;
+	parameter HBL_START_352 = 9'd344;
+//	parameter HBL_END_320 = 9'd415 - 9'd1;//9'd410;
+//	parameter HBL_END_352 = 9'd443 - 9'd1;//9'd442;
 	parameter VRES_NTSC = 9'd263;
 	parameter VRES_PAL  = 9'd313;
 	parameter VS_START_224  = 9'd235;
 	parameter VS_START_240  = 9'd251;//?
+	parameter VS_START_256  = 9'd251;//?
 	parameter VS_END_224    = VS_START_224 + 9'd3;
 	parameter VS_END_240    = VS_START_240 + 9'd3;
+	parameter VS_END_256    = VS_START_256 + 9'd3;
 	parameter VBL_START_224 = 9'd224;
 	parameter VBL_START_240 = 9'd240;
 	parameter VBL_START_256 = 9'd256;
@@ -102,14 +118,25 @@ module VDP2 (
 	
 	wire VRAM_SEL = ~A[20] & ~DTEN_N & ~AD_N & ~CS_N;	//000000-0FFFFF
 	
-	bit [19:0] VRAM_A[2];
+	bit [19:1] VRAM_A[2];
+	bit [19:1] VRAM_RA;
 	bit [15:0] VRAM_DI[2];
 	bit  [1:0] VRAM_WE[2];
 	bit        VRAM_WRITE_SLOT;
 	bit        VRAM_WRITE_PEND[2];
 	bit        VRAM_READ_PEND;
 	
-	bit DOT_CE,DOTH_CE;
+	wire VRAMA0_WRITE = (VRAM_A[0][18:17] == 2'b00);
+	wire VRAMA1_WRITE = (VRAM_A[0][18:17] == 2'b01);
+	wire VRAMB0_WRITE = (VRAM_A[0][18:17] == 2'b10);
+	wire VRAMB1_WRITE = (VRAM_A[0][18:17] == 2'b11);
+	wire VRAMA0_READ = (VRAM_RA[18:17] == 2'b00);
+	wire VRAMA1_READ = (VRAM_RA[18:17] == 2'b01);
+	wire VRAMB0_READ = (VRAM_RA[18:17] == 2'b10);
+	wire VRAMB1_READ = (VRAM_RA[18:17] == 2'b11);
+	
+	
+	bit DOT_CE_R,DOT_CE_F;
 	bit [8:0] H_CNT, V_CNT;
 	bit [8:0] SCRX, SCRY;
 	VRAMAccessPipeline_t VA_PIPE;
@@ -152,20 +179,49 @@ module VDP2 (
 			DOTCLK_DIV <= DOTCLK_DIV + 3'd1;
 		end
 	end
-	assign DOT_CE = (DOTCLK_DIV == 7);
-	assign DOTH_CE = (DOTCLK_DIV == 3);
+	assign DOT_CE_R = (DOTCLK_DIV == 7);
+	assign DOT_CE_F = (DOTCLK_DIV == 3);
 	
-	assign DCLK = DOT_CE;
+	assign DCLK = DOT_CE_R /*| DOT_CE_F*/;
+	
+	bit [8:0] HBL_END_320,HBL_END_352;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			HBL_END_320 <= 9'd5;
+			HBL_END_352 <= 9'd5;
+		end else begin
+			if (H320_END_INC) begin
+				HBL_END_320 <= HBL_END_320 + 9'd1;
+				if (HBL_END_320 == 9'd427 - 9'd1) HBL_END_320 <= 9'd0;
+			end
+			if (H320_END_DEC) begin
+				HBL_END_320 <= HBL_END_320 - 9'd1;
+				if (HBL_END_320 == 9'd0) HBL_END_320 <= 9'd427 - 9'd1;
+			end
+			
+			if (H352_END_INC) begin
+				HBL_END_352 <= HBL_END_352 + 9'd1;
+				if (HBL_END_352 == 9'd455 - 9'd1) HBL_END_352 <= 9'd0;
+			end
+			if (H352_END_DEC) begin
+				HBL_END_352 <= HBL_END_352 - 9'd1;
+				if (HBL_END_352 == 9'd0) HBL_END_352 <= 9'd455 - 9'd1;
+			end
+		end
+	end
 	
 	wire LAST_DOT = (H_CNT == HRES_320 - 1 && !REGS.TVMD.HRESO[0]) || (H_CNT == HRES_352 - 1 && REGS.TVMD.HRESO[0]);
-	wire PRELAST_DOT = (H_CNT == HRES_320 - 2);
-	wire [8:0] VBL_START = //REGS.TVMD.VRESO[1]       ? VBL_START_256 :
+	wire PRELAST_DOT = (H_CNT == HRES_320 - 2 && !REGS.TVMD.HRESO[0]) || (H_CNT == HRES_352 - 2 && REGS.TVMD.HRESO[0]);
+	wire [8:0] HBL_START = !REGS.TVMD.HRESO[0] ? HBL_START_320 : HBL_START_352;
+	wire [8:0] HBL_END = !REGS.TVMD.HRESO[0] ? HBL_END_320 : HBL_END_352;
+	wire [8:0] HDISP_END = !REGS.TVMD.HRESO[0] ? 9'd320 - 9'd1 : 9'd352 - 9'd1;
+	wire [8:0] VBL_START = REGS.TVMD.VRESO == 2'b10 ? VBL_START_256 :
 	                       REGS.TVMD.VRESO == 2'b01 ? VBL_START_240 :
 								  VBL_START_224;
-	wire [8:0] VS_START  = //REGS.TVMD.VRESO[1]       ? VS_START_256 :
+	wire [8:0] VS_START  = REGS.TVMD.VRESO == 2'b10 ? VS_START_256 :
 	                       REGS.TVMD.VRESO == 2'b01 ? VS_START_240 :
 								  VS_START_224;
-	wire [8:0] VS_END    = //REGS.TVMD.VRESO[1]       ? VS_END_256 :
+	wire [8:0] VS_END    = REGS.TVMD.VRESO == 2'b10 ? VS_END_256 :
 	                       REGS.TVMD.VRESO == 2'b01 ? VS_END_240 :
 								  VS_END_224;						  
 	wire LAST_LINE = (V_CNT == VRES_NTSC - 1);
@@ -173,17 +229,22 @@ module VDP2 (
 	bit VBLANK;
 	bit HBLANK;
 	bit ODD;
+	bit VSYNC;
+	bit HSYNC;
 	always @(posedge CLK or negedge RST_N) begin
+		bit [8:0] HDISP_CNT;
+		
 		if (!RST_N) begin
 			H_CNT <= '0;
 			V_CNT <= '0;
-			HS_N <= 1;
-			VS_N <= 1;
+			HSYNC <= 0;
+			VSYNC <= 0;
 			HBLANK <= 0;
 			VBLANK <= 0;
 			ODD <= 0;
+			HDISP_CNT <= '0;
 		end
-		else if (DOT_CE) begin
+		else if (DOT_CE_R) begin
 			H_CNT <= H_CNT + 9'd1;
 			if (LAST_DOT) begin
 				H_CNT <= '0;
@@ -194,96 +255,155 @@ module VDP2 (
 			end
 			
 			if (H_CNT == HS_START - 1) begin
-				HS_N <= 0;
+				HSYNC <= 1;
 			end else if (H_CNT == HS_END - 1) begin
-				HS_N <= 1;
+				HSYNC <= 0;
 			end
 			
-			if (H_CNT == HBL_START - 1 + 9'd36) begin
-				HBLANK <= 1;
-				if (V_CNT == VS_START - 1) begin
-					VS_N <= 0;
-				end else if (V_CNT == VS_END - 1) begin
-					VS_N <= 1;
-				end
-				if (V_CNT == VBL_START - 1) begin
-					VBLANK <= 1;
-				end else if (V_CNT == VRES_NTSC - 1) begin
-					VBLANK <= 0;
-					ODD <= ~ODD;
-				end
-			end else if (H_CNT == 9'd36 - 1) begin
+			HDISP_CNT <= HDISP_CNT + 9'd1;
+			if (H_CNT == HBL_END - 1) begin
 				HBLANK <= 0;
+				HDISP_CNT <= '0;
+			end else if (HDISP_CNT == HDISP_END) begin
+				HBLANK <= 1;
+			end
+			
+			if (H_CNT == 9'd352) begin
+				if (V_CNT == VS_START - 1) begin
+					VSYNC <= 1;
+				end else if (V_CNT == VS_END - 1) begin
+					VSYNC <= 0;
+				end
+			end
+			
+			if (LAST_DOT && V_CNT == VBL_START - 1) begin
+				VBLANK <= 1;
+			end else if (H_CNT == 9'h180 && V_CNT == VRES_NTSC - 1) begin
+				VBLANK <= 0;
+				ODD <= ~ODD;
 			end
 		end
 	end
 	assign VBL_N = ~VBLANK;
 	assign HBL_N = ~HBLANK;
+	assign VS_N = ~VSYNC;
+	assign HS_N = ~HSYNC;
+	assign FIELD = ODD;
+	assign INTERLACE = 0;
+	assign HRES = REGS.TVMD.HRESO[1:0];
+	assign VRES = REGS.TVMD.VRESO[1:0];
 	
-	assign REGS.HCNT.HCT = {H_CNT,1'b0};
-	assign REGS.VCNT.VCT = {V_CNT,1'b0};
-	
+	bit VINT;
+	bit HINT;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			HTIM_N <= 1;
+			VINT <= 0;
+			HINT <= 0;
 		end
-		else if (DOT_CE) begin
-			if (H_CNT == 9'h1A1) begin
-				HTIM_N <= 0;
-			end else if (H_CNT == 9'h020 - 1) begin
-				HTIM_N <= 1;
+		else if (DOT_CE_R) begin
+			if (H_CNT == 9'd311) begin
+				HINT <= 1;
+			end else if (LAST_DOT) begin
+				HINT <= 0;
+			end
+			
+			if (H_CNT == 9'd346) begin
+				if (V_CNT == VBL_START - 1) begin
+					VINT <= 1;
+				end else if (V_CNT == VRES_NTSC - 2) begin
+					VINT <= 0;
+				end
 			end
 		end
 	end
+	assign VINT_N = ~VINT;
+	assign HINT_N = ~HINT;
+	
+	wire HTIM_END = (H_CNT == HRES_320 - 9'd8 && !REGS.TVMD.HRESO[0]) || (H_CNT == HRES_352 - 9'd8 && REGS.TVMD.HRESO[0]);
+	bit VTIM;
+	bit HTIM;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			HTIM <= 0;
+		end
+		else if (DOT_CE_R) begin
+			if (H_CNT == 9'h18B) begin
+				HTIM <= 1;
+			end else if (H_CNT == HTIM_END) begin///////////////////
+				HTIM <= 0;
+			end
+		end
+//		else if (DOT_CE_F) begin
+//			if (H_CNT == 9'h18B) begin
+//				HTIM <= 1;
+//			end else if (H_CNT == 9'h1A2) begin
+//				HTIM <= 0;
+//			end
+//		end
+	end
 	assign VTIM_N = ~VBLANK;
+	assign HTIM_N = ~HTIM;
 	
 	
-	bit BG_FETCH;
+	wire [8:0] NBG_FETCH_START = !REGS.TVMD.HRESO[0] ? 9'h195 : 9'h1B1;
+	wire [8:0] NBG_FETCH_END = !REGS.TVMD.HRESO[0] ? 9'h131 : 9'h151;
+	wire [8:0] RBG_FETCH_START = !REGS.TVMD.HRESO[0] ? 9'h195 + 9'h010 : 9'h1B1 + 9'h010;
+	wire [8:0] RBG_FETCH_END = !REGS.TVMD.HRESO[0] ? 9'h131 + 9'h010 : 9'h151 + 9'h010;
+	
+	bit NBG_FETCH;
 	bit RBG_FETCH;
+	bit RBG_PREFETCH;
 	bit SCRL_FETCH;
 	bit RPA_FETCH;
 	bit BACK_FETCH;
 	bit LN_FETCH;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			BG_FETCH <= 0;
+			NBG_FETCH <= 0;
 			RBG_FETCH <= 0;
+			RBG_PREFETCH <= 0;
 			SCRL_FETCH <= 0;
 			RPA_FETCH <= 0;
 			BACK_FETCH <= 0;
 		end
-		else if (DOT_CE) begin
-			if (H_CNT == HRES_320 - 1 && !VBLANK) begin
-				BG_FETCH <= 1;
-			end else if (H_CNT == 9'h148 - 1) begin
-				BG_FETCH <= 0;
+		else if (DOT_CE_R) begin
+			SCRX <= SCRX + 1'd1;
+			if (H_CNT == NBG_FETCH_START - 1 && !VBLANK) begin
+				NBG_FETCH <= 1;
+				SCRX <= '0;
+			end else if (H_CNT == NBG_FETCH_END) begin
+				NBG_FETCH <= 0;
 			end
 			
-			if (H_CNT == 9'h010 - 1 && !VBLANK) begin
+			RBG_PREFETCH <= 0;
+			if (H_CNT == RBG_FETCH_START - (3 + 1) /*&& !VBLANK*/) begin
+				RBG_PREFETCH <= 1;
+			end
+			if (H_CNT == RBG_FETCH_START - 1 && !VBLANK) begin
 				RBG_FETCH <= 1;
-			end else if (H_CNT == 9'h158 - 1) begin
+			end else if (H_CNT == RBG_FETCH_END) begin
 				RBG_FETCH <= 0;
 			end
 			
-			if (H_CNT == 9'h197 - 1 && !VBLANK) begin
-				SCRL_FETCH <= 1;
-			end else if (H_CNT == 9'h19C) begin
-				SCRL_FETCH <= 0;
-			end
-			
-			if (H_CNT == 9'h17F - 1 && !VBLANK) begin
+			if (H_CNT == 9'h169 - 1 && !VBLANK) begin
 				RPA_FETCH <= 1;
-			end else if (H_CNT == 9'h196) begin
+			end else if (H_CNT == 9'h180) begin
 				RPA_FETCH <= 0;
 			end
 			
-			if (H_CNT == 9'h1A0 - 1 && !VBLANK) begin
+			if (H_CNT == 9'h181 - 1 && !VBLANK) begin
+				SCRL_FETCH <= 1;
+			end else if (H_CNT == 9'h186) begin
+				SCRL_FETCH <= 0;
+			end
+			
+			if (H_CNT == 9'h18A - 1 && !VBLANK) begin
 				BACK_FETCH <= 1;
 			end else begin
 				BACK_FETCH <= 0;
 			end
 			
-			if (H_CNT == 9'h1A1 - 1 && !VBLANK) begin
+			if (H_CNT == 9'h18B - 1 && !VBLANK) begin
 				LN_FETCH <= 1;
 			end else begin
 				LN_FETCH <= 0;
@@ -291,13 +411,21 @@ module VDP2 (
 		end
 	end
 	
+	
+	//Windows
+	wire W0_HIT = SCRX >= REGS.WPSX0.WxSX[9:1] && SCRX <= REGS.WPEX0.WxEX[9:1] &&
+	              SCRY >= REGS.WPSY0.WxSY[8:0] && SCRY <= REGS.WPEY0.WxEY[8:0];
+	wire W1_HIT = SCRX >= REGS.WPSX1.WxSX[9:1] && SCRX <= REGS.WPEX1.WxEX[9:1] &&
+	              SCRY >= REGS.WPSY1.WxSY[8:0] && SCRY <= REGS.WPEY1.WxEY[8:0];
+	
+	
 	always_comb begin
 		bit [3:0] VCPA0; 
 		bit [3:0] VCPA1; 
 		bit [3:0] VCPB0; 
 		bit [3:0] VCPB1;
 		
-		case (H_CNT[2:0])
+		case (SCRX[2:0] & {~REGS.TVMD.HRESO[1],2'b11})
 			T0: begin VCPA0 = REGS.CYCA0L[15:12]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[15:12] : REGS.CYCA0L[15:12]; 
 			          VCPB0 = REGS.CYCB0L[15:12]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1L[15:12] : REGS.CYCB0L[15:12]; end
 			T1: begin VCPA0 = REGS.CYCA0L[11: 8]; VCPA1 = REGS.RAMCTL.VRAMD ? REGS.CYCA1L[11: 8] : REGS.CYCA0L[11: 8]; 
@@ -316,48 +444,48 @@ module VDP2 (
 			          VCPB0 = REGS.CYCB0U[ 3: 0]; VCPB1 = REGS.RAMCTL.VRBMD ? REGS.CYCB1U[ 3: 0] : REGS.CYCB0U[ 3: 0]; end
 		endcase
 			
-		VA_PIPE[0].NxA0PN[0] = VCPA0 == VCP_N0PN & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1PN[0] = VCPA1 == VCP_N0PN & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0PN[0] = VCPB0 == VCP_N0PN & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1PN[0] = VCPB1 == VCP_N0PN & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0PN[1] = VCPA0 == VCP_N1PN & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1PN[1] = VCPA1 == VCP_N1PN & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0PN[1] = VCPB0 == VCP_N1PN & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1PN[1] = VCPB1 == VCP_N1PN & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0PN[2] = VCPA0 == VCP_N2PN & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1PN[2] = VCPA1 == VCP_N2PN & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0PN[2] = VCPB0 == VCP_N2PN & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1PN[2] = VCPB1 == VCP_N2PN & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0PN[3] = VCPA0 == VCP_N3PN & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1PN[3] = VCPA1 == VCP_N3PN & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0PN[3] = VCPB0 == VCP_N3PN & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1PN[3] = VCPB1 == VCP_N3PN & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0PN[0] = VCPA0 == VCP_N0PN & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1PN[0] = VCPA1 == VCP_N0PN & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0PN[0] = VCPB0 == VCP_N0PN & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1PN[0] = VCPB1 == VCP_N0PN & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0PN[1] = VCPA0 == VCP_N1PN & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1PN[1] = VCPA1 == VCP_N1PN & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0PN[1] = VCPB0 == VCP_N1PN & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1PN[1] = VCPB1 == VCP_N1PN & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0PN[2] = VCPA0 == VCP_N2PN & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1PN[2] = VCPA1 == VCP_N2PN & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0PN[2] = VCPB0 == VCP_N2PN & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1PN[2] = VCPB1 == VCP_N2PN & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0PN[3] = VCPA0 == VCP_N3PN & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1PN[3] = VCPA1 == VCP_N3PN & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0PN[3] = VCPB0 == VCP_N3PN & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1PN[3] = VCPB1 == VCP_N3PN & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
 		
-		VA_PIPE[0].NxA0CH[0] = VCPA0 == VCP_N0CH & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1CH[0] = VCPA1 == VCP_N0CH & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0CH[0] = VCPB0 == VCP_N0CH & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1CH[0] = VCPB1 == VCP_N0CH & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0CH[1] = VCPA0 == VCP_N1CH & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1CH[1] = VCPA1 == VCP_N1CH & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0CH[1] = VCPB0 == VCP_N1CH & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1CH[1] = VCPB1 == VCP_N1CH & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0CH[2] = VCPA0 == VCP_N2CH & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1CH[2] = VCPA1 == VCP_N2CH & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0CH[2] = VCPB0 == VCP_N2CH & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1CH[2] = VCPB1 == VCP_N2CH & BG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0CH[3] = VCPA0 == VCP_N3CH & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1CH[3] = VCPA1 == VCP_N3CH & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0CH[3] = VCPB0 == VCP_N3CH & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1CH[3] = VCPB1 == VCP_N3CH & BG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0CH[0] = VCPA0 == VCP_N0CH & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1CH[0] = VCPA1 == VCP_N0CH & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0CH[0] = VCPB0 == VCP_N0CH & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1CH[0] = VCPB1 == VCP_N0CH & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0CH[1] = VCPA0 == VCP_N1CH & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1CH[1] = VCPA1 == VCP_N1CH & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0CH[1] = VCPB0 == VCP_N1CH & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1CH[1] = VCPB1 == VCP_N1CH & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0CH[2] = VCPA0 == VCP_N2CH & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1CH[2] = VCPA1 == VCP_N2CH & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0CH[2] = VCPB0 == VCP_N2CH & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1CH[2] = VCPB1 == VCP_N2CH & NBG_FETCH & REGS.BGON.N2ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0CH[3] = VCPA0 == VCP_N3CH & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1CH[3] = VCPA1 == VCP_N3CH & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0CH[3] = VCPB0 == VCP_N3CH & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1CH[3] = VCPB1 == VCP_N3CH & NBG_FETCH & REGS.BGON.N3ON & REGS.TVMD.DISP;
 		
-		VA_PIPE[0].NxA0VS[0] = VCPA0 == VCP_N0VS & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1VS[0] = VCPA1 == VCP_N0VS & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0VS[0] = VCPB0 == VCP_N0VS & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1VS[0] = VCPB1 == VCP_N0VS & BG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA0VS[1] = VCPA0 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxA1VS[1] = VCPA1 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB0VS[1] = VCPB0 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
-		VA_PIPE[0].NxB1VS[1] = VCPB1 == VCP_N1VS & BG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0VS[0] = VCPA0 == VCP_N0VS & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1VS[0] = VCPA1 == VCP_N0VS & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0VS[0] = VCPB0 == VCP_N0VS & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1VS[0] = VCPB1 == VCP_N0VS & NBG_FETCH & REGS.BGON.N0ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA0VS[1] = VCPA0 == VCP_N1VS & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxA1VS[1] = VCPA1 == VCP_N1VS & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB0VS[1] = VCPB0 == VCP_N1VS & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
+		VA_PIPE[0].NxB1VS[1] = VCPB1 == VCP_N1VS & NBG_FETCH & REGS.BGON.N1ON & REGS.TVMD.DISP;
 		
 		VA_PIPE[0].NxA0CPU = ((VCPA0 == VCP_CPU | (VCPA0 == VCP_NA & VCPA1 == VCP_NA)) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
 		VA_PIPE[0].NxA1CPU = ((VCPA1 == VCP_CPU | (VCPA0 == VCP_NA & VCPA1 == VCP_NA)) & ~SCRL_FETCH & ~RPA_FETCH & ~BACK_FETCH & ~LN_FETCH) | VBLANK | ~REGS.TVMD.DISP;
@@ -397,6 +525,7 @@ module VDP2 (
 		VA_PIPE[0].RPA_POS = RPA_POS;
 		VA_PIPE[0].BS = BACK_FETCH;
 		VA_PIPE[0].LN = LN_FETCH;
+		VA_PIPE[0].RBG = RBG_PREFETCH;
 		
 		VA_PIPE[0].NxX[0] <= NxOFFX[0].INT;
 		VA_PIPE[0].NxX[1] <= NxOFFX[1].INT;
@@ -410,12 +539,8 @@ module VDP2 (
 		VA_PIPE[0].R1X <= R0X[27:16];
 		VA_PIPE[0].R0Y <= R0Y[27:16];
 		VA_PIPE[0].R1Y <= R0Y[27:16];
-		VA_PIPE[0].VRAMA0_A = VRAMA0_A;
-		VA_PIPE[0].VRAMA1_A = VRAMA1_A;
-		VA_PIPE[0].VRAMB0_A = VRAMB0_A;
-		VA_PIPE[0].VRAMB1_A = VRAMB1_A;
-
-		VA_PIPE[0].NxCH_CNT <= NBG_CH_CNT;
+		VA_PIPE[0].W0_HIT = W0_HIT;
+		VA_PIPE[0].W1_HIT = W1_HIT;
 	end
 	
 	assign VA_PIPE0 = VA_PIPE[0];
@@ -426,7 +551,7 @@ module VDP2 (
 //			VA_PIPE[2] <= '0;
 //			VA_PIPE[3] <= '0;
 		end
-		else if (DOT_CE) begin
+		else if (DOT_CE_R) begin
 			VA_PIPE[1] <= VA_PIPE[0];
 			VA_PIPE[2] <= VA_PIPE[1];
 			VA_PIPE[3] <= VA_PIPE[2];
@@ -435,7 +560,7 @@ module VDP2 (
 	end
 	
 	
-	assign SCRX = H_CNT;
+//	assign SCRX = H_CNT;
 	assign SCRY = V_CNT;
 	
 	VDP2NSxRegs_t NSxREG;
@@ -550,8 +675,8 @@ module VDP2 (
 			LZMX <= '{2{'0}};
 		end
 		else begin
-			if (DOT_CE) begin
-				if (BG_FETCH) begin
+			if (DOT_CE_R) begin
+				if (NBG_FETCH) begin
 					NX[0] <= NX[0] + LZMX[0];
 					NX[1] <= NX[1] + LZMX[1];
 					NX[2] <= NX[2] + 19'h00100;
@@ -699,33 +824,30 @@ module VDP2 (
 			KX = {{6{ROTA_TBL.KX.INT[7]}},ROTA_TBL.KX.INT,ROTA_TBL.KX.FRAC};
 			KY = {{6{ROTA_TBL.KY.INT[7]}},ROTA_TBL.KY.INT,ROTA_TBL.KY.FRAC};
 			
-			CALC <= 0;
-			if (CALC) begin
-				Xst2 <= $signed(Xst2) + $signed(DXst);
-				Yst2 <= $signed(Yst2) + $signed(DYst);
-				if (LAST_LINE) begin
-					Xst2 <= Xst;
-					Yst2 <= Yst;
+			if (DOT_CE_R) begin
+				if (VA_PIPE[0].RBG) begin
+					Xst2 <= $signed(Xst2) + $signed(DXst);
+					Yst2 <= $signed(Yst2) + $signed(DYst);
+					if (LAST_LINE) begin
+						Xst2 <= Xst;
+						Yst2 <= Yst;
+					end
 				end
-			end
-			if (DOT_CE) begin
-				Xsp2 <= $signed(Xsp2) + $signed(dX);
-				Ysp2 <= $signed(Ysp2) + $signed(dY);
-				if (PRELAST_DOT) begin
+				
+				Xsp <= $signed(Xsp) + $signed(dX);
+				Ysp <= $signed(Ysp) + $signed(dY);
+				if (VA_PIPE[1].RBG) begin
 					Xsp <= $signed(MultFF(A,($signed(Xst2) - $signed({PX,16'h0000})))) + $signed(MultFF(B,($signed(Yst2) - $signed({PY,16'h0000})))) + $signed(MultFF(C,($signed(Zst) - $signed({PZ,16'h0000}))));
 					Ysp <= $signed(MultFF(D,($signed(Xst2) - $signed({PX,16'h0000})))) + $signed(MultFF(E,($signed(Yst2) - $signed({PY,16'h0000})))) + $signed(MultFF(F,($signed(Zst) - $signed({PZ,16'h0000}))));
 					Xp  <= $signed(MultFI(A,($signed(PX) - $signed(CX)))) + $signed(MultFI(B,($signed(PY) - $signed(CY)))) + $signed(MultFI(C,($signed(PZ) - $signed(CZ)))) + $signed({CX,16'h0000}) + $signed(MX);
 					Yp  <= $signed(MultFI(D,($signed(PX) - $signed(CX)))) + $signed(MultFI(E,($signed(PY) - $signed(CY)))) + $signed(MultFI(F,($signed(PZ) - $signed(CZ)))) + $signed({CY,16'h0000}) + $signed(MY);
 					dX  <= $signed(MultFF(A,DX)) + $signed(MultFI(B,DY));
 					dY  <= $signed(MultFF(D,DX)) + $signed(MultFI(E,DY));
-					Xsp2 <= Xsp;
-					Ysp2 <= Ysp;
+//					Xsp2 <= Xsp;
+//					Ysp2 <= Ysp;
 				end
-				if (LAST_DOT) begin
-					
-				end
-				R0X <= $signed(MultFF(KX,Xsp2)) + $signed(Xp);
-				R0Y <= $signed(MultFF(KY,Ysp2)) + $signed(Yp);
+				R0X <= $signed(MultFF(KX,Xsp)) + $signed(Xp);
+				R0Y <= $signed(MultFF(KY,Ysp)) + $signed(Yp);
 				
 				if (VA_PIPE[1].RPA) begin
 					case (RxRPA_VRAM_BANK)
@@ -758,7 +880,7 @@ module VDP2 (
 						5'd20: ROTA_TBL.KY <= RP_WD;
 						5'd21: ROTA_TBL.KAst <= RP_WD;
 						5'd22: ROTA_TBL.DKAst <= RP_WD;
-						5'd23: begin ROTA_TBL.DKAx <= RP_WD; CALC <= 1; end
+						5'd23: ROTA_TBL.DKAx <= RP_WD;
 					endcase
 				end
 			end
@@ -776,7 +898,7 @@ module VDP2 (
 			LINE_PAL <= '0;
 		end
 		else begin
-			if (DOT_CE) begin
+			if (DOT_CE_R) begin
 				case (BS_VRAM_BANK)
 					2'b00: WD = RA0_Q[31:16];
 					2'b01: WD = RA1_Q[31:16];
@@ -795,31 +917,29 @@ module VDP2 (
 		end
 	end
 	
-	ScrollData_t SCX[4];
-	ScrollData_t SCY[4];
+//	ScrollData_t SCX[4];
+//	ScrollData_t SCY[4];
 	always_comb begin
-		SCX[0] = NSxREG[0].SCX + LSCX[0];
-		SCY[0] = NSxREG[0].SCY + LSCY[0] + VS[0];
-		SCX[1] = NSxREG[1].SCX + LSCX[1];
-		SCY[1] = NSxREG[1].SCY + LSCY[1] + VS[1];
-		SCX[2] = NSxREG[2].SCX;
-		SCY[2] = NSxREG[2].SCY ;
-		SCX[3] = NSxREG[3].SCX;
-		SCY[3] = NSxREG[3].SCY ;
+//		SCX[0] = NSxREG[0].SCX + LSCX[0];
+//		SCY[0] = NSxREG[0].SCY + LSCY[0] + VS[0];
+//		SCX[1] = NSxREG[1].SCX + LSCX[1];
+//		SCY[1] = NSxREG[1].SCY + LSCY[1] + VS[1];
+//		SCX[2] = NSxREG[2].SCX;
+//		SCY[2] = NSxREG[2].SCY ;
+//		SCX[3] = NSxREG[3].SCX;
+//		SCY[3] = NSxREG[3].SCY ;
 		
 		NxOFFX[0] = (NX[0] & 19'h7F800) + (NSX[0] & 19'h7F800);
-		NxOFFY[0] = NSY[0] + (VS[0] & {19{NSxREG[0].VCSC}});
 		NxOFFX[1] = (NX[1] & 19'h7F800) + (NSX[1] & 19'h7F800);
-		NxOFFY[1] = NSY[1] + (VS[1] & {19{NSxREG[1].VCSC}});
 		NxOFFX[2] = (NX[2] & 19'h7F800) + (NSX[2] & 19'h7F800);
-		NxOFFY[2] = NSY[2];
 		NxOFFX[3] = (NX[3] & 19'h7F800) + (NSX[3] & 19'h7F800);
+		NxOFFY[0] = NSY[0] + (VS[0] & {19{NSxREG[0].VCSC}});
+		NxOFFY[1] = NSY[1] + (VS[1] & {19{NSxREG[1].VCSC}});
+		NxOFFY[2] = NSY[2];
 		NxOFFY[3] = NSY[3];
 	end
 	assign NxOFFX0_DBG = NxOFFX[0].INT;
 	
-//	bit NxPN_VRAMA0_A1,NxPN_VRAMA1_A1,NxPN_VRAMB0_A1,NxPN_VRAMB1_A1;
-//	bit NxOFFX3[4];
 	bit  [1:0] LS_VRAM_BANK;
 	bit  [5:0] LS_POS;
 	bit [19:2] LS_OFFS[2];
@@ -828,16 +948,16 @@ module VDP2 (
 	bit [19:1] BS_OFFS;
 	bit [19:1] LN_OFFS;
 	bit  [1:0] BS_VRAM_BANK;
-	bit   [19:1] NxCH_ADDR[4];
-	bit   [19:1] RxCH_ADDR[2];
-	bit   [19:1] NxVS_ADDR[2];
+	bit [19:1] NxPN_ADDR[4];
+	bit [19:1] RxPN_ADDR[2];
+	bit [19:1] NxCH_ADDR[4];
+	bit [19:1] RxCH_ADDR[2];
+	bit [19:1] NxVS_ADDR[2];
 		
-	bit          VRAM_RW_PEND2;
-	bit       VRAM_WRITE_PEND_CLR[2];
-	bit       VRAM_READ_PEND_CLR;
+	bit        VRAM_RW_PEND2;
+	bit        VRAM_WRITE_PEND_CLR[2];
+	bit        VRAM_READ_PEND_CLR;
 	always @(posedge CLK or negedge RST_N) begin
-		bit   [19:1] NxPN_ADDR[4];
-		bit   [19:1] RxPN_ADDR[2];
 		bit   [19:1] NxLS_ADDR[2];
 		bit   [19:1] RxRPA_ADDR;
 		bit   [19:1] BS_ADDR;
@@ -865,7 +985,7 @@ module VDP2 (
 		VRAM_WRITE_PEND_CLR[0] <= 0;
 		VRAM_WRITE_PEND_CLR[1] <= 0;
 		VRAM_READ_PEND_CLR <= 0;
-		if (DOTH_CE) begin
+		if (DOT_CE_F) begin
 			NxPN_ADDR[0] = NxPNAddr(NxOFFX[0].INT, NxOFFY[0].INT, NSxREG[0].MP, NSxREG[0].MPn, NSxREG[0].PLSZ, NSxREG[0].CHSZ, NSxREG[0].PNC.NxPNB);
 			NxPN_ADDR[1] = NxPNAddr(NxOFFX[1].INT, NxOFFY[1].INT, NSxREG[1].MP, NSxREG[1].MPn, NSxREG[1].PLSZ, NSxREG[1].CHSZ, NSxREG[1].PNC.NxPNB);
 			NxPN_ADDR[2] = NxPNAddr(NxOFFX[2].INT, NxOFFY[2].INT, NSxREG[2].MP, NSxREG[2].MPn, NSxREG[2].PLSZ, NSxREG[2].CHSZ, NSxREG[2].PNC.NxPNB);
@@ -908,36 +1028,35 @@ module VDP2 (
 			VRAMA_RW_PEND <= 0;
 			VRAMB_RW_PEND <= 0;
 			if (!REGS.TVMD.DISP || VBLANK || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
-				VRAMA0_A <= VRAM_READ_PEND ? A[16:1] : /*VRAM_WRITE_PEND[0] ?*/ VRAM_A[0][16:1] /*: VRAM_A[1][16:1]*/;
-				VRAMA1_A <= VRAM_READ_PEND ? A[16:1] : /*VRAM_WRITE_PEND[0] ?*/ VRAM_A[0][16:1] /*: VRAM_A[1][16:1]*/;
-				VRAMB0_A <= VRAM_READ_PEND ? A[16:1] : /*VRAM_WRITE_PEND[0] ?*/ VRAM_A[0][16:1] /*: VRAM_A[1][16:1]*/;
-				VRAMB1_A <= VRAM_READ_PEND ? A[16:1] : /*VRAM_WRITE_PEND[0] ?*/ VRAM_A[0][16:1] /*: VRAM_A[1][16:1]*/;
-				VRAMA0_D <= VRAM_READ_PEND ? DI : /*VRAM_WRITE_PEND[0] ?*/ VRAM_DI[0] /*: VRAM_DI[1]*/;
-				VRAMA1_D <= VRAM_READ_PEND ? DI : /*VRAM_WRITE_PEND[0] ?*/ VRAM_DI[0] /*: VRAM_DI[1]*/;
-				VRAMB0_D <= VRAM_READ_PEND ? DI : /*VRAM_WRITE_PEND[0] ?*/ VRAM_DI[0] /*: VRAM_DI[1]*/;
-				VRAMB1_D <= VRAM_READ_PEND ? DI : /*VRAM_WRITE_PEND[0] ?*/ VRAM_DI[0] /*: VRAM_DI[1]*/;
-				VRAMA0_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND & VRAMA0_SEL}};
-				VRAMA1_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND & VRAMA1_SEL}};
-				VRAMB0_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND & VRAMB0_SEL}};
-				VRAMB1_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND & VRAMB1_SEL}};
-				VRAMA0_RD <= VRAM_READ_PEND & (VRAMA0_SEL | VRAMA1_SEL);
-				VRAMA1_RD <= VRAM_READ_PEND & (VRAMA0_SEL | VRAMA1_SEL);
-				VRAMB0_RD <= VRAM_READ_PEND & (VRAMB0_SEL | VRAMB1_SEL);
-				VRAMB1_RD <= VRAM_READ_PEND & (VRAMB0_SEL | VRAMB1_SEL);
-				VRAMA_RW_PEND <= (VRAM_READ_PEND | VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & (VRAMA0_SEL | VRAMA1_SEL);
-				VRAMB_RW_PEND <= (VRAM_READ_PEND | VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & (VRAMB0_SEL | VRAMB1_SEL);
+				VRAMA0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+				VRAMA1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+				VRAMB0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+				VRAMB1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+				VRAMA0_D <= VRAM_DI[0];
+				VRAMA1_D <= VRAM_DI[0];
+				VRAMB0_D <= VRAM_DI[0];
+				VRAMB1_D <= VRAM_DI[0];
+				VRAMA0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA0_WRITE}};
+				VRAMA1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA1_WRITE}};
+				VRAMB0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMB0_WRITE}};
+				VRAMB1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMB1_WRITE}};
+				VRAMA0_RD <= VRAM_READ_PEND & VRAMA0_READ;
+				VRAMA1_RD <= VRAM_READ_PEND & VRAMA1_READ;
+				VRAMB0_RD <= VRAM_READ_PEND & VRAMB0_READ;
+				VRAMB1_RD <= VRAM_READ_PEND & VRAMB1_READ;
+				VRAMA_RW_PEND <= (VRAM_READ_PEND & (VRAMA0_READ | VRAMA1_READ)) | (VRAM_WRITE_PEND[0] & (VRAMA0_WRITE | VRAMA1_WRITE));
+				VRAMB_RW_PEND <= (VRAM_READ_PEND & (VRAMB0_READ | VRAMB1_READ)) | (VRAM_WRITE_PEND[0] & (VRAMB0_WRITE | VRAMB1_WRITE));
 				if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
 				else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR[0] <= 1;
-				//else if (VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND_CLR[1] <= 1;
-			end else if (BG_FETCH || RBG_FETCH) begin
+			end else if (NBG_FETCH || RBG_FETCH) begin
 				VRAMA0_RD <= 0;
 				VRAMA1_RD <= 0;
 				if (NBG_A0VA.PN) begin
 					VRAMA0_A <= NxPN_ADDR[NBG_A0VA.Nx][16:1];
-					VRAMA0_RD <= 1;
+					VRAMA0_RD <= NxPN_ADDR[NBG_A0VA.Nx][18:17] == 2'b00;
 				end else if (RBG_A0VA.PN) begin
 					VRAMA0_A <= RxPN_ADDR[RBG_A0VA.Rx][16:1];
-					VRAMA0_RD <= 1;
+					VRAMA0_RD <= RxPN_ADDR[RBG_A0VA.Rx][18:17] == 2'b00;
 				end else if (NBG_A0VA.CH) begin
 					VRAMA0_A <= NxCH_ADDR[NBG_A0VA.Nx][16:1];
 					VRAMA0_RD <= NxCH_ADDR[NBG_A0VA.Nx][18:17] == 2'b00;
@@ -947,27 +1066,26 @@ module VDP2 (
 				end else	if (NBG_A0VA.VS) begin
 					VRAMA0_A <= NxVS_ADDR[NBG_A0VA.Nx[0]][16:1];
 					VRAMA0_RD <= NxVS_ADDR[NBG_A0VA.Nx[0]][18:17] == 2'b00;
-				end else	if (NBG_A0VA.CPUA && (VRAMA0_SEL || VRAMA1_SEL) && (VRAM_WRITE_PEND[0] /*|| VRAM_WRITE_PEND[1]*/ || VRAM_READ_PEND)) begin
-					VRAMA0_A <= VRAM_A[0][16:1];
-					VRAMA1_A <= VRAM_A[0][16:1];
+				end else	if (NBG_A0VA.CPUA && ((VRAM_READ_PEND && (VRAMA0_READ || VRAMA1_READ)) || (VRAM_WRITE_PEND[0] && (VRAMA0_WRITE || VRAMA1_WRITE)))) begin
+					VRAMA0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+					VRAMA1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
 					VRAMA0_D <= VRAM_DI[0];
 					VRAMA1_D <= VRAM_DI[0];
-					VRAMA0_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND  & VRAMA0_SEL}};
-					VRAMA1_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND  & VRAMA1_SEL}};
-					VRAMA0_RD <= VRAM_READ_PEND & VRAMA0_SEL;
-					VRAMA1_RD <= VRAM_READ_PEND & VRAMA1_SEL;
-					VRAMA_RW_PEND <= (VRAM_READ_PEND | VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & (VRAMA0_SEL | VRAMA1_SEL);
+					VRAMA0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA0_WRITE}};
+					VRAMA1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA1_WRITE}};
+					VRAMA0_RD <= VRAM_READ_PEND & VRAMA0_READ;
+					VRAMA1_RD <= VRAM_READ_PEND & VRAMA1_READ;
+					VRAMA_RW_PEND <= (VRAM_READ_PEND & (VRAMA0_READ | VRAMA1_READ)) | (VRAM_WRITE_PEND[0] & (VRAMA0_WRITE | VRAMA1_WRITE));
 					if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
 					else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR[0] <= 1;
-					//else if (VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND_CLR[1] <= 1;
 				end
 				
 				if (NBG_A1VA.PN) begin
 					VRAMA1_A <= NxPN_ADDR[NBG_A1VA.Nx][16:1];
-					VRAMA1_RD <= 1;
+					VRAMA1_RD <= NxPN_ADDR[NBG_A1VA.Nx][18:17] == 2'b01;
 				end else if (RBG_A1VA.PN) begin
 					VRAMA1_A <= RxPN_ADDR[RBG_A1VA.Rx][16:1];
-					VRAMA1_RD <= 1;
+					VRAMA1_RD <= RxPN_ADDR[RBG_A1VA.Rx][18:17] == 2'b01;
 				end else	if (NBG_A1VA.CH) begin
 					VRAMA1_A <= NxCH_ADDR[NBG_A1VA.Nx][16:1];
 					VRAMA1_RD <= NxCH_ADDR[NBG_A1VA.Nx][18:17] == 2'b01;
@@ -989,10 +1107,10 @@ module VDP2 (
 				VRAMB1_RD <= 0;
 				if (NBG_B0VA.PN) begin
 					VRAMB0_A <= NxPN_ADDR[NBG_B0VA.Nx][16:1];
-					VRAMB0_RD <= 1;
+					VRAMB0_RD <= NxPN_ADDR[NBG_B0VA.Nx][18:17] == 2'b10;
 				end else if (RBG_B0VA.PN) begin
 					VRAMB0_A <= RxPN_ADDR[RBG_B0VA.Rx][16:1];
-					VRAMB0_RD <= 1;
+					VRAMB0_RD <= RxPN_ADDR[RBG_B0VA.Rx][18:17] == 2'b10;
 				end else	if (NBG_B0VA.CH) begin
 					VRAMB0_A <= NxCH_ADDR[NBG_B0VA.Nx][16:1];
 					VRAMB0_RD <= NxCH_ADDR[NBG_B0VA.Nx][18:17] == 2'b10;
@@ -1002,27 +1120,26 @@ module VDP2 (
 				end else	if (NBG_B0VA.VS) begin
 					VRAMB0_A <= NxVS_ADDR[NBG_B0VA.Nx[0]][16:1];
 					VRAMB0_RD <= NxVS_ADDR[NBG_B0VA.Nx[0]][18:17] == 2'b10;
-				end else	if (NBG_B0VA.CPUA && (VRAMB0_SEL | VRAMB1_SEL) && (VRAM_WRITE_PEND[0] /*|| VRAM_WRITE_PEND[1]*/ || VRAM_READ_PEND)) begin
-					VRAMB0_A <= VRAM_A[0][16:1];
-					VRAMB1_A <= VRAM_A[0][16:1];
+				end else	if (NBG_B0VA.CPUA && ((VRAM_READ_PEND && (VRAMB0_READ || VRAMB1_READ)) || (VRAM_WRITE_PEND[0] && (VRAMB0_WRITE || VRAMB1_WRITE)))) begin
+					VRAMB0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
+					VRAMB1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
 					VRAMB0_D <= VRAM_DI[0];
 					VRAMB1_D <= VRAM_DI[0];
-					VRAMB0_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND  & VRAMB0_SEL}};
-					VRAMB1_WE <= (/*VRAM_WRITE_PEND[0] ?*/ VRAM_WE[0] /*: VRAM_WE[1]*/) & {2{(VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & ~VRAM_READ_PEND  & VRAMB1_SEL}};
-					VRAMB0_RD <= VRAM_READ_PEND & VRAMB0_SEL;
-					VRAMB1_RD <= VRAM_READ_PEND & VRAMB1_SEL;
-					VRAMB_RW_PEND <= (VRAM_READ_PEND | VRAM_WRITE_PEND[0] /*| VRAM_WRITE_PEND[1]*/) & (VRAMB0_SEL | VRAMB1_SEL);
+					VRAMB0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND  & VRAMB0_WRITE}};
+					VRAMB1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND  & VRAMB1_WRITE}};
+					VRAMB0_RD <= VRAM_READ_PEND & VRAMB0_READ;
+					VRAMB1_RD <= VRAM_READ_PEND & VRAMB1_READ;
+					VRAMB_RW_PEND <= (VRAM_READ_PEND & (VRAMB0_READ | VRAMB1_READ)) | (VRAM_WRITE_PEND[0] & (VRAMB0_WRITE | VRAMB1_WRITE));
 					if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
 					else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR[0] <= 1;
-					//else if (VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND_CLR[1] <= 1;
 				end
 				
 				if (NBG_B1VA.PN) begin
 					VRAMB1_A <= NxPN_ADDR[NBG_B1VA.Nx][16:1];
-					VRAMB1_RD <= 1;
+					VRAMB1_RD <= NxPN_ADDR[NBG_B1VA.Nx][18:17] == 2'b11;
 				end else if (RBG_B1VA.PN) begin
 					VRAMB1_A <= RxPN_ADDR[RBG_B1VA.Rx][16:1];
-					VRAMB1_RD <= 1;
+					VRAMB1_RD <= RxPN_ADDR[RBG_B1VA.Rx][18:17] == 2'b11;
 				end else	if (NBG_B1VA.CH) begin
 					VRAMB1_A <= NxCH_ADDR[NBG_B1VA.Nx][16:1];
 					VRAMB1_RD <= NxCH_ADDR[NBG_B1VA.Nx][18:17] == 2'b11;
@@ -1090,10 +1207,10 @@ module VDP2 (
 				end
 			end
 		end
-		else if (DOT_CE) begin
+		else if (DOT_CE_R) begin
 			if (!REGS.TVMD.DISP || VBLANK || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
 				
-			end else if (BG_FETCH || RBG_FETCH) begin
+			end else if (NBG_FETCH || RBG_FETCH) begin
 				if (NBG_A0VA.PN) begin
 //					NxPN_VRAMA0_A1 <= NxPN_ADDR[NBG_A0VA.Nx][1];
 				end else if (NBG_A0VA.CH) begin
@@ -1148,26 +1265,13 @@ module VDP2 (
 				BS_VRAM_BANK <= LN_ADDR[18:17];
 			end
 			
-//			if (!REGS.TVMD.DISP || VBLANK || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
-				if (VRAM_RW_PEND2) begin
-					VRAMA0_Q <= !VRAMA0_A[1] ? RA0_Q[15:0] : RA0_Q[31:16];
-					VRAMA1_Q <= !VRAMA1_A[1] ? RA1_Q[15:0] : RA1_Q[31:16];
-					VRAMB0_Q <= !VRAMB0_A[1] ? RB0_Q[15:0] : RB0_Q[31:16];
-					VRAMB1_Q <= !VRAMB1_A[1] ? RB1_Q[15:0] : RB1_Q[31:16];
-					VRAM_RW_PEND2 <= 0;
-				end
-//			end else begin
-//				if (NBG_A0VA.CPUD && VRAM_RW_PEND2) begin
-//					VRAMA0_Q <= !VRAMA0_A[1] ? RA0_Q[15:0] : RA0_Q[31:16];
-//					VRAMA1_Q <= !VRAMA1_A[1] ? RA1_Q[15:0] : RA1_Q[31:16];
-//					VRAM_RW_PEND2 <= 0;
-//				end
-//				if (NBG_B0VA.CPUD && VRAM_RW_PEND2) begin
-//					VRAMB0_Q <= !VRAMB0_A[1] ? RB0_Q[15:0] : RB0_Q[31:16];
-//					VRAMB1_Q <= !VRAMB1_A[1] ? RB1_Q[15:0] : RB1_Q[31:16];
-//					VRAM_RW_PEND2 <= 0;
-//				end
-//			end
+			if (VRAM_RW_PEND2) begin
+				VRAMA0_Q <= RA0_Q[31:16];
+				VRAMA1_Q <= RA1_Q[31:16];
+				VRAMB0_Q <= RB0_Q[31:16];
+				VRAMB1_Q <= RB1_Q[31:16];
+				VRAM_RW_PEND2 <= 0;
+			end
 			
 			if (LAST_DOT) begin
 				NBG_CH_CNT <= '{4{'0}};
@@ -1210,14 +1314,16 @@ module VDP2 (
 			NBG_CDL[1] <= '{8{'0}};
 			NBG_CDL[2] <= '{8{'0}};
 			NBG_CDL[3] <= '{8{'0}};
-			VS[0] <= '0; VS[1] <= '0;
+			VS[0] <= '0; 
+			VS[1] <= '0;
 		end
-		else if (DOT_CE) begin
+		else if (DOT_CE_R) begin
+			//NBG0/1/2/3
 			for (int i=0; i<4; i++) begin
 				BGS0.NxPN[i] = VA_PIPE[0].NxA0PN[i] | VA_PIPE[0].NxA1PN[i] | VA_PIPE[0].NxB0PN[i] | VA_PIPE[0].NxB1PN[i];
-				BGS0.NxPNS[i] = VA_PIPE[0].NxA0PN[i] ? 2'd0 : 
-									 VA_PIPE[0].NxA1PN[i] ? 2'd1 : 
-									 VA_PIPE[0].NxB0PN[i] ? 2'd2 : 
+				BGS0.NxPNS[i] = VA_PIPE[0].NxA0PN[i] && !NxPN_ADDR[NBG_A0VA.Nx][17] ? 2'd0 : 
+									 VA_PIPE[0].NxA1PN[i] &&  NxPN_ADDR[NBG_A1VA.Nx][17] ? 2'd1 : 
+									 VA_PIPE[0].NxB0PN[i] && !NxPN_ADDR[NBG_B0VA.Nx][17] ? 2'd2 : 
 									 2'd3;
 				BGS0.NxCH[i] = VA_PIPE[0].NxA0CH[i] | VA_PIPE[0].NxA1CH[i] | VA_PIPE[0].NxB0CH[i] | VA_PIPE[0].NxB1CH[i];
 				BGS0.NxCHS[i] = VA_PIPE[0].NxA0CH[i] && !NxCH_ADDR[NBG_A0VA.Nx][17] ? 2'd0 : 
@@ -1235,21 +1341,6 @@ module VDP2 (
 			end
 			BGS0.NxCH_CNT = NBG_CH_CNT;
 			
-			for (int i=0; i<2; i++) begin
-				BGS0.RxPN[i] = VA_PIPE[0].RxA0PN[i] | VA_PIPE[0].RxA1PN[i] | VA_PIPE[0].RxB0PN[i] | VA_PIPE[0].RxB1PN[i];
-				BGS0.RxPNS[i] = VA_PIPE[0].RxA0PN[i] ? 2'd0 : 
-									 VA_PIPE[0].RxA1PN[i] ? 2'd1 : 
-									 VA_PIPE[0].RxB0PN[i] ? 2'd2 : 
-									 2'd3;
-				BGS0.RxCH[i] = VA_PIPE[0].RxA0CH[i] | VA_PIPE[0].RxA1CH[i] | VA_PIPE[0].RxB0CH[i] | VA_PIPE[0].RxB1CH[i];
-				BGS0.RxCHS[i] = VA_PIPE[0].RxA0CH[i] && !RxCH_ADDR[RBG_A0VA.Rx][17] ? 2'd0 : 
-									 VA_PIPE[0].RxA1CH[i] &&  RxCH_ADDR[RBG_A1VA.Rx][17] ? 2'd1 : 
-									 VA_PIPE[0].RxB0CH[i] && !RxCH_ADDR[RBG_B0VA.Rx][17] ? 2'd2 : 
-									 2'd3;
-			end
-			BGS0.RxCH_CNT = RBG_CH_CNT;
-			
-			//NBG0/1/2/3
 			for (int i=0; i<4; i++) begin
 				if (BG_PIPE[1].NxPN[i]) begin
 					case (BG_PIPE[1].NxPNS[i])
@@ -1329,7 +1420,21 @@ module VDP2 (
 			end
 			
 			//RBG0/1
-			for (int i=0; i<1; i++) begin
+			for (int i=0; i<2; i++) begin
+				BGS0.RxPN[i] = VA_PIPE[0].RxA0PN[i] | VA_PIPE[0].RxA1PN[i] | VA_PIPE[0].RxB0PN[i] | VA_PIPE[0].RxB1PN[i];
+				BGS0.RxPNS[i] = VA_PIPE[0].RxA0PN[i] && RxPN_ADDR[RBG_A0VA.Rx][18:17] == 2'b00 ? 2'd0 : 
+									 VA_PIPE[0].RxA1PN[i] && RxPN_ADDR[RBG_A1VA.Rx][18:17] == 2'b01 ? 2'd1 : 
+									 VA_PIPE[0].RxB0PN[i] && RxPN_ADDR[RBG_B0VA.Rx][18:17] == 2'b10 ? 2'd2 : 
+									 2'd3;
+				BGS0.RxCH[i] = VA_PIPE[0].RxA0CH[i] | VA_PIPE[0].RxA1CH[i] | VA_PIPE[0].RxB0CH[i] | VA_PIPE[0].RxB1CH[i];
+				BGS0.RxCHS[i] = VA_PIPE[0].RxA0CH[i] && !RxCH_ADDR[RBG_A0VA.Rx][17] ? 2'd0 : 
+									 VA_PIPE[0].RxA1CH[i] &&  RxCH_ADDR[RBG_A1VA.Rx][17] ? 2'd1 : 
+									 VA_PIPE[0].RxB0CH[i] && !RxCH_ADDR[RBG_B0VA.Rx][17] ? 2'd2 : 
+									 2'd3;
+			end
+			BGS0.RxCH_CNT = RBG_CH_CNT;
+			
+			for (int i=0; i<2; i++) begin
 				if (BG_PIPE[1].RxPN[i]) begin
 					case (BG_PIPE[1].RxPNS[i])
 						2'd0: RPN_WD[i] = RA0_Q;
@@ -1443,18 +1548,20 @@ module VDP2 (
 			else if (!VRAM_RW_PEND2 && VRAM_READ_PEND_OLD && !VRAM_RRDY)
 				VRAM_RRDY <= 1;
 			
-			if (VRAM_SEL && !VRAM_SEL_OLD)
-				VRAM_READ_PEND <= &WE_N;
-			else if (VRAM_READ_PEND_CLR)
+			if (VRAM_SEL && !VRAM_SEL_OLD && WE_N) begin
+				VRAM_RA <= A[19:1];
+				VRAM_READ_PEND <= 1;
+			end else if (VRAM_READ_PEND_CLR) begin
 				VRAM_READ_PEND <= 0;
+			end
 			
-			if (VRAM_SEL && !VRAM_SEL_OLD && !(&WE_N)) 
+			if (VRAM_SEL && !VRAM_SEL_OLD && !WE_N && CE_F) 
 				VRAM_WRDY <= ~(VRAM_WRITE_PEND[0] & VRAM_WRITE_PEND[1]);
 			
-			if (VRAM_SEL && !(&WE_N) && !VRAM_WRITE_PEND[0] && !VRAM_WRITE_LATCH) begin
-				VRAM_A[0] <= A[19:0];
+			if (VRAM_SEL && !WE_N && !VRAM_WRITE_PEND[0] && !VRAM_WRITE_LATCH && CE_R) begin
+				VRAM_A[0] <= A[19:1];
 				VRAM_DI[0] <= DI;
-				VRAM_WE[0] <= ~WE_N;
+				VRAM_WE[0] <= ~{2{WE_N}} & ~DQM;
 				VRAM_WRITE_PEND[0] <= 1;
 				VRAM_WRITE_LATCH <= 1;
 			end else if (VRAM_WRITE_PEND_CLR[0]) begin
@@ -1469,15 +1576,12 @@ module VDP2 (
 				VRAM_WRDY <= 1;
 			end
 			
-			if (VRAM_SEL && !(&WE_N) && VRAM_WRITE_PEND[0] && !VRAM_WRITE_PEND[1] && !VRAM_WRITE_LATCH) begin
-				VRAM_A[1] <= A[19:0];
+			if (VRAM_SEL && !WE_N && VRAM_WRITE_PEND[0] && !VRAM_WRITE_PEND[1] && !VRAM_WRITE_LATCH && CE_R) begin
+				VRAM_A[1] <= A[19:1];
 				VRAM_DI[1] <= DI;
-				VRAM_WE[1] <= ~WE_N;
+				VRAM_WE[1] <= ~{2{WE_N}} & ~DQM;
 				VRAM_WRITE_PEND[1] <= 1;
 				VRAM_WRITE_LATCH <= 1;
-//			end else if (VRAM_WRITE_PEND_CLR[1]) begin
-//				VRAM_WRITE_PEND[1] <= 0;
-//				VRAM_WRDY <= 1;
 			end
 			
 			if (!VRAM_SEL && VRAM_WRITE_LATCH) begin
@@ -1485,14 +1589,10 @@ module VDP2 (
 			end
 			
 			//debug
-			if (VRAM_WRITE_PEND[0] /*&& VRAM_WRITE_PEND[1]*/) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1;
+			if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1'd1;
 			else VRAM_WRITE_PEND_CNT <= '0;
 		end
 	end
-	wire VRAMA0_SEL = (VRAM_A[0][18:17] == 2'b00);
-	wire VRAMA1_SEL = (VRAM_A[0][18:17] == 2'b01);
-	wire VRAMB0_SEL = (VRAM_A[0][18:17] == 2'b10);
-	wire VRAMB1_SEL = (VRAM_A[0][18:17] == 2'b11);
 	
 	assign RA0_A = VRAMA0_A;
 	assign RA0_D = VRAMA0_D;
@@ -1514,17 +1614,12 @@ module VDP2 (
 	assign RB1_WE = VRAMB1_WE;
 	assign RB1_RD = VRAMB1_RD;
 
-	wire [15:0] VRAM_DO = VRAMA0_SEL ? VRAMA0_Q :
-	                      VRAMA1_SEL ? VRAMA1_Q :
-							    VRAMB0_SEL ? VRAMB0_Q :
+	wire [15:0] VRAM_DO = VRAMA0_READ ? VRAMA0_Q :
+	                      VRAMA1_READ ? VRAMA1_Q :
+							    VRAMB0_READ ? VRAMB0_Q :
 								 VRAMB1_Q;
 
 								 
-	//Windows
-	wire W0_HIT = REGS.WPSX0.WxSX[9:1] >= SCRX && REGS.WPEX0.WxEX[9:1] <= SCRX &&
-	              REGS.WPSY0.WxSY[8:0] >= SCRY && REGS.WPEY0.WxEY[8:0] <= SCRY;
-	wire W1_HIT = REGS.WPSX1.WxSX[9:1] >= SCRX && REGS.WPEX1.WxEX[9:1] <= SCRX &&
-	              REGS.WPSY1.WxSY[8:0] >= SCRY && REGS.WPEY1.WxEY[8:0] <= SCRY;
 	
 	//Dots
 	DotsBuffer_t R0DB, N0DB, N1DB, N2DB, N3DB;
@@ -1536,11 +1631,11 @@ module VDP2 (
 			N2DB <= '{16{'0}};
 			N2DB <= '{16{'0}};
 		end
-		else if (DOT_CE) begin
-			if (SCRX[2:0] == 3'h7) begin
+		else if (DOT_CE_R) begin
+			if (SCRX[2:0] == {~REGS.TVMD.HRESO[1],2'b11}) begin
 				for (int i=0; i<8; i++) begin
 					R0DB[i] <= R0DB[i+8]; R0DB[i+8] <= RBG_CDL[0][i];
-					N0DB[i] <= N0DB[i+8]; N0DB[i+8] <= NBG_CDL[0][i];
+					N0DB[i] <= N0DB[i+8]; N0DB[i+8] <= !RSxREG[1].ON ? NBG_CDL[0][i] : RBG_CDL[1][i];
 					N1DB[i] <= N1DB[i+8]; N1DB[i+8] <= NBG_CDL[1][i];
 					N2DB[i] <= N2DB[i+8]; N2DB[i+8] <= NBG_CDL[2][i];
 					N3DB[i] <= N3DB[i+8]; N3DB[i+8] <= NBG_CDL[3][i];
@@ -1549,15 +1644,15 @@ module VDP2 (
 		end
 	end
 	
-	wire [3:0] R0DOTN = {1'b1,SCRX[2:0]};
+	wire [3:0] RxDOTN = {1'b1,SCRX[2:0]};
 	wire [3:0] N0DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[0].INT[2:0]};
 	wire [3:0] N1DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[1].INT[2:0]};
 	wire [3:0] N2DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[2].INT[2:0]};
 	wire [3:0] N3DOTN = {1'b0,SCRX[2:0]} + {1'b0,NSX[3].INT[2:0]};
 	
 	DotData_t R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
-	assign R0DOT = R0DB[R0DOTN];
-	assign N0DOT = N0DB[N0DOTN];
+	assign R0DOT = R0DB[RxDOTN];
+	assign N0DOT = N0DB[!RSxREG[1].ON ? N0DOTN : RxDOTN];
 	assign N1DOT = N1DB[N1DOTN];
 	assign N2DOT = N2DB[N2DOTN];
 	assign N3DOT = N3DB[N3DOTN];
@@ -1567,17 +1662,17 @@ module VDP2 (
 		if (!RST_N) begin
 			SDOT <= SDD_NULL;
 		end
-		else if (DOTH_CE) begin
+		else if (DOT_CE_F) begin
 			SDOT <= SpriteData(REGS.SPCTL.SPTYPE,REGS.SPCTL.SPCLMD,FBD);
 		end
 	end
 					  
-	wire SW_EN  = WinTest(W0_HIT ^ REGS.WCTLC.SPW0A,W1_HIT ^ REGS.WCTLC.SPW1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.SPW0E,REGS.WCTLC.SPW1E,REGS.WCTLC.SPSWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.SPLOG);
-	wire R0W_EN = WinTest(W0_HIT ^ REGS.WCTLC.R0W0A,W1_HIT ^ REGS.WCTLC.R0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.R0W0E,REGS.WCTLC.R0W1E,REGS.WCTLC.R0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.R0LOG);
-	wire N0W_EN = WinTest(W0_HIT ^ REGS.WCTLA.N0W0A,W1_HIT ^ REGS.WCTLA.N0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N0W0E,REGS.WCTLA.N0W1E,REGS.WCTLA.N0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N0LOG);
-	wire N1W_EN = WinTest(W0_HIT ^ REGS.WCTLA.N1W0A,W1_HIT ^ REGS.WCTLA.N1W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N1W0E,REGS.WCTLA.N1W1E,REGS.WCTLA.N1SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N1LOG);
-	wire N2W_EN = WinTest(W0_HIT ^ REGS.WCTLB.N2W0A,W1_HIT ^ REGS.WCTLB.N2W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N2W0E,REGS.WCTLB.N2W1E,REGS.WCTLB.N2SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N2LOG);
-	wire N3W_EN = WinTest(W0_HIT ^ REGS.WCTLB.N3W0A,W1_HIT ^ REGS.WCTLB.N3W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N3W0E,REGS.WCTLB.N3W1E,REGS.WCTLB.N3SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N3LOG);
+	wire SW_EN  = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLC.SPW0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLC.SPW1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.SPW0E,REGS.WCTLC.SPW1E,REGS.WCTLC.SPSWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.SPLOG);
+	wire R0W_EN = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLC.R0W0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLC.R0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.R0W0E,REGS.WCTLC.R0W1E,REGS.WCTLC.R0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.R0LOG);
+	wire N0W_EN = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLA.N0W0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLA.N0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N0W0E,REGS.WCTLA.N0W1E,REGS.WCTLA.N0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N0LOG);
+	wire N1W_EN = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLA.N1W0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLA.N1W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N1W0E,REGS.WCTLA.N1W1E,REGS.WCTLA.N1SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N1LOG);
+	wire N2W_EN = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLB.N2W0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLB.N2W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N2W0E,REGS.WCTLB.N2W1E,REGS.WCTLB.N2SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N2LOG);
+	wire N3W_EN = WinTest(VA_PIPE[4].W0_HIT ^ REGS.WCTLB.N3W0A,VA_PIPE[4].W1_HIT ^ REGS.WCTLB.N3W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N3W0E,REGS.WCTLB.N3W1E,REGS.WCTLB.N3SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N3LOG);
 	
 	ScreenDot_t DOT_FST, DOT_SEC, DOT_THD, DOT_FTH;
 	always @(posedge CLK or negedge RST_N) begin
@@ -1598,13 +1693,13 @@ module VDP2 (
 			DOT_THD <= SD_NULL;
 			DOT_FTH <= SD_NULL;
 		end
-		else if (DOT_CE) begin
-			STP  = SDOT.TP  & SW_EN;
-			R0TP = R0DOT.TP & R0W_EN;
-			N0TP = N0DOT.TP & N0W_EN;
-			N1TP = N1DOT.TP & N1W_EN;
-			N2TP = N2DOT.TP & N2W_EN;
-			N3TP = N3DOT.TP & N3W_EN;
+		else if (DOT_CE_R) begin
+			STP  = SDOT.TP  & ~SW_EN;
+			R0TP = R0DOT.TP & ~R0W_EN;
+			N0TP = N0DOT.TP & ~N0W_EN;
+			N1TP = N1DOT.TP & ~N1W_EN;
+			N2TP = N2DOT.TP & ~N2W_EN;
+			N3TP = N3DOT.TP & ~N3W_EN;
 			
 			SCAOS = REGS.CRAOFB.SPCAOS;
 			R0CAOS = REGS.CRAOFB.R0CAOS;
@@ -1791,7 +1886,6 @@ module VDP2 (
 	always @(posedge CLK or negedge RST_N) begin
 		bit [23:0] PAL;
 		
-		
 		if (!RST_N) begin
 			PAL_COL_FST <= '0;
 			PAL_COL_SEC <= '0;
@@ -1809,7 +1903,7 @@ module VDP2 (
 				3'd5: PAL_COL_THD <= PAL;
 				3'd7: ;
 			endcase
-			if (DOT_CE) begin
+			if (DOT_CE_R) begin
 				CCRT <= !REGS.CCCTL.CCRTMD ? DOT_FST.CCRT : DOT_SEC.CCRT;
 				CCEN <= DOT_FST.CCEN;
 				CFST <= !DOT_FST.P ? DOT_FST.DC : PAL_COL_FST;
@@ -1830,7 +1924,7 @@ module VDP2 (
 		if (!RST_N) begin
 			DCOL <= DC_NULL;
 		end
-		else if (DOT_CE) begin
+		else if (DOT_CE_R) begin
 			CC = ColorCalc(CFST, CSEC, CCRT, CCEN, REGS.CCCTL.CCMD);
 			DCOL.B <= ColorOffset(CC.B, REGS.COAB.COBL, REGS.COBB.COBL, COEN, COSL); 
 			DCOL.G <= ColorOffset(CC.G, REGS.COAG.COGR, REGS.COBG.COGR, COEN, COSL); 
@@ -1847,7 +1941,7 @@ module VDP2 (
 	
 	wire        PAL_SEL = !CS_N && !DTEN_N && !AD_N && A[20:19] == 2'b10;	//100000-17FFFF
 	wire [10:1] IO_PAL_A = REGS.RAMCTL.CRMD == 2'b00 ? A[10:1] : A[11:2];
-	wire        IO_PAL_WE = PAL_SEL & ~&WE_N & CE_R;
+	wire        IO_PAL_WE = PAL_SEL & ~WE_N & CE_R;
 	wire [10:1] PAL_A = REGS.RAMCTL.CRMD == 2'b01 ? PAL_N[10:1] : PAL_N[9:0];
 	VDP2_DPRAM #(10,16," "," ") pal1
 	(
@@ -1882,7 +1976,10 @@ module VDP2 (
 	//Registers
 	wire REG_SEL = (A[20:18] == 3'b110) & ~DTEN_N & ~AD_N & ~CS_N;
 	
-	bit [20:0] A;
+	bit [20:1] A;
+	bit        WE_N;
+	bit  [1:0] DQM;
+	bit        BURST;
 	bit [15:0] REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
 		
@@ -2127,15 +2224,29 @@ module VDP2 (
 
 			REG_DO <= '0;
 			A <= '0;
+			WE_N <= 1;
+			DQM <= '1;
+			BURST <= 0;
 		end else if (!RES_N) begin
 				
 		end else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
-				A <= {A[4:0],DI};
+				if (!DI[15]) begin
+					A[20:9] <= DI[11:0];
+					WE_N <= DI[14];
+					BURST <= DI[13];
+				end else begin
+					A[8:1] <= DI[7:0];
+					DQM <= DI[13:12];
+				end
+			end else if (!CS_N && !DTEN_N && !AD_N && BURST && CE_R) begin
+				if ((VRAM_SEL && VRAM_WRDY) || REG_SEL || PAL_SEL) begin
+					A <= A + 20'd1;
+				end
 			end
 			
 			if (REG_SEL) begin
-				if (!(&WE_N) && CE_R) begin
+				if (!WE_N && CE_R) begin
 					case ({A[8:1],1'b0})
 						9'h000: REGS.TVMD <= DI & TVMD_MASK;
 						9'h002: REGS.EXTEN <= DI & EXTEN_MASK;
@@ -2284,13 +2395,22 @@ module VDP2 (
 					case ({A[8:1],1'b0})
 						9'h000: REG_DO <= REGS.TVMD & TVMD_MASK;
 						9'h002: REG_DO <= REGS.EXTEN & EXTEN_MASK;
-						9'h004: REG_DO <= {12'h000,VBLANK | ~REGS.TVMD.DISP,HBLANK,ODD,1'b0} & TVSTAT_MASK;
+						9'h004: REG_DO <= {REGS.TVSTAT[15:8],4'h0,VBLANK|~REGS.TVMD.DISP,HBLANK,ODD,PAL} & TVSTAT_MASK;
 						9'h006: REG_DO <= REGS.VRSIZE & VRSIZE_MASK;
 						9'h008: REG_DO <= REGS.HCNT & HCNT_MASK;
 						9'h00A: REG_DO <= REGS.VCNT & VCNT_MASK;
 						9'h00E: REG_DO <= REGS.RAMCTL & RAMCTL_MASK;
 						default: REG_DO <= '0;
 					endcase
+					if ({A[8:1],1'b0} == 9'h002 && !REGS.EXTEN.EXLTEN) begin	//EXTEN
+						REGS.HCNT.HCT = {H_CNT,DOTCLK_DIV[2]};
+						REGS.VCNT.VCT = REGS.TVMD.LSMD == 2'b11 ? {V_CNT,ODD} : {1'b0,V_CNT};
+						REGS.TVSTAT.EXLTFG <= 1;
+					end
+					if ({A[8:1],1'b0} == 9'h004) begin								//TVSTAT
+						REGS.TVSTAT.EXLTFG <= 0;
+						REGS.TVSTAT.EXSYFG <= 0;
+					end
 				end
 			end
 		end
@@ -2300,9 +2420,6 @@ module VDP2 (
 	            PAL_SEL ? !A[1] ? PAL0_DO : PAL1_DO : 
 					VRAM_DO;
 	assign RDY_N = ~((VRAM_SEL & VRAM_RRDY & VRAM_WRDY) | REG_SEL | PAL_SEL);
-	
-	assign VINT_N = ~VBLANK;
-	assign HINT_N = ~HBLANK;
 	
 //	assign N0SCX = SCX[0];
 //	assign N0SCY = SCY[0];

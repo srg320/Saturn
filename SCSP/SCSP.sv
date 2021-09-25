@@ -632,7 +632,7 @@ module SCSP (
 			end
 			
 			SCU_SEL_OLD <= SCU_SEL;
-			if (SCU_SEL && !SCU_SEL_OLD && !SCU_PEND && CE_F) SCU_PEND <= 1;
+			if (SCU_SEL && !SCU_SEL_OLD && !SCU_PEND /*&& CE_F*/) SCU_PEND <= 1;
 			
 			WD_READ_OLD <= WD_READ;
 			if (WD_READ && !WD_READ_OLD && !WD_PEND) WD_PEND <= 1;
@@ -701,13 +701,13 @@ module SCSP (
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
-						MEM_ST <= MS_IDLE;
+						MEM_ST <= MS_END;
 					end else if (REG_CS && REG_RDY) begin
 						MEM_Q <= REG_Q;
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						REG_CS <= 0;
-						MEM_ST <= MS_IDLE;
+						MEM_ST <= MS_END;
 					end
 				end
 				
@@ -756,7 +756,7 @@ module SCSP (
 				end
 				
 				MS_END: begin
-					if (CYCLE_CE /*|| !SLOT_EN*/) MEM_ST <= MS_IDLE;
+					/*if (CYCLE_CE || !SLOT_EN)*/ MEM_ST <= MS_IDLE;
 				end
 				
 				default:;
