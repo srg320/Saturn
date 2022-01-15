@@ -254,11 +254,11 @@ module SCU_DMA_FIFO (
 		scfifo_component.add_ram_output_register = "OFF",
 		scfifo_component.intended_device_family = "Cyclone V",
 		scfifo_component.lpm_hint = "RAM_BLOCK_TYPE=MLAB",
-		scfifo_component.lpm_numwords = 64,
+		scfifo_component.lpm_numwords = 8,
 		scfifo_component.lpm_showahead = "ON",
 		scfifo_component.lpm_type = "scfifo",
 		scfifo_component.lpm_width = 37,
-		scfifo_component.lpm_widthu = 6,
+		scfifo_component.lpm_widthu = 3,
 		scfifo_component.overflow_checking = "OFF",
 		scfifo_component.underflow_checking = "OFF",
 		scfifo_component.use_eab = "ON";

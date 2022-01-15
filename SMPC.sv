@@ -134,7 +134,7 @@ module SMPC (
 		CS_WAIT         = 7'b0000100, 
 		CS_EXEC         = 7'b0001000,
 		CS_INTBACK_WAIT = 7'b0010000,
-		CS_INTBACK      = 7'b0100000,
+		CS_INTBACK_PERI = 7'b0100000,
 		CS_END          = 7'b1000000
 	} CommExecState_t;
 	CommExecState_t COMM_ST;
@@ -145,12 +145,14 @@ module SMPC (
 		bit        CS_N_OLD;
 		bit        IRQV_N_OLD;
 		bit [19:0] WAIT_CNT;
+		bit [19:0] INTERNAL_WAIT_CNT;
 		bit [19:0] INTBACK_WAIT_CNT;
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
+		bit        INTBACK_PERI;
 		bit        COMREG_SET;
 		bit        CONT;
-		bit        PDL;
+//		bit        PDL;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -174,7 +176,7 @@ module SMPC (
 			CDRES_N <= 0;
 			MIRQ_N <= 1;
 			RESD <= 1;
-			STE <= TIME_SET;/////////////////
+			STE <= 0;
 			
 			REG_DO <= '0;
 			RW_N_OLD <= 1;
@@ -183,7 +185,8 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 			INTBACK_EXEC <= 0;
-			PDL <= 0;
+			INTBACK_PERI <= 0;    
+//			PDL <= 0;
 			CONT <= 0;
 		end
 		else if (!MRES_N) begin
@@ -197,6 +200,7 @@ module SMPC (
 			MIRQ_N <= 1;
 			SR <= '0;
 			RESD <= 1;
+			STE <= TIME_SET;/////////////////
 		end else begin
 			if (CE) begin
 				IRQV_N_OLD <= IRQV_N;
@@ -204,7 +208,7 @@ module SMPC (
 				if (WAIT_CNT) WAIT_CNT <= WAIT_CNT - 20'd1;
 				
 				if (INTBACK_WAIT_CNT) INTBACK_WAIT_CNT <= INTBACK_WAIT_CNT - 20'd1;
-				if (IRQV_N && !IRQV_N_OLD) INTBACK_WAIT_CNT <= 20'd2000;
+				if (IRQV_N && !IRQV_N_OLD) INTBACK_WAIT_CNT <= 20'd10000;
 				
 				if (!SRES_N && !RESD && !SRES_EXEC) begin
 					MSHNMI_N <= 0;
@@ -218,14 +222,16 @@ module SMPC (
 				
 				SR[4:0] <= {~SRES_N,IREG[1][7:4]};
 
+				if (INTERNAL_WAIT_CNT) INTERNAL_WAIT_CNT <= INTERNAL_WAIT_CNT - 20'd1;
+				if (!IRQV_N && IRQV_N_OLD) INTERNAL_WAIT_CNT <= 20'd1200;
 				
 				case (COMM_ST)
 					CS_IDLE: begin
-						if (INTBACK_EXEC && CONT && !INTBACK_WAIT_CNT && !SRES_EXEC && IRQV_N && IRQV_N_OLD) begin
+						if (INTBACK_PERI && !INTBACK_WAIT_CNT && !SRES_EXEC && IRQV_N && IRQV_N_OLD) begin
 //							WAIT_CNT <= 20'd200;
-							CONT <= 0;
-							COMM_ST <= CS_INTBACK/*_WAIT*/;
-						end else if (COMREG_SET && !SRES_EXEC && !IRQV_N) begin
+							INTBACK_PERI <= 0;
+							COMM_ST <= CS_INTBACK_PERI;
+						end else if (COMREG_SET && !SRES_EXEC && !INTERNAL_WAIT_CNT) begin
 							COMREG_SET <= 0;
 							COMM_ST <= CS_START;
 						end
@@ -286,17 +292,16 @@ module SMPC (
 							end
 							
 							8'h10: begin		//INTBACK
-								if (IREG[2] == 8'hF0) begin
-									if (!IREG[0][0] && IREG[1][3]) begin
-										INTBACK_EXEC <= 1;
-										CONT <= 1;
-//										WAIT_CNT <= 20'd200;
-										COMM_ST <= CS_END;
-									end else /*if (IREG[0][0])*/ begin
+								if (IREG[2] == 8'hF0 && (IREG[0][0] || IREG[1][3])) begin
+									if (IREG[0][0]) begin
 										WAIT_CNT <= 20'd500;
 										COMM_ST <= CS_WAIT;
-									/*end else begin
-										COMM_ST <= CS_END;*/
+									end else begin
+										INTBACK_EXEC <= 1;
+										INTBACK_PERI <= 1;
+										CONT <= 0;
+										SR[7:5] <= 3'b010;
+										COMM_ST <= CS_END;
 									end
 								end else begin
 									COMM_ST <= CS_END;
@@ -403,6 +408,7 @@ module SMPC (
 							
 							8'h10: begin		//INTBACK
 								if (!INTBACK_EXEC) begin
+									SR[7:5] <= 3'b010;
 									OREG[0] <= {STE,RESD,6'b000000};
 									OREG[1] <= 8'h20;
 									OREG[2] <= 8'h21;
@@ -419,12 +425,13 @@ module SMPC (
 									OREG[13] <= SMEM[1];
 									OREG[14] <= SMEM[2];
 									OREG[15] <= SMEM[3];
-									SR[7:5] <= {2'b01,IREG[1][3]};
+									INTBACK_EXEC <= 1;
 									if (IREG[1][3]) begin
-										INTBACK_EXEC <= 1;
-										//SF <= 1;
+										SR[5] <= 1;
+//										SF <= 1;
 									end
-									PDL <= 1;
+//									PDL <= 1;
+									CONT <= 0;
 									MIRQ_N <= 0;
 								end
 							end
@@ -458,11 +465,12 @@ module SMPC (
 					end
 					
 					CS_INTBACK_WAIT: begin
-						if (!WAIT_CNT) COMM_ST <= CS_INTBACK;
+						if (!WAIT_CNT) COMM_ST <= CS_INTBACK_PERI;
 					end
 					
-					CS_INTBACK: begin
-						if (INTBACK_EXEC) begin
+					CS_INTBACK_PERI: begin
+//						if (INTBACK_EXEC) begin
+							SR[7:5] <= {1'b1,1'b1,1'b0};
 							OREG[0] <= 8'hF1;
 							OREG[1] <= 8'h02;
 							OREG[2] <= JOY1[15:8];
@@ -479,15 +487,14 @@ module SMPC (
 							OREG[13] <= 8'h00;
 							OREG[14] <= 8'h00;
 							OREG[15] <= 8'h00;
-							SR[7:5] <= {1'b1,1'b1,1'b0};
-							PDL <= 0;
+//							PDL <= 0;
 							SF <= 0;
 //							INTBACK_EXEC <= 0;
 							MIRQ_N <= 0;
 							COMM_ST <= CS_IDLE;
-						end else  begin
-							COMM_ST <= CS_EXEC;
-						end
+//						end else  begin
+//							COMM_ST <= CS_EXEC;
+//						end
 					end
 					
 					CS_END: begin
@@ -584,12 +591,14 @@ module SMPC (
 								INTBACK_EXEC <= 0;
 								SF <= 0;
 								SR[7:5] <= 3'b000;
-							end else if (DI[7]) begin
-								CONT <= 1;
-								SF <= 1;
+							end else if (CONT != DI[7]) begin
+								INTBACK_PERI <= 1;
+//								SF <= 1;
 							end
-						end else
+							CONT <= DI[7];
+						end else begin
 							IREG[0] <= DI;
+						end
 					end
 					7'h03: IREG[1] <= DI;
 					7'h05: IREG[2] <= DI;

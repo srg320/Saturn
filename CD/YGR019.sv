@@ -37,17 +37,23 @@ module YGR019 (
 	output reg        SIRQL_N,
 	output reg        SIRQH_N,
 
-	input      [17:0] CD_D,
+	input             CDD_CE,	//44100Hz*2*2
+		
+	input      [15:0] CD_D,
 	input             CD_CK,
+	input             CD_SPEED,
+	input             CD_AUDIO,
 	
 	output     [15:0] CD_SL,
 	output     [15:0] CD_SR,
 	
-	output     [15:0] CR0,
+	output     [7:0] CR0[16],
 	output     [31:0] DBG_HEADER,
 	output     [7:0] DBG_CNT,
 	output     [7:0] FIFO_CNT_DBG,
-	output     [7:0] ABUS_WAIT_CNT_DBG
+	output     [7:0] ABUS_WAIT_CNT_DBG,
+	output reg  HOOK,
+	output reg  HOOK2
 );
 	import YGR019_PKG::*;
 
@@ -57,7 +63,7 @@ module YGR019 (
 	bit [15:0]/*HIRQMSK_t*/  HMASK;
 	bit [15:0] DTR;
 	bit [15:0] TRCTL;
-	bit [15:0] MBX;
+	bit [15:0] REG04;
 	bit [15:0] CDIRQ;
 	bit [15:0] CDMASK;
 	bit [15:0] REG08;
@@ -75,25 +81,14 @@ module YGR019 (
 	
 	bit        CDFIFO_RD;
 	bit        CDFIFO_WR;
-	bit [17:0] CDFIFO_Q;
+	bit [15:0] CDFIFO_Q;
 	bit        CDFIFO_EMPTY;
 	bit        CDFIFO_FULL;
 	bit        CD_CK_OLD;
 	bit [15:0] CDD_DATA;
 	
-	wire       CDD_2X_CE;
 	bit        CDD_CE_DIV;
-	CEGen CDD_CEGen
-	(
-		.CLK(CLK),
-		.RST_N(1/*RST_N*/),
-		.IN_CLK(53693175),
-		.OUT_CLK(44100*2*2),
-		.CE(CDD_2X_CE)
-	);
-	
-	always @(posedge CLK) if (CDD_2X_CE) CDD_CE_DIV <= ~CDD_CE_DIV;
-//	wire CDD_CE = CDD_2X_CE & (CD_SPD | CDD_CE_DIV);
+	always @(posedge CLK) if (CDD_CE) CDD_CE_DIV <= ~CDD_CE_DIV;
 
 	always @(posedge CLK) CD_CK_OLD <= CD_CK;
 	assign CDFIFO_WR = CD_CK & ~CD_CK_OLD;
@@ -129,6 +124,7 @@ module YGR019 (
 		bit        CDD_SYNCED;
 		bit [11:0] CDD_CNT;
 		bit        CDD_PEND;
+		bit        CDDA_CHAN;
 
 		if (!RST_N) begin
 			CR <= '{4{'0}};
@@ -136,6 +132,7 @@ module YGR019 (
 			HIRQ <= '0;
 			HMASK <= '0;
 
+			REG04 <= '0;
 			REG08 <= '0;
 			REG1A <= '0;
 			//REG1C <= '0;
@@ -159,8 +156,11 @@ module YGR019 (
 			CDD_SYNCED <= 0;
 			CDD_CNT <= 4'd0;
 			CDD_PEND <= 0;
+			CDDA_CHAN <= 0;
 			
 			SIRQL_N <= 1;
+			
+			HOOK <= 0;
 		end else begin
 			if (!RES_N) begin
 				
@@ -183,12 +183,30 @@ module YGR019 (
 					if ((!AWRL_N || !AWRU_N) /*&& AWR_N_OLD && !ABUS_WAIT_EN*/ && CE_R) begin
 						case ({AA[5:2],2'b00})
 //							6'h00: DTR <= ADI;
-							6'h08: HIRQ <= HIRQ & ADI;
+							6'h08: for (int i=0; i<16; i++) if (!ADI[i]) HIRQ[i] <= 0;
 							6'h0C: HMASK <= ADI;
-							6'h18: begin CR[0] <= ADI; CR0 <= CR[0]; end
+							6'h18: begin CR[0] <= ADI; end
 							6'h1C: CR[1] <= ADI;
 							6'h20: CR[2] <= ADI;
-							6'h24: begin CR[3] <= ADI; SIRQL_N <= 0; end
+							6'h24: begin CR[3] <= ADI; SIRQL_N <= 0; 
+								CR0[0] <= CR[0][15:8]; 
+								CR0[1] <= CR0[0]; 
+								CR0[2] <= CR0[1]; 
+								CR0[3] <= CR0[2]; 
+								CR0[4] <= CR0[3]; 
+								CR0[5] <= CR0[4]; 
+								CR0[6] <= CR0[5]; 
+								CR0[7] <= CR0[6];
+								CR0[8] <= CR0[7]; 
+								CR0[9] <= CR0[8]; 
+								CR0[10] <= CR0[9]; 
+								CR0[11] <= CR0[10]; 
+								CR0[12] <= CR0[11]; 
+								CR0[13] <= CR0[12]; 
+								CR0[14] <= CR0[13]; 
+								CR0[15] <= CR0[14];
+								if (CR[0] == 16'h1081 && CR[1] == 16'hAE58) HOOK <= 1;
+							end
 							default:;
 						endcase
 					end else if (!ARD_N && ARD_N_OLD /*&& !ABUS_WAIT_EN*/ && CE_F) begin
@@ -197,7 +215,7 @@ module YGR019 (
 								ABUS_WAIT <= 1;
 								ABUS_WAIT_CNT_DBG <= '0;
 							end
-//							6'h24: begin MBX[1] <= 1; end
+//							6'h24: begin REG04[1] <= 1; end
 							default: ;
 						endcase
 					end
@@ -210,7 +228,7 @@ module YGR019 (
 								FIFO_DREQ_PEND <= 1;
 							end
 						end
-						6'h24: begin MBX[1] <= 1; end
+						6'h24: begin REG04[1] <= 1; end
 						default:;
 					endcase
 				end
@@ -248,7 +266,7 @@ module YGR019 (
 										ABUS_WAIT_CNT_DBG <= 8'hFF;
 									end
 								end
-								5'h04: MBX <= SDI;
+								5'h04: REG04 <= SDI;
 								5'h06: CDIRQ <= CDIRQ & SDI;
 								5'h08: REG08 <= SDI;
 								5'h0A: CDMASK <= SDI;
@@ -258,7 +276,10 @@ module YGR019 (
 								5'h16: RR[3] <= SDI;
 								5'h1A: REG1A <= SDI;
 		//						5'h1C: REG1C <= SDI;
-								5'h1E: HIRQ <= HIRQ | SDI;
+								5'h1E: begin 
+									for (int i=0; i<16; i++) if (SDI[i]) HIRQ[i] <= 1;
+									if (CR[0] == 16'h5100 && RR[3] == 16'h00C8 && SDI[0]) HOOK2 <= HOOK;
+								end
 								default:;
 							endcase
 						end else if (!SRD_N && SRD_N_OLD) begin
@@ -272,7 +293,7 @@ module YGR019 (
 									end
 								end
 								5'h02: SH_REG_DO <= TRCTL;
-								5'h04: SH_REG_DO <= MBX;
+								5'h04: SH_REG_DO <= REG04;
 								5'h06: SH_REG_DO <= CDIRQ;
 								5'h08: SH_REG_DO <= REG08;
 								5'h0A: SH_REG_DO <= CDMASK;
@@ -308,6 +329,15 @@ module YGR019 (
 							FIFO_CNT_DBG <= 8'hFF;
 						end
 					end
+//					if (!TRCTL[2]) begin
+////						FIFO_WR_POS <= '0;
+////						FIFO_RD_POS <= '0;
+////						FIFO_AMOUNT <= '0;
+////						FIFO_FULL <= 0;
+////						FIFO_EMPTY <= 1;
+//						FIFO_DREQ <= 0;
+//						FIFO_CNT_DBG <= 8'hFF;
+//					end
 				end
 				
 				if (FIFO_INC_AMOUNT && FIFO_DEC_AMOUNT) begin
@@ -329,32 +359,40 @@ module YGR019 (
 				
 				//DREQ0
 				CDFIFO_RD <= 0;
-				if (CDD_2X_CE) begin
-					CD_SL <= '0;
-					CD_SR <= '0;
-					if (!CDFIFO_EMPTY && (CDFIFO_Q[16] | CDD_CE_DIV)) begin
-						CDFIFO_RD <= 1;
-						CDD_CNT <= CDD_CNT + 12'd2;
-						if (!CDD_SYNCED) begin
-							if (CDD_CNT == 12'd10) begin
-								CDD_SYNCED <= 1; 
-								REG1A[7] <= 1; 
+				if (CDD_CE) begin
+					if (CD_SPEED || CDD_CE_DIV) begin
+						if (!CDFIFO_EMPTY) begin
+							CDFIFO_RD <= 1;
+							if (!CD_AUDIO) begin
+								CDD_CNT <= CDD_CNT + 12'd2;
+								if (!CDD_SYNCED) begin
+									if (CDD_CNT == 12'd10) begin
+										CDD_SYNCED <= 1; 
+										REG1A[7] <= 1; 
+									end
+								end else if (CDD_CNT == 12'd12) begin
+									DBG_HEADER[31:16] <= CDFIFO_Q;
+								end else if (CDD_CNT == 12'd14) begin
+									CDIRQ[4] <= 1;
+									DBG_HEADER[15:0] <= CDFIFO_Q;
+								end else if (CDD_CNT == 12'd2352-2) begin
+									CDD_SYNCED <= 0;
+									CDD_CNT <= 12'd0;
+								end
+								CDD_DATA <= CDFIFO_Q;
+								CDD_PEND <= CDD_SYNCED;
+								
+								CD_SL <= '0;
+								CD_SR <= '0;
+							end else begin
+								CDDA_CHAN <= ~CDDA_CHAN;
+								if (!CDDA_CHAN) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
+								if ( CDDA_CHAN) CD_SR <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
 							end
-						end else if (CDD_CNT == 12'd12) begin
-							DBG_HEADER[31:16] <= CDFIFO_Q[15:0];
-						end else if (CDD_CNT == 12'd14) begin
-							CDIRQ[4] <= 1;
-							DBG_HEADER[15:0] <= CDFIFO_Q[15:0];
-						end else if (CDD_CNT == 12'd2352-2) begin
-							CDD_SYNCED <= 0;
-							CDD_CNT <= 12'd0;
+						end else begin
+							CD_SL <= '0;
+							CD_SR <= '0;
 						end
-						CDD_DATA <= CDFIFO_Q[15:0];
-						CDD_PEND <= CDD_SYNCED;
-						
-						if (!CDD_CNT[1] && CDFIFO_Q[17]) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
-						if (CDD_CNT[1] && CDFIFO_Q[17]) CD_SR <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
-					end else begin
 					end
 				end
 				
@@ -396,7 +434,8 @@ module YGR019 (
 	assign AWAIT_N = ~(ABUS_WAIT & ABUS_WAIT_EN);
 	assign ARQT_N = 1;
 	
-	assign SDO = !DACK0 && REG1A[7] ? CDD_DATA : SH_REG_SEL ? SH_REG_DO : SDI;
+	assign SDO = !DACK0 /*&& REG1A[7]*/ ? CDD_DATA : SH_REG_DO;
+	
 	assign SIRQH_N = ~|(CDIRQ & CDMASK);
 	assign DREQ0_N = ~|CDD_DREQ;
 	assign DREQ1_N = ~FIFO_DREQ;

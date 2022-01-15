@@ -7,6 +7,7 @@ module SH1
 	input             RST_N,
 	input             CE_R,
 	input             CE_F,
+	input             EN,
 	
 	input             RES_N,
 	
@@ -53,6 +54,7 @@ module SH1
 		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
+		.EN(EN),
 		
 		.RES_N(RES_N),
 		.NMI_N(1'b1),

@@ -2,6 +2,7 @@ module Saturn (
 	input             CLK,
 	input             RST_N,
 	input             CE,
+	input             EN,
 	
 	input             SRES_N,
 	
@@ -24,8 +25,7 @@ module Saturn (
 	input      [31:0] VDP1_VRAM_Q,
 	output      [1:0] VDP1_VRAM_WE,
 	output            VDP1_VRAM_RD,
-	input             VDP1_VRAM_ARDY,
-	input             VDP1_VRAM_DRDY,
+	input             VDP1_VRAM_RDY,
 	
 	output     [17:1] VDP1_FB0_A,
 	output     [15:0] VDP1_FB0_D,
@@ -39,29 +39,21 @@ module Saturn (
 	output            VDP1_FB1_WE,
 	output            VDP1_FB1_RD,
 	
-	output     [16:1] VDP2_RA0_A,
-	output     [15:0] VDP2_RA0_D,
-	input      [31:0] VDP2_RA0_Q,
-	output      [1:0] VDP2_RA0_WE,
-	output            VDP2_RA0_RD,
-	
+	output     [18:1] VDP2_RA0_A,
 	output     [16:1] VDP2_RA1_A,
-	output     [15:0] VDP2_RA1_D,
+	output     [31:0] VDP2_RA_D,
+	output      [3:0] VDP2_RA_WE,
+	output            VDP2_RA_RD,
+	input      [31:0] VDP2_RA0_Q,
 	input      [31:0] VDP2_RA1_Q,
-	output      [1:0] VDP2_RA1_WE,
-	output            VDP2_RA1_RD,
 	
-	output     [16:1] VDP2_RB0_A,
-	output     [15:0] VDP2_RB0_D,
-	input      [31:0] VDP2_RB0_Q,
-	output      [1:0] VDP2_RB0_WE,
-	output            VDP2_RB0_RD,
-	
+	output     [18:1] VDP2_RB0_A,
 	output     [16:1] VDP2_RB1_A,
-	output     [15:0] VDP2_RB1_D,
+	output     [31:0] VDP2_RB_D,
+	output      [3:0] VDP2_RB_WE,
+	output            VDP2_RB_RD,
+	input      [31:0] VDP2_RB0_Q,
 	input      [31:0] VDP2_RB1_Q,
-	output      [1:0] VDP2_RB1_WE,
-	output            VDP2_RB1_RD,
 
 	input             SCSP_CE,
 	output     [18:1] SCSP_RAM_A,
@@ -73,6 +65,7 @@ module Saturn (
 	input             SCSP_RAM_RDY,
 
 	input             CD_CE,
+	input             CDD_CE,
 	input             CD_CDATA,
 	output            CD_HDATA,
 	output            CD_COMCLK,
@@ -81,6 +74,8 @@ module Saturn (
 	output            CD_DEMP,
 	input      [17:0] CD_D,
 	input             CD_CK,
+	input             CD_SPEED,
+	input             CD_AUDIO,
 	output     [18:1] CD_RAM_A,
 	output     [15:0] CD_RAM_D,
 	output      [1:0] CD_RAM_WE,
@@ -108,7 +103,7 @@ module Saturn (
 	
 	input      [15:0] JOY1,
 	
-	input       [5:0] SCRN_EN,
+	input       [6:0] SCRN_EN,
 	input       [1:0] SND_EN,
 	input             SSH_EN,
 	input             DBG_PAUSE,
@@ -149,7 +144,46 @@ module Saturn (
 	wire CE_R =  MCLK & ~PAUSE;
 	wire CE_F = ~MCLK & ~PAUSE;
 	
-	bit         SYSRES_N;
+	
+	//MSH
+	bit  [26:0] MSHA;
+	bit  [31:0] MSHDO;
+	bit  [31:0] MSHDI;
+	bit         MSHBS_N;
+	bit         MSHCS0_N;
+	bit         MSHCS1_N;
+	bit         MSHCS2_N;
+	bit         MSHCS3_N;
+	bit         MSHRD_WR_N;
+	bit   [3:0] MSHDQM_N;
+	bit         MSHRD_N;
+	bit         MSHWAIT_N;
+	bit         MSHIVECF_N;
+	bit   [3:0] MSHIRL_N;
+	bit         MSHRES_N;
+	bit         MSHNMI_N;
+	bit         MSHBGR_N;
+	bit         MSHBRLS_N;
+	
+	//SSH
+	bit  [26:0] SSHA;
+	bit  [31:0] SSHDO;
+	bit  [31:0] SSHDI;
+	bit         SSHBS_N;
+	bit         SSHCS0_N;
+	bit         SSHCS1_N;
+	bit         SSHCS2_N;
+	bit         SSHCS3_N;
+	bit         SSHRD_WR_N;
+	bit   [3:0] SSHDQM_N;
+	bit         SSHRD_N;
+	bit         SSHWAIT_N;
+	bit         SSHIVECF_N;
+	bit   [3:0] SSHIRL_N;
+	bit         SSHRES_N;
+	bit         SSHNMI_N;
+	bit         SSHBREQ_N;
+	bit         SSHBACK_N;
 	
 	//SCU
 	bit  [24:0] CA;
@@ -200,6 +234,7 @@ module Saturn (
 	bit  [15:0] BDO;
 	bit         BADDT_N;
 	bit         BDTEN_N;
+	bit         BREQ_N;
 	bit         BCS1_N;
 	bit         BRDY1_N;
 	bit         IRQ1_N;
@@ -216,46 +251,6 @@ module Saturn (
 	
 	bit  [31:0] SCU_DO;
 	
-	//MSH
-	bit  [26:0] MSHA;
-	bit  [31:0] MSHDO;
-	bit  [31:0] MSHDI;
-	bit         MSHBS_N;
-	bit         MSHCS0_N;
-	bit         MSHCS1_N;
-	bit         MSHCS2_N;
-	bit         MSHCS3_N;
-	bit         MSHRD_WR_N;
-	bit   [3:0] MSHDQM_N;
-	bit         MSHRD_N;
-	bit         MSHWAIT_N;
-	bit         MSHIVECF_N;
-	bit   [3:0] MSHIRL_N;
-	bit         MSHRES_N;
-	bit         MSHNMI_N;
-	bit         MSHBGR_N;
-	bit         MSHBRLS_N;
-	
-	//SSH
-	bit  [26:0] SSHA;
-	bit  [31:0] SSHDO;
-	bit  [31:0] SSHDI;
-	bit         SSHBS_N;
-	bit         SSHCS0_N;
-	bit         SSHCS1_N;
-	bit         SSHCS2_N;
-	bit         SSHCS3_N;
-	bit         SSHRD_WR_N;
-	bit   [3:0] SSHDQM_N;
-	bit         SSHRD_N;
-	bit         SSHWAIT_N;
-	bit         SSHIVECF_N;
-	bit   [3:0] SSHIRL_N;
-	bit         SSHRES_N;
-	bit         SSHNMI_N;
-	bit         SSHBREQ_N;
-	bit         SSHBACK_N;
-	
 	//DCC
 	bit         DRAMCE_N;
 	bit         ROMCE_N;
@@ -268,6 +263,7 @@ module Saturn (
 	
 	//SMPC
 	bit   [7:0] SMPC_DO;
+	bit         SYSRES_N;
 	bit         SNDRES_N;
 	bit         CDRES_N;
 	
@@ -295,6 +291,7 @@ module Saturn (
 		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
+		.EN(EN),
 		
 		.RES_N(MSHRES_N),
 		.NMI_N(MSHNMI_N),
@@ -345,7 +342,12 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b001000)
+		.MD(6'b001000),
+		
+		.DBG_REGN('0),
+		.DBG_REGQ(),
+		.DBG_RUN(1),
+		.DBG_BREAK()
 	);
 	
 	SH7604 SSH
@@ -354,6 +356,7 @@ module Saturn (
 		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
+		.EN(EN),
 		
 		.RES_N(SSHRES_N),
 		.NMI_N(SSHNMI_N),
@@ -403,7 +406,12 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b101000)
+		.MD(6'b101000),
+		
+		.DBG_REGN('0),
+		.DBG_REGQ(),
+		.DBG_RUN(1),
+		.DBG_BREAK()
 	);
 	
 	assign MSHIRL_N  = CIRL_N;
@@ -494,6 +502,7 @@ module Saturn (
 		.BDO(BDO),
 		.BADDT_N(BADDT_N),
 		.BDTEN_N(BDTEN_N),
+		.BREQ_N(BREQ_N),
 		.BCS1_N(BCS1_N),
 		.BRDY1_N(BRDY1_N),
 		.IRQ1_N(IRQ1_N),
@@ -652,7 +661,7 @@ module Saturn (
 		.RST_N(RST_N),
 		.CE_R(CE_R),
 		.CE_F(CE_F),
-		.EN(1/*~PAUSE*/),
+		.EN(EN),
 		
 		.RES_N(SYSRES_N),
 		
@@ -661,7 +670,7 @@ module Saturn (
 		.CS_N(BCS1_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-//		.WE_N(BWE_N),
+		.REQ_N(BREQ_N),
 		.RDY_N(BRDY1_N),
 		
 		.IRQ_N(IRQ1_N), 
@@ -676,8 +685,7 @@ module Saturn (
 		.VRAM_WE(VDP1_VRAM_WE),
 		.VRAM_RD(VDP1_VRAM_RD),
 		.VRAM_Q(VDP1_VRAM_Q),
-		.VRAM_ARDY(VDP1_VRAM_ARDY),
-		.VRAM_DRDY(VDP1_VRAM_DRDY),
+		.VRAM_RDY(VDP1_VRAM_RDY),
 		
 		.FB0_A(VDP1_FB0_A),
 		.FB0_D(VDP1_FB0_D),
@@ -709,7 +717,7 @@ module Saturn (
 		.CS_N(BCS2_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-//		.WE_N(BWE_N),
+		.REQ_N(BREQ_N),
 		.RDY_N(BRDY2_N),
 		
 		.VINT_N(IRQV_N),
@@ -722,27 +730,19 @@ module Saturn (
 		.PAL(0),
 		
 		.RA0_A(VDP2_RA0_A),
-		.RA0_D(VDP2_RA0_D),
-		.RA0_WE(VDP2_RA0_WE),
-		.RA0_RD(VDP2_RA0_RD),
-		.RA0_Q(VDP2_RA0_Q),
-		
 		.RA1_A(VDP2_RA1_A),
-		.RA1_D(VDP2_RA1_D),
-		.RA1_WE(VDP2_RA1_WE),
-		.RA1_RD(VDP2_RA1_RD),
+		.RA_D(VDP2_RA_D),
+		.RA_WE(VDP2_RA_WE),
+		.RA_RD(VDP2_RA_RD),
+		.RA0_Q(VDP2_RA0_Q),
 		.RA1_Q(VDP2_RA1_Q),
 		
 		.RB0_A(VDP2_RB0_A),
-		.RB0_D(VDP2_RB0_D),
-		.RB0_WE(VDP2_RB0_WE),
-		.RB0_RD(VDP2_RB0_RD),
-		.RB0_Q(VDP2_RB0_Q),
-		
 		.RB1_A(VDP2_RB1_A),
-		.RB1_D(VDP2_RB1_D),
-		.RB1_WE(VDP2_RB1_WE),
-		.RB1_RD(VDP2_RB1_RD),
+		.RB_D(VDP2_RB_D),
+		.RB_WE(VDP2_RB_WE),
+		.RB_RD(VDP2_RB_RD),
+		.RB0_Q(VDP2_RB0_Q),
 		.RB1_Q(VDP2_RB1_Q),
 		
 		.R(R),
@@ -795,7 +795,7 @@ module Saturn (
 		.CS_N(BCSS_N),
 		.AD_N(BADDT_N),
 		.DTEN_N(BDTEN_N),
-//		.WE_N(BWE_N),
+		.REQ_N(BREQ_N),
 		.RDY_N(BRDYS_N),
 		.INT_N(IRQS_N),
 		
@@ -901,6 +901,7 @@ module Saturn (
 		.RST_N(RST_N),
 		.CE_R(SHCE_R),
 		.CE_F(SHCE_F),
+		.EN(EN),
 		
 		.RES_N(CDRES_N),
 		
@@ -966,7 +967,7 @@ module Saturn (
 		.SA(SA[21:1]),
 		.SDI(SDO),
 		.SDO(YGR019_SDO),
-		.BDI(SDI),
+		.BDI(CD_RAM_Q),
 		.SWRL_N(SWRL_N),
 		.SWRH_N(SWRH_N),
 		.SRD_N(SRD_N),
@@ -980,8 +981,12 @@ module Saturn (
 		.DREQ0_N(DREQ0_N),
 		.DREQ1_N(DREQ1_N),
 
+		.CDD_CE(CDD_CE),
+		
 		.CD_D(CD_D),
 		.CD_CK(CD_CK),
+		.CD_SPEED(CD_SPEED),
+		.CD_AUDIO(CD_AUDIO),
 		
 		.CD_SL(CD_SL),
 		.CD_SR(CD_SR)
@@ -990,7 +995,7 @@ module Saturn (
 	assign SWAIT_N = CD_RAM_RDY;
 	
 	assign CD_RAM_A = SA[18:1];
-	assign CD_RAM_D = YGR019_SDO;
+	assign CD_RAM_D = !DACK0 ? YGR019_SDO : SDO;
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
