@@ -179,6 +179,94 @@ package VDP1_PKG;
 	} Coord_t;
 	parameter Coord_t COORD_NULL = {11'h000,11'h000};
 	
+	function Coord_t SSprCoordACalc(CMDTBL_t CMD);
+		bit [10:0] x,y;
+//		bit [10:0] xa,xb;
+//		bit [10:0] ya,yb;
+//		
+//		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
+//		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
+		case (CMD.CMDCTRL.ZP[1:0])
+			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXA.COORD) : $signed(CMD.CMDXC.COORD);
+			2'b01: x = $signed(CMD.CMDXA.COORD);
+			2'b10: x = $signed(CMD.CMDXA.COORD) - ($signed(CMD.CMDXB.COORD)>>>1);
+			2'b11: x = $signed(CMD.CMDXA.COORD) - $signed(CMD.CMDXB.COORD);
+		endcase
+		case (CMD.CMDCTRL.ZP[3:2])
+			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYA.COORD) : $signed(CMD.CMDYC.COORD);
+			2'b01: y = $signed(CMD.CMDYA.COORD);
+			2'b10: y = $signed(CMD.CMDYA.COORD) - ($signed(CMD.CMDYB.COORD)>>>1);
+			2'b11: y = $signed(CMD.CMDYA.COORD) - $signed(CMD.CMDYB.COORD);
+		endcase
+		return {x,y};
+	endfunction
+	
+	function Coord_t SSprCoordBCalc(CMDTBL_t CMD);
+		bit [10:0] x,y;
+//		bit [10:0] xa,xb;
+//		bit [10:0] ya,yb;
+//		
+//		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
+//		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
+		case (CMD.CMDCTRL.ZP[1:0])
+			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXC.COORD) : $signed(CMD.CMDXA.COORD);
+			2'b01: x = $signed(CMD.CMDXA.COORD) + $signed(CMD.CMDXB.COORD);
+			2'b10: x = $signed(CMD.CMDXA.COORD) + (($signed(CMD.CMDXB.COORD) + 11'd1)>>>1);
+			2'b11: x = $signed(CMD.CMDXA.COORD);
+		endcase
+		case (CMD.CMDCTRL.ZP[3:2])
+			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYC.COORD) : $signed(CMD.CMDYA.COORD);
+			2'b01: y = $signed(CMD.CMDYA.COORD) + $signed(CMD.CMDYB.COORD);
+			2'b10: y = $signed(CMD.CMDYA.COORD) + (($signed(CMD.CMDYB.COORD) + 11'd1)>>>1);
+			2'b11: y = $signed(CMD.CMDYA.COORD);
+		endcase
+		return {x,y};
+	endfunction
+	
+	function bit [10:0] SSprWidthXCalc(CMDTBL_t CMD);
+		bit [10:0] w;
+//		bit [10:0] xa,xc;
+//		
+//		{xa,xc} = CMD.CMDXC.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXC.COORD} : {CMD.CMDXC.COORD,CMD.CMDXA.COORD};
+		case (CMD.CMDCTRL.ZP)
+			4'b0000: w = $signed(CMD.CMDXC.COORD) - $signed(CMD.CMDXA.COORD);
+			default: w = $signed(CMD.CMDXB.COORD);
+		endcase
+		return $signed(w) >= 0 ? $signed(w) : -$signed(w);
+	endfunction
+	
+	function bit [10:0] SSprWidthYCalc(CMDTBL_t CMD);
+		bit [10:0] w;
+//		bit [10:0] ya,yc;
+//		
+//		{ya,yc} = CMD.CMDYC.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYC.COORD} : {CMD.CMDYC.COORD,CMD.CMDYA.COORD};
+		case (CMD.CMDCTRL.ZP)
+			4'b0000: w = $signed(CMD.CMDYC.COORD) - $signed(CMD.CMDYA.COORD);
+			default: w = $signed(CMD.CMDYB.COORD);
+		endcase
+		return $signed(w) >= 0 ? $signed(w) : -$signed(w);
+	endfunction
+	
+	function bit SSprDirXCalc(CMDTBL_t CMD);
+		bit        dir;
+		
+		case (CMD.CMDCTRL.ZP)
+			4'b0000: dir = ~($signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD));
+			default: dir = CMD.CMDXB.COORD[10];
+		endcase
+		return dir;
+	endfunction
+	
+	function bit SSprDirYCalc(CMDTBL_t CMD);
+		bit        dir;
+		
+		case (CMD.CMDCTRL.ZP)
+			4'b0000: dir = ~($signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD));
+			default: dir = CMD.CMDYB.COORD[10];
+		endcase
+		return dir;
+	endfunction
+	
 	typedef struct packed
 	{
 		bit [10: 0] X;
@@ -301,7 +389,7 @@ package VDP1_PKG;
 		return {SB,SG,SR};
 	endfunction
 	
-	function bit [15:0] ColorCalc(input bit [15:0] ORIG, input bit [15:0] BACK, input bit [2:0] CCB);
+	function bit [15:0] ColorCalc(input bit [15:0] ORIG, input bit [15:0] BACK, input bit [2:0] CCB, input bit MON);
 		bit [15:0] CC;
 		bit [14:0] ORIG_HALF,ORIG_ONE;
 		bit [14:0] BACK_HALF,BACK_ONE;
@@ -324,7 +412,7 @@ package VDP1_PKG;
 			3'b111: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = ORIG[15]; end//TODO Gouraud
 		endcase
 		
-		CC = {MSB,ColorAdd(A,B)};		
+		CC = {MON|MSB,ColorAdd(A,B)};		
 		return CC;
 	endfunction
 

@@ -97,6 +97,7 @@ module Saturn (
 	output            INTERLACE,
 	output      [1:0] HRES,
 	output      [1:0] VRES,
+	output            DCE,
 	
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
@@ -675,7 +676,7 @@ module Saturn (
 		
 		.IRQ_N(IRQ1_N), 
 		
-		.DCLK(DCLK),
+		.DCE(DCE),
 		.VTIM_N(VTIM_N),
 		.HTIM_N(HTIM_N),
 		.VOUT(VOUT),
@@ -723,6 +724,7 @@ module Saturn (
 		.VINT_N(IRQV_N),
 		.HINT_N(IRQH_N),
 		
+		.DCE(DCE),
 		.HTIM_N(HTIM_N),
 		.VTIM_N(VTIM_N),
 		.FBD(VOUT),

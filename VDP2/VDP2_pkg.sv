@@ -1549,10 +1549,10 @@ package VDP2_PKG;
 	typedef bit [ 1: 0] NxVSS_t[2];
 	typedef bit [ 1: 0] NxPNCNT_t[2];
 	typedef bit [ 2: 0] NxCHCNT_t[4];
+	typedef bit         NxCHEN_t[4];
 	typedef bit [13: 0] RxDispCoord_t[2];
 	typedef bit [ 1: 0] RxPNS_t[2];
 	typedef bit [ 1: 0] RxCHS_t[2];
-	typedef bit [ 2: 0] RxCHCNT_t[2];
 	typedef bit [ 2: 0] RxCELLX_t[2];
 	typedef bit [ 1: 0] RxCTS_t[2];
 	
@@ -1613,6 +1613,7 @@ package VDP2_PKG;
 		NxCHS_t     NxCHS;
 		NxPNCNT_t   NxPN_CNT;
 		NxCHCNT_t   NxCH_CNT;
+		NxCHEN_t    NxCH_EN;
 		bit [ 1: 0] NxVS;
 		NxVSS_t     NxVSS;
 		
@@ -1620,18 +1621,17 @@ package VDP2_PKG;
 		RxPNS_t     RxPNS;
 		bit [ 1: 0] RxCH;
 		RxCHS_t     RxCHS;
-		RxCHCNT_t   RxCH_CNT;
 		RxCELLX_t   RxCELLX;
 		bit [ 1: 0] RxCT;
 		RxCTS_t     RxCTS;
 	} BGState_t;
-	typedef BGState_t BGPipeline_t [5];
+	typedef BGState_t BGPipeline_t [4];
 	
 	typedef PN_t        NxPND_t[6];
 	typedef NxPND_t     PNPipe_t [4];
 	
 	typedef bit [31: 0] NxCHD_t[4];
-	typedef NxCHD_t     CHPipe_t [4];
+	typedef NxCHD_t     CHPipe_t [2];
 	
 	typedef PN_t        RxPND_t[2];
 	typedef RxPND_t     RPNPipe_t [5];
@@ -2156,10 +2156,11 @@ package VDP2_PKG;
 		bit [ 4: 0] CCRT;
 		bit         COEN;
 		bit         COSL;
+		bit         SDEN;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,5'b00000,1'b0,1'b0,1'b0,24'h000000};
+	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,24'h000000};
 	
 
 	//Color calculation
@@ -2224,6 +2225,10 @@ package VDP2_PKG;
 		CO = !COEN ? C : !COSL ? CAS[7:0] & ~{8{COAx[8]&CAS[8]}} | {8{~COAx[8]&CAS[8]}} : CBS[7:0] & ~{8{COBx[8]&CBS[8]}} | {8{~COBx[8]&CBS[8]}}; 
 		
 		return CO;
+	endfunction
+	
+	function bit [7:0] Shadow(input bit [7:0] C, input bit SDEN);
+		return SDEN ? {1'b0,C[7:1]} : C;
 	endfunction
 	
 	//

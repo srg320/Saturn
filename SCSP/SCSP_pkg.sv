@@ -259,7 +259,6 @@ package SCSP_PKG;
 	typedef bit [15:0] SOUS_t;		//RW,100600-10067F
 	parameter bit [15:0] SOUS_MASK = 16'hFFFF;
 	
-	
 	typedef struct packed
 	{
 		SCR0_t      SCR0;
@@ -276,7 +275,66 @@ package SCSP_PKG;
 		SCR8_t      SCR8;
 	} SCR_t;
 	
-	typedef SOUS_t STACK_t[32];
+//	typedef SOUS_t STACK_t[32];
+	
+	typedef struct packed		//RW,100700-10077F
+	{
+		bit [12: 0] COEF;
+		bit [ 2: 0] UNUSED;
+	} COEF_t;
+	parameter bit [15:0] COEF_MASK = 16'hFFF8;
+	
+	typedef bit [16:1] MADRS_t;		//RW,100780-1007BF
+	parameter bit [16:1] MADRS_MASK = 16'hFFFF;
+	
+	typedef struct packed		//RW,100800-100BFF
+	{
+		bit         UNUSED;
+		bit [ 6: 0] TRA;
+		bit         TWT;
+		bit [ 6: 0] TWA;
+		bit         XSEL;
+		bit [ 1: 0] YSEL;
+		bit         UNUSED2;
+		bit [ 5: 0] IRA;
+		bit         IWT;
+		bit [ 4: 0] IWA;
+		bit         TABLE;
+		bit         MWT;
+		bit         MRD;
+		bit         EWT;
+		bit [ 3: 0] EWA;
+		bit         ADRL;
+		bit         FRCL;
+		bit [ 1: 0] SHIFT;
+		bit         YRL;
+		bit         NEGB;
+		bit         ZERO;
+		bit         BSEL;
+		bit         NOFL;
+		bit [ 5: 0] COEF;
+		bit [ 1: 0] UNUSED3;
+		bit [ 4: 0] MASA;
+		bit         ADREB;
+		bit         NXADR;
+	} MPRO_t;
+	parameter bit [63:0] MPRO_MASK = 64'h7FFFEFFFFFFFFE7F;
+	
+	typedef bit [23:0] TEMP_t;		//RW,100C00-100DFF
+	parameter bit [23:0] TEMP_MASK = 24'hFFFFFF;
+	
+	typedef bit [23:0] MEMS_t;		//RW,100E00-100E7F
+	parameter bit [23:0] MEMS_MASK = 24'hFFFFFF;
+	
+	typedef bit [19:0] MIXS_t;		//RW,100E80-100EBF
+	parameter bit [19:0] MIXS_MASK = 20'hFFFFF;
+	
+	typedef bit [15:0] EFREG_t;	//RW,100EC0-100EDF
+	parameter bit [15:0] EFREG_MASK = 16'hFFFF;
+	
+	typedef MIXS_t MIXSS_t[16];
+	typedef EFREG_t EFREGS_t[16];
+	
 	
 	typedef enum bit [1:0] {
 		EGS_ATTACK  = 2'b00, 
@@ -310,39 +368,43 @@ package SCSP_PKG;
 	} OPPipe_t;
 	parameter OPPipe_t OP_PIPE_RESET = '{'0,0,0};
 	
-	function bit [15:0] SoundSel(input bit [15:0] WAVE, input bit [15:0] NOISE, SCR0_t SCR0);
-		bit [15:0] SD;
-		bit [15:0] temp;
+	function bit signed [15:0] SignedShiftRight(bit signed [15:0] V, bit [3:0] A);
+		return $signed(V)>>>A;;
+	endfunction
+	
+	function bit [15:0] SoundSel(input bit signed [15:0] WAVE, input bit signed [15:0] NOISE, SCR0_t SCR0);
+		bit signed [15:0] SD;
+		bit signed [15:0] temp;
 		
 		case (SCR0.SSCTL)
 			2'b00: temp = WAVE;
 			2'b01: temp = NOISE;
-			default: temp = 16'H0000;
+			default: temp = 16'sh0000;
 		endcase
 		SD = {temp[15] ^ SCR0.SBCTL[1], temp[14:0] ^ {15{SCR0.SBCTL[0]}}}; 
 	
 		return SD;
 	endfunction
 
-	function bit [15:0] MDCalc(input STACK_t STACK, SCR4_t SCR4);
-		bit [15:0] MD;
-		bit [15:0] X,Y;
-		bit [15:0] TEMP;
-		
-		X = STACK[SCR4.MDXSL];
-		Y = STACK[SCR4.MDYSL];
-		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
-		MD = $signed(TEMP)>>>(26-SCR4.MDL);
-		
-		return SCR4.MDL ? MD : '0;
-	endfunction
+//	function bit signed [15:0] MDCalc(input STACK_t STACK, SCR4_t SCR4);
+//		bit signed [15:0] MD;
+//		bit signed [15:0] X,Y;
+//		bit signed [15:0] TEMP;
+//		
+//		X = $signed(STACK[SCR4.MDXSL]);
+//		Y = $signed(STACK[SCR4.MDYSL]);
+//		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
+//		MD = $signed($signed(TEMP)>>>(26-SCR4.MDL));
+//		
+//		return SCR4.MDL ? MD : '0;
+//	endfunction
 
-	function bit [15:0] MDCalc2(bit [15:0] X, bit [15:0] Y, bit [3:0] MDL);
-		bit [15:0] MD;
-		bit [15:0] TEMP;
+	function bit signed [15:0] MDCalc2(bit signed [15:0] X, bit signed [15:0] Y, bit [3:0] MDL);
+		bit signed [15:0] MD;
+		bit signed [15:0] TEMP;
 		
 		TEMP = {X[15],X[15:1]} + {Y[15],Y[15:1]}; 
-		MD = TEMP>>>(~MDL);
+		MD = $signed($signed(TEMP)>>>(~MDL));
 		
 		return MDL ? MD : '0;
 	endfunction
@@ -400,28 +462,24 @@ package SCSP_PKG;
 		return RES;
 	endfunction
 	
-	function bit [15:0] VolCalc(bit [15:0] ENV, bit [7:0] TL);
-		bit [15:0] RES;
-		
-		RES = ENV>>>TL[7:4];
-		
-		return RES;
+	function bit signed [15:0] VolCalc(bit signed [15:0] ENV, bit [7:0] TL);
+		return $signed($signed(ENV)>>>TL[7:4]);
 	endfunction
 	
-	function bit [15:0] LevelCalc(bit [15:0] WAVE, bit [2:0] SDL);
-		return SDL ? WAVE>>>(~SDL) : '0;
+	function bit signed [15:0] LevelCalc(bit signed [15:0] WAVE, bit [2:0] SDL);
+		return SDL ? $signed(WAVE>>>(~SDL)) : 16'sh0000;
 	endfunction
 	
-	function bit [15:0] PanLCalc(bit [15:0] WAVE, bit [4:0] PAN);
-		return !PAN[4] ? WAVE>>>PAN[3:0] : WAVE;
+	function bit signed [15:0] PanLCalc(bit signed [15:0] WAVE, bit [4:0] PAN);
+		return !PAN[4] ? $signed($signed(WAVE)>>>PAN[3:0]) : WAVE;
 	endfunction
 	
-	function bit [15:0] PanRCalc(bit [15:0] WAVE, bit [4:0] PAN);
-		return  PAN[4] ? WAVE>>>PAN[3:0] : WAVE;
+	function bit signed [15:0] PanRCalc(bit signed [15:0] WAVE, bit [4:0] PAN);
+		return  PAN[4] ? $signed($signed(WAVE)>>>PAN[3:0]) : WAVE;
 	endfunction
 	
-	function bit [15:0] MVolCalc(bit [15:0] WAVE, bit [3:0] MVOL);
-		return WAVE>>>(~MVOL);
+	function bit signed [15:0] MVolCalc(bit signed [15:0] WAVE, bit [3:0] MVOL);
+		return $signed($signed(WAVE)>>>(~MVOL));
 	endfunction
 	
 	function bit [7:0] LFOWave(bit [7:0] POS, bit [7:0] NOISE, bit [1:0] LFOWS);

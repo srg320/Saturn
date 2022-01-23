@@ -69,7 +69,12 @@ module SCSP (
 	output SCR7_t     SCR7_DBG,
 	output SCR8_t     SCR8_DBG,
 	output     [19:0] ADP_DBG,
-	output     [9:0] EVOL_OP2_DBG
+	output      [9:0] EVOL_OP2_DBG,
+	output signed [15:0] LVL_DBG,
+	output signed [15:0] PAN_L_DBG,
+	output signed [15:0] PAN_R_DBG,
+	output            DIR_ACC_L_OF,
+	output            DIR_ACC_R_OF
 );
 	import SCSP_PKG::*;
 	
@@ -109,7 +114,9 @@ module SCSP (
 	SCR8_t     SCR8;
 //	STACK_t    STACK0;
 //	STACK_t    STACK1;
-
+	MIXSS_t    MIXSS;
+	EFREGS_t   EFREGS;
+	
 	bit  [3:0] CR4_CA;
 	
 	bit [19:0] ADP;
@@ -168,9 +175,11 @@ module SCSP (
 	always @(posedge CLK) if (CYCLE_CE) CYCLE_NUM <= CYCLE_NUM + 2'd1;
 	wire SLOT_EN = CYCLE_NUM == 2'b00;
 	wire DSP_EN = CYCLE_NUM == 2'b01;
+	wire OUT_EN = CYCLE_NUM == 2'b10;
 	
 	wire SLOT_CE = SLOT_EN & CYCLE_CE;
 	wire DSP_CE = DSP_EN & CYCLE_CE;
+	wire OUT_CE = OUT_EN & CYCLE_CE;
 	
 	bit        SAMPLE_CE;
 	
@@ -257,11 +266,7 @@ module SCSP (
 			S = OP2_PIPE.SLOT;
 			
 			MD <= MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
-			
-//			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? {SAOI[S],SAOF[S]} + (PHASE + {MD,10'h000}) : {SAOI[S],SAOF[S]} - (PHASE + {MD,10'h000});
 			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR[S] ? SAO_Q + (PHASE + {MD,10'h000}) : SAO_Q - (PHASE + {MD,10'h000});
-			
-			NEW_SA_INT_DBG = NEW_SA_INT;
 			
 			LL = LEA - LSA;
 			if (SLOT_CE) begin
@@ -310,9 +315,9 @@ module SCSP (
 				
 				{OP3_SAOI,OP3_SAOF} <= NEW_SAO;
 				
-//				OP3_MD <= MD;//MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
 				OP3_PIPE <= OP2_PIPE;
 			end
+			NEW_SA_INT_DBG = NEW_SA_INT;
 		end
 	end
 	bit [25:0] SAO_Q;
@@ -321,10 +326,8 @@ module SCSP (
 	assign EVOL_OP2_DBG = EVOL[OP2_PIPE.SLOT];
 	
 	//Operation 3:  
-//	bit [15:0] OP3_MD;	//Modulation data
 	bit [15:0] OP3_SAOI;	//Sample address offset integer
 	bit [ 9:0] OP3_SAOF;	//Sample address offset fractional
-//	wire [19:0] SOFFS = {4'b0000,OP3_SAOI};
 	assign ADP = {SCR0.SAH,SA} + (!SCR0.PCM8B ? {3'b000,OP3_SAOI,1'b0} : {4'b0000,OP3_SAOI});
 	
 	always @(posedge CLK or negedge RST_N) begin
@@ -332,7 +335,9 @@ module SCSP (
 		
 		if (!RST_N) begin
 			OP4_PIPE <= OP_PIPE_RESET;
-			OP4_WD <= '0;
+			// synopsys translate_off
+			OP4_WD <= 0;
+			// synopsys translate_on
 		end
 		else begin
 //			S = OP3_PIPE.SLOT;
@@ -347,13 +352,16 @@ module SCSP (
 	//Operation 4: EG
 	bit  [9:0] EVOL[32]; //Envelope level
 	EGState_t  EGST[32]; //Envelope state
-	bit [15:0] OP4_WD; //Wave form data
+	bit signed [15:0] OP4_WD; //Wave form data
 	always @(posedge CLK or negedge RST_N) begin
 		bit [10:0] VOL_NEXT;
 		bit [ 4:0] S;
 		
 		if (!RST_N) begin
 			OP5_PIPE <= OP_PIPE_RESET;
+			// synopsys translate_off
+			OP5_WD <= 0;
+			// synopsys translate_on
 			EVOL <= '{32{'1}};
 			EGST <= '{32{EGS_RELEASE}};
 		end
@@ -365,8 +373,10 @@ module SCSP (
 						VOL_NEXT = {1'b0,EVOL[S]} - {1'b0,SCR2.AR,5'b11111} + 11'd1;
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
+							OP5_EVOL <= VOL_NEXT[9:0];
 						end else begin
 							EVOL[S] <= 10'h000;
+							OP5_EVOL <= 10'h000;
 							EGST[S] <= EGS_DECAY1;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
@@ -376,8 +386,10 @@ module SCSP (
 						VOL_NEXT = {1'b0,EVOL[S]} + {1'b0,SCR2.D1R,5'b00000};
 						if (VOL_NEXT[9:5] < SCR1.DL) begin
 							EVOL[S] <= VOL_NEXT[9:0];
+							OP5_EVOL <= VOL_NEXT[9:0];
 						end else begin
 							EVOL[S] <= VOL_NEXT[9:0];//{SCR[S].SCR1.DL,5'b00000};
+							OP5_EVOL <= VOL_NEXT[9:0];
 							EGST[S] <= EGS_DECAY2;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
@@ -387,8 +399,10 @@ module SCSP (
 						VOL_NEXT = {1'b0,EVOL[S]} + {1'b0,SCR2.D2R,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
+							OP5_EVOL <= VOL_NEXT[9:0];
 						end else begin
 							EVOL[S] <= 10'h3FF;
+							OP5_EVOL <= 10'h3FF;
 						end
 						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
 					end
@@ -397,11 +411,13 @@ module SCSP (
 						VOL_NEXT = {1'b0,EVOL[S]} + {1'b0,SCR1.RR,5'b00000};
 						if (!VOL_NEXT[10]) begin
 							EVOL[S] <= VOL_NEXT[9:0];
+							OP5_EVOL <= VOL_NEXT[9:0];
 						end else begin
 							EVOL[S] <= 10'h3FF;
+							OP5_EVOL <= 10'h3FF;
 						end
 						if (OP4_PIPE.KON) begin
-							EVOL[S] <= 10'h3FF;
+							//EVOL[S] <= 10'h3FF;
 							EGST[S] <= EGS_ATTACK;
 						end
 					end
@@ -414,22 +430,26 @@ module SCSP (
 	end
 	
 	//Operation 5: Level calculation
-	bit [15:0] OP5_WD; //Wave form data
+	bit signed [15:0] OP5_WD; //Wave form data
+	bit [ 9:0] OP5_EVOL;
 	always @(posedge CLK or negedge RST_N) begin
-		bit [ 4:0] S;
+//		bit [ 4:0] S;
 		bit [ 7:0] TL;
-		bit [15:0] TEMP;
+		bit signed [15:0] TEMP;
 		
 		if (!RST_N) begin
 			OP6_PIPE <= OP_PIPE_RESET;
-			OP6_SD <= '0;
+			// synopsys translate_off
+			OP6_SD <= 0;
+			// synopsys translate_on
 		end
 		else begin
-			S = OP5_PIPE.SLOT;
+//			S = OP5_PIPE.SLOT;
 			TL = SCR3.TL;
 			if (SLOT_CE) begin
 				TEMP = VolCalc(OP5_WD, TL);
-				OP6_SD <= EVOL[S] != 10'h3FF ? TEMP : '0;
+				OP6_SD <= OP5_EVOL != 10'h3FF ? TEMP : '0;
+				OP6_EVOL <= OP5_EVOL;
 				OP6_PIPE <= OP5_PIPE;
 			end
 			EVOL_DBG <= TEMP;
@@ -437,107 +457,159 @@ module SCSP (
 	end
 	
 	//Operation 6: Level calculation
-	bit [15:0] OP6_SD;	//Slot out data
+	bit signed [15:0] OP6_SD;	//Slot out data
+	bit [ 9:0] OP6_EVOL;
 	always @(posedge CLK or negedge RST_N) begin
-		bit [ 4:0] S;
-		bit [25:0] TEMP;
+//		bit [ 4:0] S;
+//		bit [25:0] TEMP;
 		
 		if (!RST_N) begin
 			OP7_PIPE <= OP_PIPE_RESET;
 		end
 		else begin
-			S = OP6_PIPE.SLOT;
+//			S = OP6_PIPE.SLOT;
 			if (SLOT_CE) begin
-				TEMP = $signed(OP6_SD) * (10'h3FF-EVOL[S]);
-				OP7_SD <= TEMP[25:10];
+//				TEMP = $signed(OP6_SD) * (10'h3FF - OP6_EVOL);
+				OP7_SD <= VolCalc(OP6_SD, OP6_EVOL[9:2]);//TEMP[25:10];
 				OP7_PIPE <= OP6_PIPE;
 			end
 		end
 	end
 	
 	//Operation 7: Stack save
-	bit [15:0] OP7_SD;
-	bit [15:0] DIR_ACC_L,DIR_ACC_R;
-//	bit        DIR_OUT;
+	//Direct out
+	bit signed [15:0] OP7_SD;
+	bit [16:0] DIR_ACC_L,DIR_ACC_R;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
-		bit [15:0] TEMP;
-		bit [15:0] TEMP_L,TEMP_R;
+		bit signed [15:0] TEMP;
+		bit signed [15:0] PAN_L,PAN_R;
 		
 		if (!RST_N) begin
-//			DIR_OUT <= 0;
+			// synopsys translate_off
+			DIR_ACC_L <= 0;
+			DIR_ACC_R <= 0;
+			// synopsys translate_on
 		end
 		else begin
 			S = OP7_PIPE.SLOT;
 			
 			if (SLOT_CE) begin
 				TEMP = LevelCalc(OP7_SD,SCR8.DISDL);
-				TEMP_L = PanLCalc(TEMP,SCR8.DIPAN);
-				TEMP_R = PanRCalc(TEMP,SCR8.DIPAN);
+				PAN_L = PanLCalc(TEMP,SCR8.DIPAN);
+				PAN_R = PanRCalc(TEMP,SCR8.DIPAN);
 				if (S == 5'd0) begin
-					DIR_ACC_L <= {{2{TEMP_L[15]}},TEMP_L[15:2]};
-					DIR_ACC_R <= {{2{TEMP_R[15]}},TEMP_R[15:2]};
+					DIR_ACC_L <= {{3{PAN_L[15]}},PAN_L[15:2]};
+					DIR_ACC_R <= {{3{PAN_R[15]}},PAN_R[15:2]};
 				end else begin
-					DIR_ACC_L <= DIR_ACC_L + {{2{TEMP_L[15]}},TEMP_L[15:2]};
-					DIR_ACC_R <= DIR_ACC_R + {{2{TEMP_R[15]}},TEMP_R[15:2]};
+					DIR_ACC_L <= DIR_ACC_L + {{3{PAN_L[15]}},PAN_L[15:2]};
+					DIR_ACC_R <= DIR_ACC_R + {{3{PAN_R[15]}},PAN_R[15:2]};
 				end
+				LVL_DBG <= TEMP;
+				PAN_L_DBG <= PAN_L;
+				PAN_R_DBG <= PAN_R;
 			end
 		end
 	end
+	assign DIR_ACC_L_OF = ^DIR_ACC_L[16:15];
+	assign DIR_ACC_R_OF = ^DIR_ACC_L[16:15];
 	
-	bit [15:0] EFF_ACC_L,EFF_ACC_R;
+	//DSP input
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
-		bit [15:0] TEMP;
-		bit [15:0] TEMP_L,TEMP_R;
+		bit signed [15:0] TEMP;
+		bit signed [15:0] PAN_L,PAN_R;
 		
 		if (!RST_N) begin
-			
+			// synopsys translate_off
+			MIXSS <= '{16{'0}};
+			// synopsys translate_on
 		end
 		else begin
 			S = OP7_PIPE.SLOT;
 			
-			if (DSP_CE) begin
-				TEMP = '0;
-				if (S <= 5'd15) begin
-					
-				end else if (S == 5'd16) begin
-					TEMP = LevelCalc(ESL,3'h7/*SCR8.EFSDL*/);
-					EFF_ACC_L <= {{2{TEMP[15]}},TEMP[15:2]};
-				end else if (S == 5'd17) begin
-					TEMP = LevelCalc(ESR,3'h7/*SCR8.EFSDL*/);
-					EFF_ACC_R <= {{2{TEMP[15]}},TEMP[15:2]};
+			if (SLOT_CE) begin
+				if (S == 5'd0) begin
+					MIXSS <= '{16{'0}};
 				end
-//				TEMP_L = PanLCalc(TEMP,5'h1F/*SCR8.EFPAN*/);
-//				TEMP_R = PanRCalc(TEMP,5'h0F/*SCR8.EFPAN*/);
-//				
-//				if (S == 5'd0) begin
-//					EFF_ACC_L <= {{2{TEMP_L[15]}},TEMP_L[15:2]};
-//					EFF_ACC_R <= {{2{TEMP_R[15]}},TEMP_R[15:2]};
-//				end else begin
-//					EFF_ACC_L <= EFF_ACC_L + {{2{TEMP_L[15]}},TEMP_L[15:2]};
-//					EFF_ACC_R <= EFF_ACC_R + {{2{TEMP_R[15]}},TEMP_R[15:2]};
-//				end
+			end else if (DSP_CE) begin
+				TEMP = LevelCalc(OP7_SD,SCR7.IMXL);
+				MIXSS[SCR7.ISEL] <= MIXSS[SCR7.ISEL] + {{4{TEMP[15]}},TEMP};
 			end
 		end
 	end
 	
-	
-	//Direct out
-	assign SAMPLE_CE = (OP7_PIPE.SLOT == 5'd31) && CYCLE_NUM == 2'b11 && CYCLE_CE;
-	bit [15:0] DIR_L,DIR_R;
-	bit [15:0] EFF_L,EFF_R;
+	//DSP execute
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			DIR_L <= '0;
-			DIR_R <= '0;
+			// synopsys translate_off
+			EFREGS <= '{16{'0}};
+			// synopsys translate_on
 		end
 		else begin
+			if (DSP_CE) begin
+				for (int i=0; i<16; i++) begin
+					EFREGS[i] <= MIXSS[i][19:4];
+				end
+			end
+		end
+	end
+	
+	//Effect out
+	bit signed [15:0] EFF_ACC_L,EFF_ACC_R;
+	always @(posedge CLK or negedge RST_N) begin
+		bit [ 4:0] S;
+		bit signed [15:0] TEMP;
+		bit signed [15:0] PAN_L,PAN_R;
+		
+		if (!RST_N) begin
+			// synopsys translate_off
+			EFF_ACC_L <= '0;
+			EFF_ACC_R <= '0;
+			// synopsys translate_on
+		end
+		else begin
+			S = OP7_PIPE.SLOT;
+			
+			if (OUT_CE) begin
+				TEMP = '0;
+				if (S <= 5'd15) begin
+					TEMP = LevelCalc(EFREGS[S[3:0]],SCR8.EFSDL);
+				end else if (S == 5'd16) begin
+					TEMP = LevelCalc(ESL,SCR8.EFSDL);
+				end else if (S == 5'd17) begin
+					TEMP = LevelCalc(ESR,SCR8.EFSDL);
+				end
+				PAN_L = PanLCalc(TEMP,SCR8.EFPAN);
+				PAN_R = PanRCalc(TEMP,SCR8.EFPAN);
+				
+				if (S == 5'd0) begin
+					EFF_ACC_L <= {{2{PAN_L[15]}},PAN_L[15:2]};
+					EFF_ACC_R <= {{2{PAN_R[15]}},PAN_R[15:2]};
+				end else begin
+					EFF_ACC_L <= EFF_ACC_L + {{2{PAN_L[15]}},PAN_L[15:2]};
+					EFF_ACC_R <= EFF_ACC_R + {{2{PAN_R[15]}},PAN_R[15:2]};
+				end
+			end
+		end
+	end
+	
+	//Out
+	assign SAMPLE_CE = (OP7_PIPE.SLOT == 5'd31) && CYCLE_NUM == 2'b11 && CYCLE_CE;
+	bit signed [15:0] DIR_L,DIR_R;
+	bit signed [15:0] EFF_L,EFF_R;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			// synopsys translate_off
+			DIR_L <= '0;
+			DIR_R <= '0;
+			// synopsys translate_on
+		end else begin
 			if (SAMPLE_CE) begin
-				DIR_L <= SND_EN[0] ? DIR_ACC_L : '0;
-				DIR_R <= SND_EN[0] ? DIR_ACC_R : '0;
-				EFF_L <= SND_EN[1] ? EFF_ACC_L : '0;
-				EFF_R <= SND_EN[1] ? EFF_ACC_R : '0;
+				DIR_L <= SND_EN[0] ? $signed({DIR_ACC_L[16],DIR_ACC_L[14:0]}) : 16'sh0000;
+				DIR_R <= SND_EN[0] ? $signed({DIR_ACC_R[16],DIR_ACC_R[14:0]}) : 16'sh0000;
+				EFF_L <= SND_EN[1] ? $signed(EFF_ACC_L[15:0]) : 16'sh0000;
+				EFF_R <= SND_EN[1] ? $signed(EFF_ACC_R[15:0]) : 16'sh0000;
 			end
 		end
 	end
