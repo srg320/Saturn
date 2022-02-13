@@ -306,7 +306,7 @@ package SCSP_PKG;
 		bit [ 3: 0] EWA;
 		bit         ADRL;
 		bit         FRCL;
-		bit [ 1: 0] SHIFT;
+		bit [ 1: 0] SHFT;
 		bit         YRL;
 		bit         NEGB;
 		bit         ZERO;
@@ -321,13 +321,13 @@ package SCSP_PKG;
 	parameter bit [63:0] MPRO_MASK = 64'h7FFFEFFFFFFFFE7F;
 	
 	typedef bit [23:0] TEMP_t;		//RW,100C00-100DFF
-	parameter bit [23:0] TEMP_MASK = 24'hFFFFFF;
+	parameter bit [31:0] TEMP_MASK = 32'h00FFFFFF;
 	
 	typedef bit [23:0] MEMS_t;		//RW,100E00-100E7F
-	parameter bit [23:0] MEMS_MASK = 24'hFFFFFF;
+	parameter bit [31:0] MEMS_MASK = 32'h00FFFFFF;
 	
 	typedef bit [19:0] MIXS_t;		//RW,100E80-100EBF
-	parameter bit [19:0] MIXS_MASK = 20'hFFFFF;
+	parameter bit [31:0] MIXS_MASK = 32'h000FFFFF;
 	
 	typedef bit [15:0] EFREG_t;	//RW,100EC0-100EDF
 	parameter bit [15:0] EFREG_MASK = 16'hFFFF;
@@ -492,6 +492,25 @@ package SCSP_PKG;
 			2'b11: WAVE = NOISE;
 		endcase
 		return WAVE;
+	endfunction
+	
+	function bit [25:0] DSPMulti(bit [23:0] X, bit [12:0] Y);
+		bit [37:0] M;
+		
+		M = {X,1'b0} * {Y,1'b0};
+		return M[37:12];
+	endfunction
+	
+	function bit [23:0] DSPShifter(bit [25:0] A, bit [1:0] SHFT);
+		bit [23:0] S;
+		
+		case (SHFT)
+			2'b00: S = !A[25] && A[24:23] != 2'b00 ? 24'h7FFFFF : A[25] && A[24:23] != 2'b11 ? 24'h800000 : A[23:0];
+			2'b01: S = !A[25] && A[24:23] != 2'b00 ? 24'h7FFFFF : A[25] && A[24:23] != 2'b11 ? 24'h800000 : {A[22:0],1'b0};
+			2'b10: S = A[23:0];
+			2'b11: S = {A[22:0],1'b0};
+		endcase
+		return S;
 	endfunction
 	
 endpackage

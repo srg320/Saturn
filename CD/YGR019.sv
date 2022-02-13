@@ -47,11 +47,11 @@ module YGR019 (
 	output     [15:0] CD_SL,
 	output     [15:0] CD_SR,
 	
-	output     [7:0] CR0[16],
+//	output     [7:0] CR0[16],
 	output     [31:0] DBG_HEADER,
-	output     [7:0] DBG_CNT,
-	output     [7:0] FIFO_CNT_DBG,
-	output     [7:0] ABUS_WAIT_CNT_DBG,
+//	output     [7:0] DBG_CNT,
+//	output     [7:0] FIFO_CNT_DBG,
+//	output     [7:0] ABUS_WAIT_CNT_DBG,
 	output reg  HOOK,
 	output reg  HOOK2
 );
@@ -177,7 +177,7 @@ module YGR019 (
 					SCU_REG_SEL_OLD <= SCU_REG_SEL;
 				end
 				
-				if (ABUS_WAIT_CNT_DBG < 8'hF0 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 8'd1;
+//				if (ABUS_WAIT_CNT_DBG < 8'hF0 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 8'd1;
 				
 				if (SCU_REG_SEL) begin
 					if ((!AWRL_N || !AWRU_N) /*&& AWR_N_OLD && !ABUS_WAIT_EN*/ && CE_R) begin
@@ -189,22 +189,22 @@ module YGR019 (
 							6'h1C: CR[1] <= ADI;
 							6'h20: CR[2] <= ADI;
 							6'h24: begin CR[3] <= ADI; SIRQL_N <= 0; 
-								CR0[0] <= CR[0][15:8]; 
-								CR0[1] <= CR0[0]; 
-								CR0[2] <= CR0[1]; 
-								CR0[3] <= CR0[2]; 
-								CR0[4] <= CR0[3]; 
-								CR0[5] <= CR0[4]; 
-								CR0[6] <= CR0[5]; 
-								CR0[7] <= CR0[6];
-								CR0[8] <= CR0[7]; 
-								CR0[9] <= CR0[8]; 
-								CR0[10] <= CR0[9]; 
-								CR0[11] <= CR0[10]; 
-								CR0[12] <= CR0[11]; 
-								CR0[13] <= CR0[12]; 
-								CR0[14] <= CR0[13]; 
-								CR0[15] <= CR0[14];
+//								CR0[0] <= CR[0][15:8]; 
+//								CR0[1] <= CR0[0]; 
+//								CR0[2] <= CR0[1]; 
+//								CR0[3] <= CR0[2]; 
+//								CR0[4] <= CR0[3]; 
+//								CR0[5] <= CR0[4]; 
+//								CR0[6] <= CR0[5]; 
+//								CR0[7] <= CR0[6];
+//								CR0[8] <= CR0[7]; 
+//								CR0[9] <= CR0[8]; 
+//								CR0[10] <= CR0[9]; 
+//								CR0[11] <= CR0[10]; 
+//								CR0[12] <= CR0[11]; 
+//								CR0[13] <= CR0[12]; 
+//								CR0[14] <= CR0[13]; 
+//								CR0[15] <= CR0[14];
 								if (CR[0] == 16'h1081 && CR[1] == 16'hAE58) HOOK <= 1;
 							end
 							default:;
@@ -213,7 +213,7 @@ module YGR019 (
 						case ({AA[5:2],2'b00})
 							6'h00: begin
 								ABUS_WAIT <= 1;
-								ABUS_WAIT_CNT_DBG <= '0;
+//								ABUS_WAIT_CNT_DBG <= '0;
 							end
 //							6'h24: begin REG04[1] <= 1; end
 							default: ;
@@ -236,7 +236,7 @@ module YGR019 (
 				if (CE_F) begin
 					if (ABUS_WAIT && (!FIFO_EMPTY || TRCTL[3])) begin
 						ABUS_WAIT <= 0;
-						ABUS_WAIT_CNT_DBG <= 8'hFF;
+//						ABUS_WAIT_CNT_DBG <= 8'hFF;
 					end
 				end
 				
@@ -254,7 +254,7 @@ module YGR019 (
 									end
 								end
 								5'h02: begin 
-									TRCTL <= SDI; 
+									TRCTL <= SDI & TRCTL_WMASK; 
 									FIFO_DREQ_PEND <= SDI[2]; 
 									if (SDI[1]) begin
 										FIFO_WR_POS <= '0;
@@ -263,18 +263,18 @@ module YGR019 (
 //										FIFO_FULL <= 0;
 										FIFO_EMPTY <= 1;
 										FIFO_DREQ <= 0;
-										ABUS_WAIT_CNT_DBG <= 8'hFF;
+//										ABUS_WAIT_CNT_DBG <= 8'hFF;
 									end
 								end
-								5'h04: REG04 <= SDI;
-								5'h06: CDIRQ <= CDIRQ & SDI;
-								5'h08: REG08 <= SDI;
+								5'h04: REG04 <= SDI & REG04_WMASK;
+								5'h06: CDIRQ <= CDIRQ & (SDI /*& CDIRQ_WMASK*/);
+								5'h08: REG08 <= SDI & REG08_WMASK;
 								5'h0A: CDMASK <= SDI;
 								5'h10: RR[0] <= SDI;
 								5'h12: RR[1] <= SDI;
 								5'h14: RR[2] <= SDI;
 								5'h16: RR[3] <= SDI;
-								5'h1A: REG1A <= SDI;
+								5'h1A: REG1A <= SDI & REG1A_WMASK;
 		//						5'h1C: REG1C <= SDI;
 								5'h1E: begin 
 									for (int i=0; i<16; i++) if (SDI[i]) HIRQ[i] <= 1;
@@ -292,16 +292,16 @@ module YGR019 (
 										FIFO_DREQ_PEND <= 1;
 									end
 								end
-								5'h02: SH_REG_DO <= TRCTL;
-								5'h04: SH_REG_DO <= REG04;
-								5'h06: SH_REG_DO <= CDIRQ;
-								5'h08: SH_REG_DO <= REG08;
-								5'h0A: SH_REG_DO <= CDMASK;
+								5'h02: SH_REG_DO <= TRCTL & TRCTL_RMASK;
+								5'h04: SH_REG_DO <= REG04 & REG04_RMASK;
+								5'h06: SH_REG_DO <= CDIRQ & CDIRQ_RMASK;
+								5'h08: SH_REG_DO <= REG08 & REG08_RMASK;
+								5'h0A: SH_REG_DO <= CDMASK & CDMASK_RMASK;
 								5'h10: SH_REG_DO <= CR[0];
 								5'h12: SH_REG_DO <= CR[1];
 								5'h14: SH_REG_DO <= CR[2];
 								5'h16: begin SH_REG_DO <= CR[3]; SIRQL_N <= 1; end
-								5'h1A: SH_REG_DO <= REG1A;
+								5'h1A: SH_REG_DO <= REG1A & REG1A_RMASK;
 								5'h1C: SH_REG_DO <= 16'h0016;//REG1C;
 								default: SH_REG_DO <= '0;
 							endcase
@@ -311,12 +311,12 @@ module YGR019 (
 				
 				//DREQ1
 				if (SHCE_R) begin
-					if (FIFO_CNT_DBG < 8'h80) FIFO_CNT_DBG <= FIFO_CNT_DBG + 8'd1;
+//					if (FIFO_CNT_DBG < 8'h80) FIFO_CNT_DBG <= FIFO_CNT_DBG + 8'd1;
 					
 					if (FIFO_DREQ_PEND) begin
 						FIFO_DREQ_PEND <= 0;
 						FIFO_DREQ <= 1;
-						FIFO_CNT_DBG <= '0;
+//						FIFO_CNT_DBG <= '0;
 					end
 
 					DACK1_OLD <= DACK1;
@@ -326,7 +326,7 @@ module YGR019 (
 						FIFO_INC_AMOUNT <= 1;
 						if (FIFO_AMOUNT > 7'd2 && FIFO_DREQ) begin
 							FIFO_DREQ <= 0;
-							FIFO_CNT_DBG <= 8'hFF;
+//							FIFO_CNT_DBG <= 8'hFF;
 						end
 					end
 //					if (!TRCTL[2]) begin
@@ -397,12 +397,12 @@ module YGR019 (
 				end
 				
 				if (SHCE_R) begin
-					if (DBG_CNT < 8'h80) DBG_CNT <= DBG_CNT + 8'd1;
+//					if (DBG_CNT < 8'h80) DBG_CNT <= DBG_CNT + 8'd1;
 					
 					if (CDD_PEND) begin
 						CDD_DREQ[0] <= REG1A[7];
 						CDD_PEND <= 0;
-						if (REG1A[7]) DBG_CNT <= '0;
+//						if (REG1A[7]) DBG_CNT <= '0;
 					end else if (CDD_DREQ[0]) begin
 						CDD_DREQ[0] <= 0;
 					end
@@ -410,7 +410,7 @@ module YGR019 (
 					
 					DACK0_OLD <= DACK0;
 					if (DACK0 && !DACK0_OLD) begin
-						DBG_CNT <= 8'hFF;
+//						DBG_CNT <= 8'hFF;
 					end
 				end
 			end

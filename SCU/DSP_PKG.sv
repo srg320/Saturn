@@ -37,6 +37,7 @@ package SCUDSP_PKG;
 		bit         LOPW;
 		bit         TOPW;
 		bit         PCW;
+		bit         DMAW;		//DMA opcode out
 		bit [ 3: 0] RAMW;
 		bit [ 3: 0] CTW;
 		bit [ 3: 0] CTI;
@@ -46,13 +47,14 @@ package SCUDSP_PKG;
 	{
 		bit         ST;		//DMA start
 		bit         DIR;		//DMA direction (0: D0->RAM, 1: RAM->D0)
-		bit [ 3: 0] RAMW;		//DMA DATA RAM destination
-		bit         PRGW;		//DMA PRG RAM destination
-		bit [ 1: 0] RAMS;		//DMA DATA RAM source
+		bit [ 3: 0] RAMW;		//DMA DATA RAM write
+		bit         PRGW;		//DMA PRG RAM write
+		bit [ 3: 0] RAMR;		//DMA DATA RAM read
+		bit [ 1: 0] RAMS;		//DMA DATA RAM bank select
 		bit [ 2: 0] ADDI;		//DMA address increment
 		bit         CNTM;		//DMA counter source mode (0: IMM8, 1: RAMx)
 		bit [ 1: 0] CNTS;		//DMA TN0 source (RAMx)
-		bit [ 3: 0] CTI;
+		bit [ 3: 0] CTI;		//DMA counter source DATA RAM address increment
 		bit         HOLD;
 	} DMAInst_t;
 	
@@ -80,7 +82,7 @@ package SCUDSP_PKG;
 	                                  {2'b00, 2'b00, 1'b0, 1'b0, 4'b0000},
 										       {1'b0, 2'b00, 1'b0, 2'b00, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 4'b0000, 4'b0000, 4'b0000},
 										       1'b0,
-												 {1'b0, 1'b0, 4'b0000, 1'b0, 2'b00, 3'b000, 1'b0, 2'b00, 4'b0000, 1'b0},
+												 {1'b0, 1'b0, 4'b0000, 1'b0, 4'b0000, 2'b00, 3'b000, 1'b0, 2'b00, 4'b0000, 1'b0},
 												 {1'b0, 1'b0, 1'b0, 1'b0}};
 
 	function DecInst_t Decode(input bit [31:0] IC, bit COND);
@@ -96,10 +98,10 @@ package SCUDSP_PKG;
 				di.XBUS.RXW = IC[25];
 				di.XBUS.PW = IC[24];
 				case (IC[21:20])
-					2'b00: di.XBUS.CTI[0] = IC[22];
-					2'b01: di.XBUS.CTI[1] = IC[22];
-					2'b10: di.XBUS.CTI[2] = IC[22];
-					2'b11: di.XBUS.CTI[3] = IC[22];
+					2'b00: di.XBUS.CTI[0] = |IC[25:23] & IC[22];
+					2'b01: di.XBUS.CTI[1] = |IC[25:23] & IC[22];
+					2'b10: di.XBUS.CTI[2] = |IC[25:23] & IC[22];
+					2'b11: di.XBUS.CTI[3] = |IC[25:23] & IC[22];
 				endcase
 				
 				di.YBUS.RAMS = IC[15:14];
@@ -107,10 +109,10 @@ package SCUDSP_PKG;
 				di.YBUS.RYW = IC[19];
 				di.YBUS.ACW = |IC[18:17];
 				case (IC[15:14])
-					2'b00: di.YBUS.CTI[0] = IC[16];
-					2'b01: di.YBUS.CTI[1] = IC[16];
-					2'b10: di.YBUS.CTI[2] = IC[16];
-					2'b11: di.YBUS.CTI[3] = IC[16];
+					2'b00: di.YBUS.CTI[0] = |IC[19:17] & IC[16];
+					2'b01: di.YBUS.CTI[1] = |IC[19:17] & IC[16];
+					2'b10: di.YBUS.CTI[2] = |IC[19:17] & IC[16];
+					2'b11: di.YBUS.CTI[3] = |IC[19:17] & IC[16];
 				endcase
 				
 				di.D1BUS.IMMS = ~IC[13] & IC[12];
@@ -135,16 +137,16 @@ package SCUDSP_PKG;
 					default:;
 				endcase
 				case (IC[1:0])
-					2'b00: di.D1BUS.CTI[0] = ~IC[3] & IC[2];
-					2'b01: di.D1BUS.CTI[1] = ~IC[3] & IC[2];
-					2'b10: di.D1BUS.CTI[2] = ~IC[3] & IC[2];
-					2'b11: di.D1BUS.CTI[3] = ~IC[3] & IC[2];
+					2'b00: di.D1BUS.CTI[0] = &IC[13:12] & ~IC[3] & IC[2];
+					2'b01: di.D1BUS.CTI[1] = &IC[13:12] & ~IC[3] & IC[2];
+					2'b10: di.D1BUS.CTI[2] = &IC[13:12] & ~IC[3] & IC[2];
+					2'b11: di.D1BUS.CTI[3] = &IC[13:12] & ~IC[3] & IC[2];
 				endcase
 				case (IC[9:8])
-					2'b00: di.D1BUS.CTI[0] = IC[12] & ~IC[11] & ~IC[10];
-					2'b01: di.D1BUS.CTI[1] = IC[12] & ~IC[11] & ~IC[10];
-					2'b10: di.D1BUS.CTI[2] = IC[12] & ~IC[11] & ~IC[10];
-					2'b11: di.D1BUS.CTI[3] = IC[12] & ~IC[11] & ~IC[10];
+					2'b00: di.D1BUS.CTI[0] = |IC[13:12] & ~IC[11] & ~IC[10];
+					2'b01: di.D1BUS.CTI[1] = |IC[13:12] & ~IC[11] & ~IC[10];
+					2'b10: di.D1BUS.CTI[2] = |IC[13:12] & ~IC[11] & ~IC[10];
+					2'b11: di.D1BUS.CTI[3] = |IC[13:12] & ~IC[11] & ~IC[10];
 				endcase
 			end
 			
@@ -183,6 +185,12 @@ package SCUDSP_PKG;
 					2'b11: di.DMA.RAMW[3] = ~IC[10] & ~IC[12];
 				endcase
 				di.DMA.PRGW = IC[10] & ~IC[12];
+				case (IC[9:8])
+					2'b00: di.DMA.RAMR[0] = ~IC[10] & IC[12];
+					2'b01: di.DMA.RAMR[1] = ~IC[10] & IC[12];
+					2'b10: di.DMA.RAMR[2] = ~IC[10] & IC[12];
+					2'b11: di.DMA.RAMR[3] = ~IC[10] & IC[12];
+				endcase
 				di.DMA.RAMS = IC[9:8];
 				di.DMA.ADDI = IC[17:15] /*& {~IC[13],~IC[13],1'b1}*/;
 				di.DMA.CNTM = IC[13];
@@ -194,6 +202,7 @@ package SCUDSP_PKG;
 					2'b11: di.DMA.CTI[3] = IC[13] & IC[2];
 				endcase
 				di.DMA.HOLD = IC[14];
+				di.D1BUS.DMAW = 1;
 			end
 			
 			4'b1101: begin
@@ -219,44 +228,48 @@ package SCUDSP_PKG;
 	function bit [31:0] ImmSext(input bit [31:0] val, input bit [1:0] mode);
 		bit [31:0] res;
 		
-		//0: 8->32, 1: 25->32, 2: 19->32
+		//0: 8->32, 2: 25->32, 3: 19->32
 		res[7:0] = val[7:0];
 		case (mode)
-			2'b01:   res[18:8] = val[18:8];
 			2'b10:   res[18:8] = val[18:8];
+			2'b11:   res[18:8] = val[18:8];
 			default: res[18:8] = {11{val[7]}};
 		endcase
 		case (mode)
-			2'b01:   res[24:19] = val[24:19];
-			2'b10:   res[24:19] = {6{val[7]}};
+			2'b10:   res[24:19] = val[24:19];
+			2'b11:   res[24:19] = {6{val[18]}};
 			default: res[24:19] = {6{val[7]}};
 		endcase
-		res[31:25] = {7{val[7]}};
+		case (mode)
+			2'b10:   res[31:25] = {7{val[24]}};
+			2'b11:   res[31:25] = {7{val[18]}};
+			default: res[31:25] = {7{val[7]}};
+		endcase
 	
 		return res;
 	endfunction
 	
-	function bit [6:0] DMAAddrAdd(input bit [2:0] mode, input bit dir);
-		bit [6:0] res;
+	function bit [8:0] DMAAddrAdd(input bit [2:0] mode, input bit dir);
+		bit [8:0] res;
 		
-		res = 7'd0;
-		if (!dir) begin
+		res = 9'd0;
+//		if (!dir) begin
 			case (mode)
-				3'b000: res = 7'd0>>1;
-				3'b001: res = 7'd1>>1;
-				3'b010: res = 7'd2>>1;
-				3'b011: res = 7'd4>>1;
-				3'b100: res = 7'd8>>1;
-				3'b101: res = 7'd16>>1;
-				3'b110: res = 7'd32>>1;
-				3'b111: res = 7'd64>>1;
+				3'b000: res = 9'd0;
+				3'b001: res = 9'd4;
+				3'b010: res = 9'd8;
+				3'b011: res = 9'd16;
+				3'b100: res = 9'd32;
+				3'b101: res = 9'd64;
+				3'b110: res = 9'd128;
+				3'b111: res = 9'd256;
 			endcase
-		end else begin
-			case (mode)
-				3'b000: res = 7'd0;
-				3'b001: res = 7'd1;
-			endcase
-		end
+//		end else begin
+//			case (mode)
+//				3'b000: res = 7'd0;
+//				3'b001: res = 7'd1;
+//			endcase
+//		end
 		
 		return res;
 	endfunction

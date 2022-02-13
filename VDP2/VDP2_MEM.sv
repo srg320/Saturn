@@ -243,28 +243,18 @@ module VDP2_pal (
 endmodule
 
 module VDP2_WRITE_FIFO (
-	CLK,
-	DATA,
-	WRREQ,
-	RDREQ,
-	Q,
-	EMPTY,
-	FULL);
-
-	input	  CLK;
-	input	[35:0]  DATA;
-	input	  RDREQ;
-	input	  WRREQ;
-	output	  EMPTY;
-	output	  FULL;
-	output	[35:0] Q;
+	input	        CLK,
+	input	 [35:0] DATA,
+	input	        WRREQ,
+	input	        RDREQ,
+	output [35:0] Q,
+	output	     EMPTY,
+	output	     FULL
+);
 
 	wire  sub_wire0;
 	wire  sub_wire1;
 	wire [35:0] sub_wire2;
-	wire  EMPTY = sub_wire0;
-	wire  FULL = sub_wire1;
-	wire [35:0] Q = sub_wire2[35:0];
 
 	scfifo	scfifo_component (
 				.clock (CLK),
@@ -290,6 +280,10 @@ module VDP2_WRITE_FIFO (
 		scfifo_component.lpm_widthu = 3,
 		scfifo_component.overflow_checking = "OFF",
 		scfifo_component.underflow_checking = "OFF",
-		scfifo_component.use_eab = "ON";
+		scfifo_component.use_eab = "OFF";
+		
+	assign Q = sub_wire2;
+	assign EMPTY = sub_wire0;
+	assign FULL = sub_wire1;
 
 endmodule

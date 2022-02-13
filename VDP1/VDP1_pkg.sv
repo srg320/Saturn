@@ -181,43 +181,47 @@ package VDP1_PKG;
 	
 	function Coord_t SSprCoordACalc(CMDTBL_t CMD);
 		bit [10:0] x,y;
-//		bit [10:0] xa,xb;
-//		bit [10:0] ya,yb;
-//		
+		bit [10:0] xa,XB;
+		bit [10:0] ya,YB;
+		
 //		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
 //		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
+		XB = !CMD.CMDXB.COORD[10] ? $signed(CMD.CMDXB.COORD) : 11'sd0 - $signed(CMD.CMDXB.COORD);
+		YB = !CMD.CMDYB.COORD[10] ? $signed(CMD.CMDYB.COORD) : 11'sd0 - $signed(CMD.CMDYB.COORD);
 		case (CMD.CMDCTRL.ZP[1:0])
 			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXA.COORD) : $signed(CMD.CMDXC.COORD);
 			2'b01: x = $signed(CMD.CMDXA.COORD);
-			2'b10: x = $signed(CMD.CMDXA.COORD) - ($signed(CMD.CMDXB.COORD)>>>1);
-			2'b11: x = $signed(CMD.CMDXA.COORD) - $signed(CMD.CMDXB.COORD);
+			2'b10: x = $signed(CMD.CMDXA.COORD) - $signed($signed(XB)>>>1);
+			2'b11: x = $signed(CMD.CMDXA.COORD) - $signed(XB);
 		endcase
 		case (CMD.CMDCTRL.ZP[3:2])
 			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYA.COORD) : $signed(CMD.CMDYC.COORD);
 			2'b01: y = $signed(CMD.CMDYA.COORD);
-			2'b10: y = $signed(CMD.CMDYA.COORD) - ($signed(CMD.CMDYB.COORD)>>>1);
-			2'b11: y = $signed(CMD.CMDYA.COORD) - $signed(CMD.CMDYB.COORD);
+			2'b10: y = $signed(CMD.CMDYA.COORD) - $signed($signed(YB)>>>1);
+			2'b11: y = $signed(CMD.CMDYA.COORD) - $signed(YB);
 		endcase
 		return {x,y};
 	endfunction
 	
 	function Coord_t SSprCoordBCalc(CMDTBL_t CMD);
 		bit [10:0] x,y;
-//		bit [10:0] xa,xb;
-//		bit [10:0] ya,yb;
+		bit [10:0] xa,XB;
+		bit [10:0] ya,YB;
 //		
 //		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
 //		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
+		XB = !CMD.CMDXB.COORD[10] ? $signed(CMD.CMDXB.COORD) : 11'sd0 - $signed(CMD.CMDXB.COORD);
+		YB = !CMD.CMDYB.COORD[10] ? $signed(CMD.CMDYB.COORD) : 11'sd0 - $signed(CMD.CMDYB.COORD);
 		case (CMD.CMDCTRL.ZP[1:0])
 			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXC.COORD) : $signed(CMD.CMDXA.COORD);
-			2'b01: x = $signed(CMD.CMDXA.COORD) + $signed(CMD.CMDXB.COORD);
-			2'b10: x = $signed(CMD.CMDXA.COORD) + (($signed(CMD.CMDXB.COORD) + 11'd1)>>>1);
+			2'b01: x = $signed(CMD.CMDXA.COORD) + $signed(XB);
+			2'b10: x = $signed(CMD.CMDXA.COORD) + $signed(($signed(XB) + 11'd1)>>>1);
 			2'b11: x = $signed(CMD.CMDXA.COORD);
 		endcase
 		case (CMD.CMDCTRL.ZP[3:2])
 			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYC.COORD) : $signed(CMD.CMDYA.COORD);
-			2'b01: y = $signed(CMD.CMDYA.COORD) + $signed(CMD.CMDYB.COORD);
-			2'b10: y = $signed(CMD.CMDYA.COORD) + (($signed(CMD.CMDYB.COORD) + 11'd1)>>>1);
+			2'b01: y = $signed(CMD.CMDYA.COORD) + $signed(YB);
+			2'b10: y = $signed(CMD.CMDYA.COORD) + $signed(($signed(YB) + 11'd1)>>>1);
 			2'b11: y = $signed(CMD.CMDYA.COORD);
 		endcase
 		return {x,y};

@@ -103,6 +103,7 @@ module Saturn (
 	output     [15:0] SOUND_R,
 	
 	input      [15:0] JOY1,
+	input      [15:0] JOY2,
 	
 	input       [6:0] SCRN_EN,
 	input       [1:0] SND_EN,
@@ -179,7 +180,6 @@ module Saturn (
 	bit   [3:0] SSHDQM_N;
 	bit         SSHRD_N;
 	bit         SSHWAIT_N;
-	bit         SSHIVECF_N;
 	bit   [3:0] SSHIRL_N;
 	bit         SSHRES_N;
 	bit         SSHNMI_N;
@@ -325,7 +325,7 @@ module Saturn (
 		.ERD_N(SSHRD_N),
 		.ECE_N(1'b1),
 		.EOE_N(1'b1),
-		.EIVECF_N(SSHIVECF_N),
+		.EIVECF_N(1'b1),
 		
 		.WAIT_N(MSHWAIT_N),
 		.IVECF_N(),
@@ -375,7 +375,7 @@ module Saturn (
 		.RD_WR_N(SSHRD_WR_N),
 		.WE_N(SSHDQM_N),
 		.RD_N(SSHRD_N),
-		.IVECF_N(SSHIVECF_N),
+		.IVECF_N(),
 		
 		.EA({2'b00,ECA}),
 		.EDI(ECDI),
@@ -583,7 +583,7 @@ module Saturn (
 			DBG_HOOK <= 0;
 		end else if (CE_R) begin
 			DBG_WAIT_CNT <= DBG_WAIT_CNT + 8'd1;
-			if (CRD_N && CDQM_N[0] && CDQM_N[1] && CDQM_N[2] && CDQM_N[3]) begin
+			if (!CRD_N || !CDQM_N[0] || !CDQM_N[1] || !CDQM_N[2] || !CDQM_N[3]) begin
 				DBG_WAIT_CNT <= 8'd0;
 			end
 			if (CA == 25'h0012B0 && !CRD_N && !CCS3_N) DBG_HOOK <= 1;
@@ -637,22 +637,16 @@ module Saturn (
 		
 		.MSHRES_N(MSHRES_N),
 		.MSHNMI_N(MSHNMI_N),
-		
 		.SSHRES_N(SSHRES_N),
 		.SSHNMI_N(SSHNMI_N),
-		
 		.SYSRES_N(SYSRES_N),
 		.SNDRES_N(SNDRES_N),
 		.CDRES_N(CDRES_N),
 		
 		.MIRQ_N(MIRQ_N),
 		
-		.P1I(7'h00),
-		.P1O(),
-		.P2I(7'h00),
-		.P2O(),
-		
-		.JOY1(JOY1)
+		.JOY1(JOY1),
+		.JOY2(JOY2)
 	);
 	
 	bit VDP1_CMD_END,VDP1_START;

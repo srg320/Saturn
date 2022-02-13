@@ -1548,6 +1548,7 @@ package VDP2_PKG;
 	typedef bit [ 1: 0] NxCHS_t[4];
 	typedef bit [ 1: 0] NxVSS_t[2];
 	typedef bit [ 1: 0] NxPNCNT_t[2];
+	typedef bit         NxPNEN_t[4];
 	typedef bit [ 2: 0] NxCHCNT_t[4];
 	typedef bit         NxCHEN_t[4];
 	typedef bit [13: 0] RxDispCoord_t[2];
@@ -1596,6 +1597,8 @@ package VDP2_PKG;
 		bit         LW_POS;
 		bit         RPA;
 		bit         RPB;
+		bit         RCTA;
+		bit         RCTB;
 		bit   [7:2] RP_POS;
 		bit         BS;
 		bit         LN;
@@ -1612,6 +1615,7 @@ package VDP2_PKG;
 		bit [ 3: 0] NxCH;
 		NxCHS_t     NxCHS;
 		NxPNCNT_t   NxPN_CNT;
+		NxPNEN_t    NxPN_EN;
 		NxCHCNT_t   NxCH_CNT;
 		NxCHEN_t    NxCH_EN;
 		bit [ 1: 0] NxVS;
@@ -1628,7 +1632,7 @@ package VDP2_PKG;
 	typedef BGState_t BGPipeline_t [4];
 	
 	typedef PN_t        NxPND_t[6];
-	typedef NxPND_t     PNPipe_t [4];
+	typedef NxPND_t     PNPipe_t [6];
 	
 	typedef bit [31: 0] NxCHD_t[4];
 	typedef NxCHD_t     CHPipe_t [2];
@@ -2010,7 +2014,7 @@ package VDP2_PKG;
 	endfunction
 	
 	function bit [19:1] RxRPAddr(input bit [18:1] RPTA, input bit [7:2] RP_POS);
-		return ({RPTA,1'b0} & ~19'h00080) + {RP_POS,1'b0};
+		return ({RPTA,1'b0} & ~19'h00040) + {RP_POS,1'b0};
 	endfunction
 	
 	function bit [19:1] RxCTAddr(input bit [15:0] RxKA, input bit [2:0] RxKTAOS, input bit RxKDBS);
@@ -2153,6 +2157,7 @@ package VDP2_PKG;
 	{
 		bit [ 2: 0] CAOS;
 		bit         CCEN;
+		bit         CCM3;
 		bit [ 4: 0] CCRT;
 		bit         COEN;
 		bit         COSL;
@@ -2160,71 +2165,54 @@ package VDP2_PKG;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,24'h000000};
+	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,24'h000000};
 	
 
 	//Color calculation
 	typedef struct packed
 	{
-		bit         TP;
 		bit [ 7: 0] B;
 		bit [ 7: 0] G;
 		bit [ 7: 0] R;
 	} DotColor_t;
-	parameter DotColor_t DC_NULL = {1'b0,8'h00,8'h00,8'h00};
+	parameter DotColor_t DC_NULL = {8'h00,8'h00,8'h00};
 	
 	typedef struct packed
 	{
+		bit         CC;
 		bit [ 7: 0] B;
 		bit [ 7: 0] G;
 		bit [ 7: 0] R;
 	} Color_t;
-	parameter Color_t C_NULL = {8'h00,8'h00,8'h00};
+	parameter Color_t C_NULL = {1'b0,8'h00,8'h00,8'h00};
 	
-	function DotColor_t Color555ToDC(input bit [15:0] DW);
-		DotColor_t DC;
-
-		DC.TP = DW[15]; 
-		DC.B = {DW[14:10],3'b000}; 
-		DC.G = {DW[9:5],3'b000}; 
-		DC.R = {DW[4:0],3'b000}; 
-	
-		return DC;
-	endfunction
-	
-	function Color_t Color555To888(input bit [14:0] DW);
+	function bit [23:0] Color555To888(input bit [15:0] DW);
 		return {DW[14:10],3'b000,DW[9:5],3'b000,DW[4:0],3'b000}; 
 	endfunction
 	
 	function bit [7:0] ColorCalcRatio(input bit [7:0] CA, input bit [7:0] CB, input bit [5:0] RA, input bit [5:0] RB);
-		bit [7:0] CR;
 		bit [13:0] S;
 		
 		S = (CA * RA) + (CB * RB);
 		return (S[12:5] | {8{S[13]}}); 
 	endfunction
 	
-	function Color_t ColorCalc(input Color_t CT, input Color_t CS, input bit [4:0] CCRT, input bit CCEN, input bit CCMD);
-		Color_t CC;
-		Color_t TEMP;
+	function DotColor_t ColorCalc(input DotColor_t CT, input DotColor_t CS, input bit [4:0] CCRT, input bit CCEN, input bit CCMD);
+		DotColor_t TEMP;
 		
 		TEMP.R = ColorCalcRatio(CT.R, CS.R, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
 		TEMP.G = ColorCalcRatio(CT.G, CS.G, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
 		TEMP.B = ColorCalcRatio(CT.B, CS.B, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
-		CC = !CCEN ? CT : TEMP; 
 		
-		return CC;
+		return !CCEN ? CT : TEMP;
 	endfunction
 	
 	function bit [7:0] ColorOffset(input bit [7:0] C, input bit [8:0] COAx, input bit [8:0] COBx, input bit COEN, input bit COSL);
-		bit [7:0] CO;
 		bit [8:0] CAS, CBS;
 
 		CAS = $signed({1'b0,C}) + $signed(COAx);
 		CBS = $signed({1'b0,C}) + $signed(COBx);
-		CO = !COEN ? C : !COSL ? CAS[7:0] & ~{8{COAx[8]&CAS[8]}} | {8{~COAx[8]&CAS[8]}} : CBS[7:0] & ~{8{COBx[8]&CBS[8]}} | {8{~COBx[8]&CBS[8]}}; 
-		
-		return CO;
+		return !COEN ? C : !COSL ? CAS[7:0] & ~{8{COAx[8]&CAS[8]}} | {8{~COAx[8]&CAS[8]}} : CBS[7:0] & ~{8{COBx[8]&CBS[8]}} | {8{~COBx[8]&CBS[8]}}; 
 	endfunction
 	
 	function bit [7:0] Shadow(input bit [7:0] C, input bit SDEN);

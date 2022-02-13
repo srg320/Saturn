@@ -262,7 +262,7 @@ module VDP1 (
 			CMD_ADDR <= '0;
 			CMD_READ <= 0;
 			SPR_READ <= 0;
-			SYS_CLIP <= {10'h000,9'h000,10'h13F,9'h0FF};//CLIP_NULL;
+			SYS_CLIP <= CLIP_NULL;
 			USR_CLIP <= CLIP_NULL;
 			LOC_COORD <= COORD_NULL;
 			
@@ -292,8 +292,14 @@ module VDP1 (
 			
 //			if (FRAME_START && CMD_ST != CMDS_IDLE) FRAME_START_PEND <= 1;
 
-			CMD_COORD_OVER = (CMD.CMDXA.COORD + LOC_COORD.X > SYS_CLIP.X2 && CMD.CMDXB.COORD + LOC_COORD.X > SYS_CLIP.X2 && CMD.CMDXC.COORD + LOC_COORD.X > SYS_CLIP.X2 && CMD.CMDXD.COORD + LOC_COORD.X > SYS_CLIP.X2) ||
-								  (CMD.CMDYA.COORD + LOC_COORD.Y > SYS_CLIP.Y2 && CMD.CMDYB.COORD + LOC_COORD.Y > SYS_CLIP.Y2 && CMD.CMDYC.COORD + LOC_COORD.Y > SYS_CLIP.Y2 && CMD.CMDYD.COORD + LOC_COORD.Y > SYS_CLIP.Y2);
+			CMD_COORD_OVER = ($signed(CMD.CMDXA.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
+			                  $signed(CMD.CMDXB.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
+			                  $signed(CMD.CMDXC.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
+			                  $signed(CMD.CMDXD.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2)) ||
+								  ($signed(CMD.CMDYA.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
+								   $signed(CMD.CMDYB.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
+								   $signed(CMD.CMDYC.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
+								   $signed(CMD.CMDYD.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2));
 					
 			case (CMD_ST) 
 				CMDS_IDLE: begin
@@ -336,7 +342,7 @@ module VDP1 (
 							end
 							
 							4'h1: begin	//scaled sprite
-								if (CMD.CMDSIZE.SX && CMD.CMDSIZE.SY && ((!CMD.CMDXB.COORD[10] && !CMD.CMDYB.COORD[10]) || !CMD.CMDCTRL.ZP)) begin
+								if (CMD.CMDSIZE.SX && CMD.CMDSIZE.SY) begin
 									if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
 										CMDCOLR_LAST <= CMD.CMDCOLR;
 										CLT_READ <= 1;
@@ -419,18 +425,6 @@ module VDP1 (
 				end
 				
 				CMDS_SSPR_START: begin
-//					case (CMD.CMDCTRL.ZP[1:0])
-//						2'b00: begin LINE_VERTA.X <= $signed(CMD.CMDXA.COORD);                       LINE_VERTB.X <= $signed(CMD.CMDXC.COORD); end
-//						2'b01: begin LINE_VERTA.X <= $signed(CMD.CMDXA.COORD);                       LINE_VERTB.X <= $signed(CMD.CMDXA.COORD) + $signed(CMD.CMDXB.COORD; end
-//						2'b10: begin LINE_VERTA.X <= $signed(CMD.CMDXA.COORD) - ($signed(CMD.CMDXB.COORD)>>>1); LINE_VERTB.X <= $signed(CMD.CMDXA.COORD) + (($signed(CMD.CMDXB.COORD+11'd1)>>>1); end
-//						2'b11: begin LINE_VERTA.X <= $signed(CMD.CMDXA.COORD) - $signed(CMD.CMDXB.COORD);       LINE_VERTB.X <= $signed(CMD.CMDXA.COORD); end
-//					endcase
-//					case (CMD.CMDCTRL.ZP[3:2])
-//						2'b00: begin LINE_VERTA.Y <= $signed(CMD.CMDYA.COORD);                       LINE_VERTB.Y <= $signed(CMD.CMDYC.COORD); end
-//						2'b01: begin LINE_VERTA.Y <= $signed(CMD.CMDYA.COORD);                       LINE_VERTB.Y <= $signed(CMD.CMDYA.COORD) + $signed(CMD.CMDYB.COORD); end
-//						2'b10: begin LINE_VERTA.Y <= $signed(CMD.CMDYA.COORD) - ($signed(CMD.CMDYB.COORD>>>1); LINE_VERTB.Y <= $signed(CMD.CMDYA.COORD) + ((CMD.CMDYB.COORD+11'd1)>>>1); end
-//						2'b11: begin LINE_VERTA.Y <= $signed(CMD.CMDYA.COORD) - $signed(CMD.CMDYB.COORD);       LINE_VERTB.Y <= $signed(CMD.CMDYA.COORD); end
-//					endcase
 					LINE_VERTA <= SSprCoordACalc(CMD);
 					LINE_VERTB <= SSprCoordBCalc(CMD);
 					DIR[0] <= SSprDirXCalc(CMD);
@@ -476,17 +470,17 @@ module VDP1 (
 					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
 					SPR_READ <= 0;
 					if (VRAM_DONE) begin 
-						if (CMD.CMDCTRL.COMM == 4'h2) CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
+						if (CMD.CMDCTRL.COMM >= 4'h2) CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
 						else CMD_ST <= CMDS_SPR_DRAW;
 						DBG_CMD_WAIT_CNT <= '0;
 					end
 				end
 				
 				CMDS_BACK_READ: begin
-					if (CMD.CMDCTRL.COMM <= 4'h1) 
-						CMD_ST <= CMDS_SPR_DRAW;
-					else
+					if (CMD.CMDCTRL.COMM >= 4'h2) 
 						CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
+					else
+						CMD_ST <= CMDS_SPR_DRAW;
 				end
 				
 				CMDS_SPR_DRAW: begin
@@ -924,8 +918,9 @@ module VDP1 (
 	assign DBG_DRAW_OVER = DRAW_X[10:8] == 3'b011 || DRAW_X[10:8] == 3'b101 || DRAW_Y[10:8] == 2'b011 || DRAW_Y[10:8] == 3'b101;
 	
 	//FB out
-	bit [8:0] OUT_X, ERASE_X;
-	bit [8:0] OUT_Y, ERASE_Y;
+	bit         HBL_SKIP;
+	bit [ 8: 0] OUT_X, ERASE_X;
+	bit [ 8: 0] OUT_Y, ERASE_Y;
 	always @(posedge CLK or negedge RST_N) begin
 		bit       HTIM_N_OLD;
 		bit       VTIM_N_OLD;
@@ -933,46 +928,59 @@ module VDP1 (
 		if (!RST_N) begin
 			OUT_X <= '0;
 			OUT_Y <= '0;
+			HBL_SKIP <= 0;
 		end
 		else begin
-			if (OUT_X < 9'd352 && VTIM_N && DCE) begin
-				OUT_X <= OUT_X + 9'd1;
-				FB_DISP_A <= {OUT_Y[7:0],OUT_X};
+			HTIM_N_OLD <= HTIM_N;
+			VTIM_N_OLD <= VTIM_N;
+			
+			if (!VTIM_N && VTIM_N_OLD) begin
+				HBL_SKIP <= 1;
+			end
+			if (!HTIM_N && HTIM_N_OLD && HBL_SKIP) begin
+				HBL_SKIP <= 0;
 			end
 			
-			HTIM_N_OLD <= HTIM_N;
-			if (HTIM_N && !HTIM_N_OLD && VTIM_N) begin
+			if (OUT_X < 9'd352 && VTIM_N && DCE) begin
+				OUT_X <= OUT_X + 9'd1;
+//				FB_DISP_A <= {OUT_Y[7:0],OUT_X};
+			end
+			if (HTIM_N && !HTIM_N_OLD) begin
 				OUT_X <= '0;
+			end
+			
+			if (HTIM_N && !HTIM_N_OLD && VTIM_N) begin
 				OUT_Y <= OUT_Y + 9'd1;
 			end
 			if (HTIM_N && !HTIM_N_OLD && !VTIM_N) begin
-				OUT_Y <= '0;
+				OUT_Y <= '1;
 			end
 			
+			
 			if (CE_R) begin
-				if (!VTIM_N) begin
+				if (!VTIM_N && VBLANK_ERASE) begin
 					ERASE_X <= ERASE_X + 9'd1;
 					if (ERASE_X == {EWRR.X3,3'b111}) begin
 						ERASE_X <= {EWLR.X1,3'b000};
 						ERASE_Y <= ERASE_Y + 9'd1;
 					end
 					FB_ERASE_A <= {ERASE_Y[7:0],ERASE_X};
-				end else begin
-					ERASE_X <= {EWLR.X1,3'b000};
-					ERASE_Y <= EWLR.Y1;
+//				end else begin
+//					ERASE_X <= {EWLR.X1,3'b000};
+//					ERASE_Y <= EWLR.Y1;
 				end
 			end
-//			VTIM_N_OLD <= VTIM_N;
-//			if (VTIM_N && !VTIM_N_OLD) begin
-//				OUT_Y <= '0;
-//			end
+			if (!VTIM_N && VTIM_N_OLD) begin
+				ERASE_X <= {EWLR.X1,3'b000};
+				ERASE_Y <= EWLR.Y1;
+			end
 		end
 	end
 	
 	assign FRAME_ERASE_HIT = (OUT_X >= {EWLR.X1,3'b000}) & (OUT_X <= {EWRR.X3,3'b111}) & (OUT_Y >= EWLR.Y1) & (OUT_Y <= EWRR.Y3) & FRAME_ERASE & VTIM_N;
 	assign VBLANK_ERASE_HIT = (ERASE_X >= {EWLR.X1,3'b000}) & (ERASE_X <= {EWRR.X3,3'b111}) & (ERASE_Y >= EWLR.Y1) & (ERASE_Y <= EWRR.Y3) & VBLANK_ERASE & ~VTIM_N;
 	
-//	assign FB_DISP_A = {OUT_Y,OUT_X};
+	assign FB_DISP_A = {OUT_Y[7:0],OUT_X};
 	assign VOUT = FB_DISP_Q;
 		
 	
@@ -1273,9 +1281,12 @@ module VDP1 (
 	
 	bit [15:0] REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
+		bit        HTIM_N_OLD;
 		bit        VTIM_N_OLD;
 		bit        FRAME_ERASECHANGE_PEND;
 		bit        START_DRAW_PEND;
+		bit        VBE_CHECK;
+		
 		
 		if (!RST_N) begin
 			TVMR <= '0;
@@ -1297,7 +1308,8 @@ module VDP1 (
 			FRAME_ERASE <= 0;
 			VBLANK_ERASE <= 0;
 			DRAW_TERMINATE <= 0;
-			
+			VBE_CHECK <= 0;
+					
 //			FRAME <= 0;
 			FRAMES_DBG <= '0;
 			START_DRAW_CNT <= '0;
@@ -1332,7 +1344,7 @@ module VDP1 (
 						5'h0A: EWRR <= DI & EWRR_MASK;
 						default:;
 					endcase
-					if (A[5:1] == 5'h00>>1 && DI[3]) VBLANK_ERASE <= 1;
+//					if (A[5:1] == 5'h00>>1 && DI[3]) VBLANK_ERASE <= 1;
 					if (A[5:1] == 5'h02>>1 && DI[1]) FRAME_ERASECHANGE_PEND <= 1;
 					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 8'd1; end
 					if (A[5:1] == 5'h0C>>1 && DI[1]) DRAW_TERMINATE <= 1;
@@ -1347,6 +1359,7 @@ module VDP1 (
 				end
 			end
 			
+			HTIM_N_OLD <= HTIM_N;
 			VTIM_N_OLD <= VTIM_N;
 			if (VTIM_N && !VTIM_N_OLD) begin
 				FRAMES_DBG <= FRAMES_DBG + 8'd1;
@@ -1363,10 +1376,10 @@ module VDP1 (
 				FRAME_START <= 1;
 				EDSR.CEF <= 0;
 				EDSR.BEF <= EDSR.CEF;
-			end else if (/*PTMR.PTM == 2'b10 &&*/ VTIM_N && !VTIM_N_OLD) begin
-				FRAME_ERASE <= 0;
+			end
+			if (VTIM_N && !VTIM_N_OLD) begin
 				VBLANK_ERASE <= 0;
-				if (TVMR.VBE && FBCR.FCT && FBCR.FCM) begin
+				/*if (TVMR.VBE && FBCR.FCT && FBCR.FCM) begin
 					FB_SEL <= ~FB_SEL;
 					VBLANK_ERASE <= 1;
 					if (PTMR.PTM == 2'b10) begin
@@ -1376,22 +1389,22 @@ module VDP1 (
 					EDSR.BEF <= EDSR.CEF;
 					FRAME_ERASECHANGE_PEND <= 0;
 					FRAMES_DBG <= 8'd0;
-				end else if (!FBCR.FCM) begin
+				end else*/ if (!FBCR.FCM) begin
 					FB_SEL <= ~FB_SEL;
 					FRAME_ERASE <= 1;
 					if (PTMR.PTM == 2'b10) begin
 						FRAME_START <= 1;
+						EDSR.CEF <= 0;
+						EDSR.BEF <= EDSR.CEF;
 					end
-					EDSR.CEF <= 0;
-					EDSR.BEF <= EDSR.CEF;
 					FRAMES_DBG <= 8'd0;
 				end else if (FRAME_ERASECHANGE_PEND && FBCR.FCT) begin
 					FB_SEL <= ~FB_SEL;
 					if (PTMR.PTM == 2'b10) begin
 						FRAME_START <= 1;
+						EDSR.CEF <= 0;
+						EDSR.BEF <= EDSR.CEF;
 					end
-					EDSR.CEF <= 0;
-					EDSR.BEF <= EDSR.CEF;
 					FRAME_ERASECHANGE_PEND <= 0;
 					FRAMES_DBG <= 8'd0;
 				end else if (FRAME_ERASECHANGE_PEND && !FBCR.FCT) begin
@@ -1399,6 +1412,20 @@ module VDP1 (
 					FRAME_ERASECHANGE_PEND <= 0;
 				end
 //				FRAME <= 1;//~FRAME;
+			end else if (!VTIM_N && VTIM_N_OLD) begin
+				FRAME_ERASE <= 0;
+			end
+			
+			if (!VTIM_N) begin
+				if (!HTIM_N && HTIM_N_OLD && HBL_SKIP) begin
+					VBE_CHECK <= 1;
+				end
+				if (!HTIM_N && HTIM_N_OLD && !HBL_SKIP && VBE_CHECK) begin
+					VBE_CHECK <= 0;
+					if (TVMR.VBE && FBCR.FCT && FBCR.FCM) begin
+						VBLANK_ERASE <= 1;
+					end
+				end
 			end
 			
 			if (!IRQ_N && CE_R) IRQ_N <= 1;
