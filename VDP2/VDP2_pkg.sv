@@ -71,7 +71,7 @@ package VDP2_PKG;
 		bit [ 1: 0] RDBSA1;
 		bit [ 1: 0] RDBSA0;
 	} RAMCTL_t;
-	parameter bit [15:0] RAMCTL_MASK = 16'h33FF;
+	parameter bit [15:0] RAMCTL_MASK = 16'hB3FF;
 	
 	typedef struct packed	//RW,180010,180018
 	{
@@ -1186,7 +1186,6 @@ package VDP2_PKG;
 		bit         BMSZ;
 		bit         BMEN;
 		PNCNx_t     PNC;
-		bit [ 5: 0] MPn[16];
 		bit [ 2: 0] BMP;
 		bit         BMPR;
 		bit         BMCC;
@@ -1202,6 +1201,18 @@ package VDP2_PKG;
 		bit [ 1: 0] SCCM;
 	} VDP2RSRegs_t;
 	typedef VDP2RSRegs_t VDP2RSxRegs_t [2];
+	
+	typedef struct
+	{
+		bit [ 8: 6] MP;
+		bit [ 5: 0] MPn[16];
+		bit         KTE;
+		bit [ 1: 0] KMD;
+		bit [ 2: 0] KTAOS;
+		bit         KDBS;
+		bit [ 1: 0] PLSZ;
+	} VDP2RPRegs_t;
+	typedef VDP2RPRegs_t VDP2RPxRegs_t [2];
 	
 	
 	function VDP2NSxRegs_t NSxRegs(input VDP2Regs_t REGS);
@@ -1404,39 +1415,6 @@ package VDP2_PKG;
 		
 		S[0].PNC = REGS.PNCR;
 		S[1].PNC = REGS.PNCN0;
-		
-		S[0].MPn[0] = REGS.MPABRA.RxMPA;
-		S[1].MPn[0] = REGS.MPABRA.RxMPA;
-		S[0].MPn[1] = REGS.MPABRA.RxMPB;
-		S[1].MPn[1] = REGS.MPABRA.RxMPB;
-		S[0].MPn[2] = REGS.MPCDRA.RxMPC;
-		S[1].MPn[2] = REGS.MPCDRA.RxMPC;
-		S[0].MPn[3] = REGS.MPCDRA.RxMPD;
-		S[1].MPn[3] = REGS.MPCDRA.RxMPD;
-		S[0].MPn[4] = REGS.MPEFRA.RxMPE;
-		S[1].MPn[4] = REGS.MPEFRA.RxMPE;
-		S[0].MPn[5] = REGS.MPEFRA.RxMPF;
-		S[1].MPn[5] = REGS.MPEFRA.RxMPF;
-		S[0].MPn[6] = REGS.MPGHRA.RxMPG;
-		S[1].MPn[6] = REGS.MPGHRA.RxMPG;
-		S[0].MPn[7] = REGS.MPGHRA.RxMPH;
-		S[1].MPn[7] = REGS.MPGHRA.RxMPH;
-		S[0].MPn[8] = REGS.MPIJRA.RxMPI;
-		S[1].MPn[8] = REGS.MPIJRA.RxMPI;
-		S[0].MPn[9] = REGS.MPIJRA.RxMPJ;
-		S[1].MPn[9] = REGS.MPIJRA.RxMPJ;
-		S[0].MPn[10] = REGS.MPKLRA.RxMPK;
-		S[1].MPn[10] = REGS.MPKLRA.RxMPK;
-		S[0].MPn[11] = REGS.MPKLRA.RxMPL;
-		S[1].MPn[11] = REGS.MPKLRA.RxMPL;
-		S[0].MPn[12] = REGS.MPMNRA.RxMPM;
-		S[1].MPn[12] = REGS.MPMNRA.RxMPM;
-		S[0].MPn[13] = REGS.MPMNRA.RxMPN;
-		S[1].MPn[13] = REGS.MPMNRA.RxMPN;
-		S[0].MPn[14] = REGS.MPOPRA.RxMPO;
-		S[1].MPn[14] = REGS.MPOPRA.RxMPO;
-		S[0].MPn[15] = REGS.MPOPRA.RxMPP;
-		S[1].MPn[15] = REGS.MPOPRA.RxMPP;
 	
 		S[0].BMP = REGS.BMPNB.R0BMP;
 		S[1].BMP = REGS.BMPNA.N0BMP;
@@ -1477,6 +1455,62 @@ package VDP2_PKG;
 		S[0].SCCM = REGS.SFCCMD.R0SCCM;
 		S[1].SCCM = REGS.SFCCMD.N1SCCM;
 		
+		return S;
+	endfunction
+	
+	function VDP2RPxRegs_t RPxRegs(input VDP2Regs_t REGS);
+		VDP2RPxRegs_t S;
+		
+		S[0].MP = REGS.MPOFR.RAMP;
+		S[1].MP = REGS.MPOFR.RBMP;
+		
+		S[0].MPn[0] = REGS.MPABRA.RxMPA;
+		S[1].MPn[0] = REGS.MPABRB.RxMPA;
+		S[0].MPn[1] = REGS.MPABRA.RxMPB;
+		S[1].MPn[1] = REGS.MPABRB.RxMPB;
+		S[0].MPn[2] = REGS.MPCDRA.RxMPC;
+		S[1].MPn[2] = REGS.MPCDRB.RxMPC;
+		S[0].MPn[3] = REGS.MPCDRA.RxMPD;
+		S[1].MPn[3] = REGS.MPCDRB.RxMPD;
+		S[0].MPn[4] = REGS.MPEFRA.RxMPE;
+		S[1].MPn[4] = REGS.MPEFRB.RxMPE;
+		S[0].MPn[5] = REGS.MPEFRA.RxMPF;
+		S[1].MPn[5] = REGS.MPEFRB.RxMPF;
+		S[0].MPn[6] = REGS.MPGHRA.RxMPG;
+		S[1].MPn[6] = REGS.MPGHRB.RxMPG;
+		S[0].MPn[7] = REGS.MPGHRA.RxMPH;
+		S[1].MPn[7] = REGS.MPGHRB.RxMPH;
+		S[0].MPn[8] = REGS.MPIJRA.RxMPI;
+		S[1].MPn[8] = REGS.MPIJRB.RxMPI;
+		S[0].MPn[9] = REGS.MPIJRA.RxMPJ;
+		S[1].MPn[9] = REGS.MPIJRB.RxMPJ;
+		S[0].MPn[10] = REGS.MPKLRA.RxMPK;
+		S[1].MPn[10] = REGS.MPKLRB.RxMPK;
+		S[0].MPn[11] = REGS.MPKLRA.RxMPL;
+		S[1].MPn[11] = REGS.MPKLRB.RxMPL;
+		S[0].MPn[12] = REGS.MPMNRA.RxMPM;
+		S[1].MPn[12] = REGS.MPMNRB.RxMPM;
+		S[0].MPn[13] = REGS.MPMNRA.RxMPN;
+		S[1].MPn[13] = REGS.MPMNRB.RxMPN;
+		S[0].MPn[14] = REGS.MPOPRA.RxMPO;
+		S[1].MPn[14] = REGS.MPOPRB.RxMPO;
+		S[0].MPn[15] = REGS.MPOPRA.RxMPP;
+		S[1].MPn[15] = REGS.MPOPRB.RxMPP;
+		
+		S[0].KTE = REGS.KTCTL.RAKTE;
+		S[1].KTE = REGS.KTCTL.RBKTE;
+		
+		S[0].KMD = REGS.KTCTL.RAKMD;
+		S[1].KMD = REGS.KTCTL.RBKMD;
+		
+		S[0].KTAOS = REGS.KTAOF.RAKTAOS;
+		S[1].KTAOS = REGS.KTAOF.RBKTAOS;
+		
+		S[0].KDBS = REGS.KTCTL.RAKDBS;
+		S[1].KDBS = REGS.KTCTL.RBKDBS;
+		
+		S[0].PLSZ = REGS.PLSZ.RAPLSZ;
+		S[1].PLSZ = REGS.PLSZ.RBPLSZ;
 		return S;
 	endfunction
 
@@ -1591,6 +1625,7 @@ package VDP2_PKG;
 		bit [ 1: 0] RxA1CT;
 		bit [ 1: 0] RxB0CT;
 		bit [ 1: 0] RxB1CT;
+		bit [ 1: 0] RxCRCT;
 		bit         LS;
 		bit   [5:0] LS_POS;
 		bit         LW;
@@ -1602,7 +1637,7 @@ package VDP2_PKG;
 		bit   [7:2] RP_POS;
 		bit         BS;
 		bit         LN;
-		bit         RBG;
+//		bit         RBG;
 		bit         W0_HIT; 
 		bit         W1_HIT;
 	} VRAMAccessState_t;
@@ -1628,6 +1663,7 @@ package VDP2_PKG;
 		RxCELLX_t   RxCELLX;
 		bit [ 1: 0] RxCT;
 		RxCTS_t     RxCTS;
+		bit [ 1: 0] RxCRCT;
 	} BGState_t;
 	typedef BGState_t BGPipeline_t [4];
 	
@@ -1732,7 +1768,12 @@ package VDP2_PKG;
 			default: PN = NxPN[0];
 		endcase
 		
-		OFFX = NxOFFX + {NxZMHF&NxCH_CNT[1],3'b000};
+		case (NxCHCN)
+			3'b000:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[0],3'b000};
+			3'b001:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[1],3'b000};
+			default: OFFX = NxOFFX;
+		endcase
+		
 		case (NxCHSZ)
 			1'b0: cell_offs = { 2'b00,                        NxOFFY[2:0] ^ {3{PN.VF}} };
 			1'b1: cell_offs = { NxOFFY[3]^PN.VF,OFFX[3]^PN.HF,NxOFFY[2:0] ^ {3{PN.VF}} };

@@ -51,11 +51,11 @@ package SCUDSP_PKG;
 		bit         PRGW;		//DMA PRG RAM write
 		bit [ 3: 0] RAMR;		//DMA DATA RAM read
 		bit [ 1: 0] RAMS;		//DMA DATA RAM bank select
-		bit [ 2: 0] ADDI;		//DMA address increment
+//		bit [ 2: 0] ADDI;		//DMA address increment
 		bit         CNTM;		//DMA counter source mode (0: IMM8, 1: RAMx)
 		bit [ 1: 0] CNTS;		//DMA TN0 source (RAMx)
 		bit [ 3: 0] CTI;		//DMA counter source DATA RAM address increment
-		bit         HOLD;
+//		bit         HOLD;
 	} DMAInst_t;
 	
 	typedef struct packed
@@ -82,7 +82,7 @@ package SCUDSP_PKG;
 	                                  {2'b00, 2'b00, 1'b0, 1'b0, 4'b0000},
 										       {1'b0, 2'b00, 1'b0, 2'b00, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 1'b0, 4'b0000, 4'b0000, 4'b0000},
 										       1'b0,
-												 {1'b0, 1'b0, 4'b0000, 1'b0, 4'b0000, 2'b00, 3'b000, 1'b0, 2'b00, 4'b0000, 1'b0},
+												 {1'b0, 1'b0, 4'b0000, 1'b0, 4'b0000, 2'b00/*, 3'b000*/, 1'b0, 2'b00, 4'b0000/*, 1'b0*/},
 												 {1'b0, 1'b0, 1'b0, 1'b0}};
 
 	function DecInst_t Decode(input bit [31:0] IC, bit COND);
@@ -192,7 +192,7 @@ package SCUDSP_PKG;
 					2'b11: di.DMA.RAMR[3] = ~IC[10] & IC[12];
 				endcase
 				di.DMA.RAMS = IC[9:8];
-				di.DMA.ADDI = IC[17:15] /*& {~IC[13],~IC[13],1'b1}*/;
+//				di.DMA.ADDI = IC[17:15];
 				di.DMA.CNTM = IC[13];
 				di.DMA.CNTS = IC[1:0];
 				case (IC[1:0])
@@ -201,7 +201,7 @@ package SCUDSP_PKG;
 					2'b10: di.DMA.CTI[2] = IC[13] & IC[2];
 					2'b11: di.DMA.CTI[3] = IC[13] & IC[2];
 				endcase
-				di.DMA.HOLD = IC[14];
+//				di.DMA.HOLD = IC[14];
 				di.D1BUS.DMAW = 1;
 			end
 			

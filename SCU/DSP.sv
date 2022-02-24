@@ -87,9 +87,13 @@ module SCU_DSP (
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			IC <= '0;
-		end
-		else if (RUN && CE) begin
-			IC <= PRG_RAM_Q;
+		end else if (CE) begin
+			if (!EX) begin
+				IC <= '0;
+			end 
+			if (RUN) begin
+				IC <= PRG_RAM_Q;
+			end
 		end
 	end
 	
@@ -316,7 +320,7 @@ module SCU_DSP (
 		if (!RST_N) begin
 			TN0 <= '0;
 			T0 <= 0;
-			DMAI <= '{1'b0, 1'b0, 4'b0000, 1'b0, 4'b0000, 2'b00, 3'b000, 1'b0, 2'b00, 4'b0000, 1'b0};
+			DMAI <= '0;
 			DMA_REQ <= 0;
 			
 			HOOK1 <= 0;

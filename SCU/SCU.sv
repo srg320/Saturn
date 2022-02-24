@@ -81,7 +81,7 @@ module SCU (
 	DxAD_t     DAD[3];
 	DxEN_t     DEN[3];
 	DxMD_t     DMD[3];
-	DSTP_t     DSTP;
+//	DSTP_t     DSTP;
 	DSTA_t     DSTA;
 	T0C_t      T0C;
 	T1S_t      T1S;
@@ -1634,7 +1634,7 @@ module SCU (
 			DAD <= '{'0,'0,'0};
 			DEN <= '{'0,'0,'0};
 			DMD <= '{'0,'0,'0};
-			DSTP <= DSTP_INIT;
+//			DSTP <= DSTP_INIT;
 			T0C <= RSEL_INIT;
 			T1S <= RSEL_INIT;
 			T1MD <= T1MD_INIT;
@@ -1650,7 +1650,7 @@ module SCU (
 			DAD <= '{'0,'0,'0};
 			DEN <= '{'0,'0,'0};
 			DMD <= '{'0,'0,'0};
-			DSTP <= DSTP_INIT;
+//			DSTP <= DSTP_INIT;
 			T0C <= RSEL_INIT;
 			T1S <= RSEL_INIT;
 			T1MD <= T1MD_INIT;
@@ -1766,12 +1766,12 @@ module SCU (
 						if (!CDQM_N[3] && !DMA_RUN[2]) DMD[2][31:24] <= CDI[31:24] & DxMD_WMASK[31:24];
 					end
 					
-					8'h60: begin
-						if (!CDQM_N[0]) DSTP[ 7: 0] <= CDI[ 7: 0] & DSTP_WMASK[ 7: 0];
-						if (!CDQM_N[1]) DSTP[15: 8] <= CDI[15: 8] & DSTP_WMASK[15: 8];
-						if (!CDQM_N[2]) DSTP[23:16] <= CDI[23:16] & DSTP_WMASK[23:16];
-						if (!CDQM_N[3]) DSTP[31:24] <= CDI[31:24] & DSTP_WMASK[31:24];
-					end
+//					8'h60: begin
+//						if (!CDQM_N[0]) DSTP[ 7: 0] <= CDI[ 7: 0] & DSTP_WMASK[ 7: 0];
+//						if (!CDQM_N[1]) DSTP[15: 8] <= CDI[15: 8] & DSTP_WMASK[15: 8];
+//						if (!CDQM_N[2]) DSTP[23:16] <= CDI[23:16] & DSTP_WMASK[23:16];
+//						if (!CDQM_N[3]) DSTP[31:24] <= CDI[31:24] & DSTP_WMASK[31:24];
+//					end
 					
 					8'h90: begin
 						if (!CDQM_N[0]) T0C[ 7: 0] <= CDI[ 7: 0] & T0C_WMASK[ 7: 0];

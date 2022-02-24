@@ -30,14 +30,16 @@ module Saturn (
 	output     [17:1] VDP1_FB0_A,
 	output     [15:0] VDP1_FB0_D,
 	input      [15:0] VDP1_FB0_Q,
-	output            VDP1_FB0_WE,
+	output      [1:0] VDP1_FB0_WE,
 	output            VDP1_FB0_RD,
 	
 	output     [17:1] VDP1_FB1_A,
 	output     [15:0] VDP1_FB1_D,
 	input      [15:0] VDP1_FB1_Q,
-	output            VDP1_FB1_WE,
+	output      [1:0] VDP1_FB1_WE,
 	output            VDP1_FB1_RD,
+	
+	input             VDP1_FB_RDY,
 	
 	output     [18:1] VDP2_RA0_A,
 	output     [16:1] VDP2_RA1_A,
@@ -97,7 +99,8 @@ module Saturn (
 	output            INTERLACE,
 	output      [1:0] HRES,
 	output      [1:0] VRES,
-	output            DCE,
+	output            DCE_R,
+	output            DCE_F,
 	
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
@@ -670,7 +673,8 @@ module Saturn (
 		
 		.IRQ_N(IRQ1_N), 
 		
-		.DCE(DCE),
+		.DCE_R(DCE_R),
+		.DCE_F(DCE_F),
 		.VTIM_N(VTIM_N),
 		.HTIM_N(HTIM_N),
 		.VOUT(VOUT),
@@ -693,6 +697,7 @@ module Saturn (
 		.FB1_WE(VDP1_FB1_WE),
 		.FB1_RD(VDP1_FB1_RD),
 		.FB1_Q(VDP1_FB1_Q),
+		.FB_RDY(VDP1_FB_RDY),
 		
 		.DBG_START(VDP1_START),
 		.DBG_CMD_END(VDP1_CMD_END)
@@ -718,7 +723,8 @@ module Saturn (
 		.VINT_N(IRQV_N),
 		.HINT_N(IRQH_N),
 		
-		.DCE(DCE),
+		.DCE_R(DCE_R),
+		.DCE_F(DCE_F),
 		.HTIM_N(HTIM_N),
 		.VTIM_N(VTIM_N),
 		.FBD(VOUT),
