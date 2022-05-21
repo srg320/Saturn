@@ -239,12 +239,12 @@ module VDP1 (
 		bit [18:1] NEXT_ADDR;
 		bit [18:1] CMD_JRET;
 		CMDCOLR_t  CMDCOLR_LAST;
-		bit [10:0] CMDXA_CLIP;
-		bit [10:0] CMDXB_CLIP;
-		bit [10:0] CMDXC_CLIP;
-		bit [10:0] CMDXD_CLIP;
-		bit [10:0] RIGHT_VERT_X_CLIP;
-		bit [10:0] RIGHT_VERT_Y_CLIP;
+//		bit [10:0] CMDXA_CLIP;
+//		bit [10:0] CMDXB_CLIP;
+//		bit [10:0] CMDXC_CLIP;
+//		bit [10:0] CMDXD_CLIP;
+//		bit [10:0] RIGHT_VERT_X_CLIP;
+//		bit [10:0] RIGHT_VERT_Y_CLIP;
 		bit [11:0] NEW_LINE_SX;
 		bit [11:0] NEW_LINE_SY;
 		bit [11:0] NEW_POLY_LSX;
@@ -298,14 +298,14 @@ module VDP1 (
 			
 //			if (FRAME_START && CMD_ST != CMDS_IDLE) FRAME_START_PEND <= 1;
 
-			CMD_COORD_OVER = ($signed(CMD.CMDXA.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
-			                  $signed(CMD.CMDXB.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
-			                  $signed(CMD.CMDXC.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2) && 
-			                  $signed(CMD.CMDXD.COORD + LOC_COORD.X) > $signed(SYS_CLIP.X2)) ||
-								  ($signed(CMD.CMDYA.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
-								   $signed(CMD.CMDYB.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
-								   $signed(CMD.CMDYC.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2) && 
-								   $signed(CMD.CMDYD.COORD + LOC_COORD.Y) > $signed(SYS_CLIP.Y2));
+			CMD_COORD_OVER = ($signed(CMD.CMDXA + {{5{LOC_COORD.X[10]}},LOC_COORD.X}) > $signed({{5{SYS_CLIP.X2[10]}},SYS_CLIP.X2}) && 
+			                  $signed(CMD.CMDXB + {{5{LOC_COORD.X[10]}},LOC_COORD.X}) > $signed({{5{SYS_CLIP.X2[10]}},SYS_CLIP.X2}) && 
+			                  $signed(CMD.CMDXC + {{5{LOC_COORD.X[10]}},LOC_COORD.X}) > $signed({{5{SYS_CLIP.X2[10]}},SYS_CLIP.X2}) && 
+			                  $signed(CMD.CMDXD + {{5{LOC_COORD.X[10]}},LOC_COORD.X}) > $signed({{5{SYS_CLIP.X2[10]}},SYS_CLIP.X2})) ||
+								  ($signed(CMD.CMDYA + {{5{LOC_COORD.Y[10]}},LOC_COORD.Y}) > $signed({{5{SYS_CLIP.Y2[10]}},SYS_CLIP.Y2}) && 
+								   $signed(CMD.CMDYB + {{5{LOC_COORD.Y[10]}},LOC_COORD.Y}) > $signed({{5{SYS_CLIP.Y2[10]}},SYS_CLIP.Y2}) && 
+								   $signed(CMD.CMDYC + {{5{LOC_COORD.Y[10]}},LOC_COORD.Y}) > $signed({{5{SYS_CLIP.Y2[10]}},SYS_CLIP.Y2}) && 
+								   $signed(CMD.CMDYD + {{5{LOC_COORD.Y[10]}},LOC_COORD.Y}) > $signed({{5{SYS_CLIP.Y2[10]}},SYS_CLIP.Y2}));
 					
 			case (CMD_ST) 
 				CMDS_IDLE: begin
@@ -523,18 +523,18 @@ module VDP1 (
 				end
 				
 				CMDS_DSPR_START: begin
-					CMDXA_CLIP <= $signed(CMD.CMDXA.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
-					               $signed(CMD.CMDXA.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
-					               CMD.CMDXA.COORD;
-					CMDXB_CLIP <= $signed(CMD.CMDXB.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
-					               $signed(CMD.CMDXB.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
-					               CMD.CMDXB.COORD;
-					CMDXC_CLIP <= $signed(CMD.CMDXC.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
-					               $signed(CMD.CMDXC.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
-					               CMD.CMDXC.COORD;
-					CMDXD_CLIP <= $signed(CMD.CMDXD.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
-					               $signed(CMD.CMDXD.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
-					               CMD.CMDXD.COORD;
+//					CMDXA_CLIP <= $signed(CMD.CMDXA.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+//					               $signed(CMD.CMDXA.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+//					               CMD.CMDXA.COORD;
+//					CMDXB_CLIP <= $signed(CMD.CMDXB.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+//					               $signed(CMD.CMDXB.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+//					               CMD.CMDXB.COORD;
+//					CMDXC_CLIP <= $signed(CMD.CMDXC.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+//					               $signed(CMD.CMDXC.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+//					               CMD.CMDXC.COORD;
+//					CMDXD_CLIP <= $signed(CMD.CMDXD.COORD) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+//					               $signed(CMD.CMDXD.COORD) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+//					               CMD.CMDXD.COORD;
 					DIR <= '0;
 					TEXT_X <= '0;
 					TEXT_Y <= '0;
@@ -607,12 +607,12 @@ module VDP1 (
 				end
 				
 				CMDS_LINE_CALC: begin
-					RIGHT_VERT_X_CLIP = $signed(RIGHT_VERT.X) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
-					                    $signed(RIGHT_VERT.X) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
-					                    RIGHT_VERT.X;
-					RIGHT_VERT_Y_CLIP = $signed(RIGHT_VERT.Y) < $signed(SYS_CLIP.Y1 - LOC_COORD.Y) ? SYS_CLIP.Y1 - LOC_COORD.Y : 
-					                    $signed(RIGHT_VERT.Y) > $signed(SYS_CLIP.Y2 - LOC_COORD.Y) ? SYS_CLIP.Y2 - LOC_COORD.Y : 
-					                    RIGHT_VERT.Y;
+//					RIGHT_VERT_X_CLIP = $signed(RIGHT_VERT.X) < $signed(SYS_CLIP.X1 - LOC_COORD.X) ? SYS_CLIP.X1 - LOC_COORD.X : 
+//					                    $signed(RIGHT_VERT.X) > $signed(SYS_CLIP.X2 - LOC_COORD.X) ? SYS_CLIP.X2 - LOC_COORD.X : 
+//					                    RIGHT_VERT.X;
+//					RIGHT_VERT_Y_CLIP = $signed(RIGHT_VERT.Y) < $signed(SYS_CLIP.Y1 - LOC_COORD.Y) ? SYS_CLIP.Y1 - LOC_COORD.Y : 
+//					                    $signed(RIGHT_VERT.Y) > $signed(SYS_CLIP.Y2 - LOC_COORD.Y) ? SYS_CLIP.Y2 - LOC_COORD.Y : 
+//					                    RIGHT_VERT.Y;
 					LINE_VERTA <= LEFT_VERT;
 					LINE_VERTB <= RIGHT_VERT;//{RIGHT_VERT_X_CLIP,RIGHT_VERT_Y_CLIP};
 					NEW_LINE_SX = {RIGHT_VERT.X[10],RIGHT_VERT.X} - {LEFT_VERT.X[10],LEFT_VERT.X};
@@ -926,7 +926,7 @@ module VDP1 (
 			TP = 0;
 			EC = 0;
 		end
-		CALC_C = ColorCalc(ORIG_C,DRAW_BACK_C,CMD.CMDPMOD.CCB,CMD.CMDPMOD.MON);
+		CALC_C = !TVMR.TVM[0] ? ColorCalc(ORIG_C,DRAW_BACK_C,CMD.CMDPMOD.CCB,CMD.CMDPMOD.MON) : ORIG_C;
 			
 		SCLIP = !DRAW_X[10] && DRAW_X[9:0] <= SYS_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] <= SYS_CLIP.Y2[8:0];
 		UCLIP = !DRAW_X[10] && DRAW_X[9:0] >= USR_CLIP.X1[9:0] && DRAW_X[9:0] <= USR_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] >= USR_CLIP.Y1[8:0] && DRAW_Y[8:0] <= USR_CLIP.Y2[8:0];
@@ -1017,8 +1017,8 @@ module VDP1 (
 		
 	
 	//VRAM
-	wire CPU_VRAM_REQ = (A[20:19] == 2'b00) & ~DTEN_N & ~AD_N & ~CS_N & ~REQ_N;	//000000-07FFFF
-	wire CPU_FB_REQ = (A[20:19] == 2'b01) & ~DTEN_N & ~AD_N & ~CS_N & ~REQ_N;	//080000-0FFFFF
+	wire CPU_VRAM_REQ = (A[20:19] == 2'b00) & ~AD_N & ~CS_N & ~REQ_N;	//000000-07FFFF
+	wire CPU_FB_REQ = (A[20:19] == 2'b01) & ~AD_N & ~CS_N & ~REQ_N;	//080000-0FFFFF
 	bit [18: 1] VRAM_LAST_A;
 	bit         CPU_FB_RRDY;
 	bit         CPU_FB_WRDY;
@@ -1082,14 +1082,14 @@ module VDP1 (
 			if (SPR_READ && !SPR_READ_PEND) SPR_READ_PEND <= 1;
 			if (CLT_READ && !CLT_READ_PEND) CLT_READ_PEND <= 1;
 			
-			if (CPU_VRAM_REQ && !WE_N && CPU_VRAM_WRDY) CPU_VRAM_WRDY <= 0;
-			if (CPU_VRAM_REQ &&  WE_N && CPU_VRAM_RRDY) CPU_VRAM_RRDY <= 0;
+			if (CPU_VRAM_REQ && !WE_N && !DTEN_N && CPU_VRAM_WRDY) CPU_VRAM_WRDY <= 0;
+			if (CPU_VRAM_REQ &&  WE_N &&  DTEN_N && CPU_VRAM_RRDY) CPU_VRAM_RRDY <= 0;
 			
 			/*if (CE_R)*/ VRAM_DONE <= 0;
 			CLT_WE <= 0;
 			case (VRAM_ST)
 				VS_IDLE: begin
-					if ((CPU_VRAM_REQ && !WE_N) || !CPU_VRAM_WRDY) begin
+					if ((CPU_VRAM_REQ && !WE_N && !DTEN_N) || !CPU_VRAM_WRDY) begin
 						if (VRAM_RDY) begin
 							VRAM_A <= A[18:1];
 							VRAM_D <= DI;
@@ -1099,7 +1099,7 @@ module VDP1 (
 							CPU_VRAM_WRDY <= 1;
 							VRAM_ST <= VS_CPU_WRITE;
 						end
-					end else if ((CPU_VRAM_REQ && WE_N) || !CPU_VRAM_RRDY) begin
+					end else if ((CPU_VRAM_REQ && WE_N && DTEN_N) || !CPU_VRAM_RRDY) begin
 						begin
 							VRAM_A <= A[18:1];
 							VRAM_WE <= '0;
@@ -1267,8 +1267,8 @@ module VDP1 (
 			end
 			
 			
-			if (CPU_FB_REQ && !WE_N && CPU_FB_WRDY) CPU_FB_WRDY <= 0;
-			if (CPU_FB_REQ &&  WE_N && CPU_FB_RRDY) CPU_FB_RRDY <= 0;
+			if (CPU_FB_REQ && !WE_N && !DTEN_N && CPU_FB_WRDY) CPU_FB_WRDY <= 0;
+			if (CPU_FB_REQ &&  WE_N &&  DTEN_N && CPU_FB_RRDY) CPU_FB_RRDY <= 0;
 			
 			case (FB_ST)
 				FS_IDLE: begin
@@ -1284,7 +1284,7 @@ module VDP1 (
 							FB_D <= {FB_DRAW_D[7:0],FB_DRAW_D[7:0]};
 							FB_WE <= {~DRAW_X[0],DRAW_X[0]};
 						end
-					end else if ((CPU_FB_REQ && !WE_N) || !CPU_FB_WRDY) begin
+					end else if ((CPU_FB_REQ && !WE_N && !DTEN_N) || !CPU_FB_WRDY) begin
 						if (FB_RDY) begin
 							FB_A <= A[17:1];
 							FB_D <= DI;
@@ -1293,7 +1293,7 @@ module VDP1 (
 							CPU_FB_WRDY <= 1;
 							FB_ST <= FS_CPU_WRITE;
 						end
-					end else if ((CPU_FB_REQ && WE_N) || !CPU_FB_RRDY) begin
+					end else if ((CPU_FB_REQ && WE_N && DTEN_N) || !CPU_FB_RRDY) begin
 						begin
 							FB_A <= A[17:1];
 							FB_RD <= 1;
@@ -1369,7 +1369,7 @@ module VDP1 (
 
 
 	//Registers
-	wire REG_REQ = (A[20:19] == 2'b10) & ~DTEN_N & ~AD_N & ~CS_N & ~REQ_N;
+	wire REG_REQ = (A[20:19] == 2'b10) & ~AD_N & ~CS_N & ~REQ_N;
 	
 	assign MODR = {4'h0,3'b000,PTMR.PTM[1],FBCR.EOS,FBCR.DIE,FBCR.DIL,FBCR.FCM,TVMR.VBE,TVMR.TVM};
 	
@@ -1410,25 +1410,10 @@ module VDP1 (
 		end else if (!RES_N) begin
 				
 		end else begin
-//			if (!CS_N && DTEN_N && AD_N && CE_R) begin
-//				if (!DI[15]) begin
-//					A[20:9] <= DI[11:0];
-//					WE_N <= DI[14];
-//					BURST <= DI[13];
-//				end else begin
-//					A[8:1] <= DI[7:0];
-//					DQM <= DI[13:12];
-//				end
-//			end else if (!CS_N && !DTEN_N && !AD_N && BURST && CE_R) begin
-//				if ((CPU_VRAM_SEL && CPU_VRAM_RRDY && CPU_VRAM_WRDY) || CPU_FB_SEL || REG_REQ) begin
-//					A <= A + 20'd1;
-//				end
-//			end
-			
 			START_DRAW_PEND <= 0;
 			DRAW_TERMINATE <= 0;
 			if (REG_REQ) begin
-				if (!WE_N) begin
+				if (!WE_N && !DTEN_N) begin
 					case ({A[5:1],1'b0})
 						5'h00: TVMR <= DI & TVMR_MASK;
 						5'h02: FBCR <= DI & FBCR_MASK;

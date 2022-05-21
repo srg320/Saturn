@@ -187,15 +187,15 @@ module VDP2 (
 	assign DOT_CE_R = (DOTCLK_DIV == 3) & CE_R;
 	assign DOT_CE_F = (DOTCLK_DIV == 1) & CE_R;
 	
-	assign DCLK = DOT_CE_R | (DOT_CE_F & HRES[0]);
+	assign DCLK = DOT_CE_R | (DOT_CE_F & HRES[1]);
 	assign DCE_R = DOT_CE_R;
 	assign DCE_F = DOT_CE_F;
 	
 	bit  [ 8: 0] HBL_END_320,HBL_END_352;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			HBL_END_320 <= 9'd6;
-			HBL_END_352 <= 9'd6;
+			HBL_END_320 <= 9'd4;
+			HBL_END_352 <= 9'd4;
 		end else begin
 			if (H320_END_INC) begin
 				HBL_END_320 <= HBL_END_320 + 9'd1;
@@ -218,8 +218,8 @@ module VDP2 (
 	end
 	
 	wire LAST_DOT = (H_CNT == HRES_320 - 1 && !HRES[0]) || (H_CNT == HRES_352 - 1 && HRES[0]);
-	wire PRELAST_DOT = (H_CNT == HRES_320 - 2 && !HRES[0]) || (H_CNT == HRES_352 - 2 && HRES[0]);
-	wire [8:0] HBL_START = !HRES[0] ? HBL_START_320 : HBL_START_352;
+//	wire PRELAST_DOT = (H_CNT == HRES_320 - 2 && !HRES[0]) || (H_CNT == HRES_352 - 2 && HRES[0]);
+//	wire [8:0] HBL_START = !HRES[0] ? HBL_START_320 : HBL_START_352;
 	wire [8:0] HBL_END = !HRES[0] ? HBL_END_320 : HBL_END_352;
 	wire [8:0] HDISP_END = !HRES[0] ? 9'd320 - 9'd1 : 9'd352 - 9'd1;
 	wire [8:0] VBL_START = VBL_START_224 + {VRES,4'h0};
@@ -289,7 +289,6 @@ module VDP2 (
 				VBLANK2 <= 1;
 			end else if (LAST_DOT && V_CNT == VRES_NTSC - 2) begin
 				VBLANK2 <= 0;
-				ODD <= ~ODD;
 			end
 			
 			if (V_CNT >= VBL_START && V_CNT <= VRES_NTSC - 2) begin
@@ -303,8 +302,8 @@ module VDP2 (
 	assign HBL_N = ~HBLANK;
 	assign VS_N = ~VSYNC;
 	assign HS_N = ~HSYNC;
-	assign FIELD = ODD;
-	assign INTERLACE = 0;
+	assign FIELD = ODD && &REGS.TVMD.LSMD;
+	assign INTERLACE = &REGS.TVMD.LSMD;
 //	assign HRES = REGS.TVMD.HRESO[1:0];
 //	assign VRES = REGS.TVMD.VRESO[1:0];
 	
@@ -884,10 +883,11 @@ module VDP2 (
 	bit  [ 7: 2] RP_POS;
 	bit  [ 1: 0] VRAM_BANK;
 	bit          VRAM_WRITE_PEND_CLR[2];
-	bit          VRAM_READ_PEND_CLR;
-	bit          VRAM_WRITE_PIPE;
+//	bit          VRAM_READ_PEND_CLR;
+//	bit          VRAM_WRITE_PIPE;
 	always @(posedge CLK or negedge RST_N) begin
-		bit CS_N_OLD;
+//		bit CS_N_OLD;
+		bit FIFO_EMPTY_OLD;
 		
 		if (!RST_N) begin
 			VRAMA0_A <= '0;
@@ -913,10 +913,10 @@ module VDP2 (
 			VRAM_RRDY <= 1;
 			VRAM_WRDY <= 1;
 			
-			CS_N_OLD <= 1;
+//			CS_N_OLD <= 1;
 		end else begin
 			VRAM_WRITE_PEND_CLR = '{2{0}};
-			VRAM_READ_PEND_CLR <= 0;
+//			VRAM_READ_PEND_CLR <= 0;
 			if (DOT_CE_F) begin
 				VRAMA0_WE <= 0;
 				VRAMA1_WE <= 0;
@@ -927,7 +927,7 @@ module VDP2 (
 				VRAMB0_RD <= 0;
 				VRAMB1_RD <= 0;
 				VRAM_READ_PIPE[0] <= 0;
-				VRAM_WRITE_PIPE <= 0;
+//				VRAM_WRITE_PIPE <= 0;
 				if (!DISP || VBLANK2 || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
 					if (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1]) begin
 						VRAMA0_A <= {VRAM_A[0][18:2],1'b0};
@@ -941,7 +941,7 @@ module VDP2 (
 						VRAMB0_WE <= VRAM_WE[1] & {4{VRAM_WRITE_PEND[1] /*& ~VRAM_READ_PEND*/}};
 						VRAMB1_WE <= VRAM_WE[1] & {4{VRAM_WRITE_PEND[1] /*& ~VRAM_READ_PEND*/}};
 						VRAM_WRITE_PEND_CLR = '{2{1}};
-						VRAM_WRITE_PIPE <= 1;
+//						VRAM_WRITE_PIPE <= 1;
 					end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin 
 						VRAMA0_A <= {2'b00,VRAM_RA[16:1]};
 						VRAMA1_A <= {      VRAM_RA[16:1]};
@@ -1018,14 +1018,14 @@ module VDP2 (
 								VRAMA0_WE <= VRAM_WE[0];
 								VRAMA1_WE <= VRAM_WE[0];
 								VRAM_WRITE_PEND_CLR[0] = 1;
-								VRAM_WRITE_PIPE <= 1;
+//								VRAM_WRITE_PIPE <= 1;
 							end else if (VRAM_WRITE_PEND[1]) begin
 								VRAMA0_A <= {1'b0,VRAM_A[1][17:2],1'b0};
 								VRAMA_D <= VRAM_D[1];
 								VRAMA0_WE <= VRAM_WE[1];
 								VRAMA1_WE <= VRAM_WE[1];
 								VRAM_WRITE_PEND_CLR[1] = 1;
-								VRAM_WRITE_PIPE <= 1;
+//								VRAM_WRITE_PIPE <= 1;
 							end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin
 								VRAMA0_A <= {2'b00,VRAM_RA[16:1]};
 								VRAMA1_A <= {      VRAM_RA[16:1]};
@@ -1100,14 +1100,14 @@ module VDP2 (
 								VRAMB0_WE <= VRAM_WE[0];
 								VRAMB1_WE <= VRAM_WE[0];
 								VRAM_WRITE_PEND_CLR[0] = 1;
-								VRAM_WRITE_PIPE <= 1;
+//								VRAM_WRITE_PIPE <= 1;
 							end else if (VRAM_WRITE_PEND[1]) begin
 								VRAMB0_A <= {1'b1,VRAM_A[1][17:2],1'b0};
 								VRAMB_D <= VRAM_D[1];
 								VRAMB0_WE <= VRAM_WE[1];
 								VRAMB1_WE <= VRAM_WE[1];
 								VRAM_WRITE_PEND_CLR[1] = 1;
-								VRAM_WRITE_PIPE <= 1;
+//								VRAM_WRITE_PIPE <= 1;
 							end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin
 								VRAMB0_A <= {2'b00,VRAM_RA[16:1]};
 								VRAMB1_A <= {      VRAM_RA[16:1]};
@@ -1333,7 +1333,7 @@ module VDP2 (
 				VRAM_WRDY <= 1;
 			end
 			
-			if (VRAM_REQ && !WE_N && !BURST) begin
+			if (VRAM_REQ && !WE_N && !DTEN_N && !BURST) begin
 				case (A[2:1])
 					2'b00: begin
 						VRAM_A[0] <= A[18:1];
@@ -1402,98 +1402,30 @@ module VDP2 (
 //				FIFO_RDREQ <= 1;
 			end
 			
-			CS_N_OLD <= CS_N;
-			if (CS_N && !CS_N_OLD && BURST) begin
+//			CS_N_OLD <= CS_N;
+			FIFO_EMPTY_OLD <= FIFO_EMPTY;
+//			if (CS_N && !CS_N_OLD && BURST) begin
+			if (CS_N && FIFO_EMPTY && !FIFO_EMPTY_OLD && BURST) begin
 				if (!VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND[0] <= |VRAM_WE[0];
 				if (!VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND[1] <= |VRAM_WE[1];
 			end
 			
 			
-//			if (VRAM_REQ && !WE_N) begin
-//				case (A[2:1])
-//					2'b00: begin
-//						VRAM_BUF_A[0] <= A[18:1];
-//						VRAM_BUF_D[0][31:16] <= DI;
-//						VRAM_BUF_WE[0][3:2] <= ~{2{WE_N}} & ~DQM;
-//					end
-//					2'b01: begin
-//						VRAM_BUF_A[0] <= A[18:1];
-//						VRAM_BUF_D[0][15:0] <= DI;
-//						VRAM_BUF_WE[0][1:0] <= ~{2{WE_N}} & ~DQM;
-//						if (!BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//					end
-//					2'b10: begin
-//						VRAM_BUF_A[1] <= A[18:1];
-//						VRAM_BUF_D[1][31:16] <= DI;
-//						VRAM_BUF_WE[1][3:2] <= ~{2{WE_N}} & ~DQM;
-//					end
-//					2'b11: begin
-//						VRAM_BUF_A[1] <= A[18:1];
-//						VRAM_BUF_D[1][15:0] <= DI;
-//						VRAM_BUF_WE[1][1:0] <= ~{2{WE_N}} & ~DQM;
-//						if (!BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//						else if (BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//					end
-//				endcase
-//			end
-//			
-//			CS_N_OLD <= CS_N;
-//			if (CS_N && !CS_N_OLD) begin
-//				if (VRAM_BUF_WE[0] || VRAM_BUF_WE[1]) VRAM_WRDY <= 0;
-//			end
-//			
-//			if (VRAM_WRITE_PEND_CLR[0] || VRAM_WRITE_PEND_CLR[1]) begin
-//				if (VRAM_WRITE_PEND_CLR[0]) begin
-//					VRAM_WE[0] <= '0;
-//					VRAM_WRITE_PEND[0] <= 0;
-//					if (VRAM_BUF_WE[0]) begin
-//						VRAM_A[0] <= VRAM_BUF_A[0];
-//						VRAM_D[0] <= VRAM_BUF_D[0];
-//						VRAM_WE[0] <= VRAM_BUF_WE[0];
-//						VRAM_WRITE_PEND[0] <= |VRAM_BUF_WE[0];
-//						
-//						VRAM_BUF_WE[0] <= '0;
-//						if (!VRAM_WRITE_PEND[1] || VRAM_WRITE_PEND_CLR[1]) VRAM_WRDY <= 1;
-//					end
-//				end
-//				if (VRAM_WRITE_PEND_CLR[1]) begin
-//					VRAM_WE[1] <= '0;
-//					VRAM_WRITE_PEND[1] <= 0;
-//					if (VRAM_BUF_WE[1]) begin
-//						VRAM_A[1] <= VRAM_BUF_A[1];
-//						VRAM_D[1] <= VRAM_BUF_D[1];
-//						VRAM_WE[1] <= VRAM_BUF_WE[1];
-//						VRAM_WRITE_PEND[1] <= |VRAM_BUF_WE[1];
-//						
-//						VRAM_BUF_WE[1] <= '0;
-//						if (!VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND_CLR[0]) VRAM_WRDY <= 1;
-//					end
-//				end
-//			end else if (!VRAM_WRITE_PEND[0] && !VRAM_WRITE_PEND[1] && DOT_CE_R) begin
-//				if (VRAM_BUF_WE[0] || VRAM_BUF_WE[1]) begin
-//					VRAM_A <= VRAM_BUF_A;
-//					VRAM_D <= VRAM_BUF_D;
-//					VRAM_WE <= VRAM_BUF_WE;
-//					VRAM_WRITE_PEND[0] <= |VRAM_BUF_WE[0];
-//					VRAM_WRITE_PEND[1] <= |VRAM_BUF_WE[1];
-//					
-//					VRAM_BUF_WE <= '{2{'0}};
-//					VRAM_WRDY <= 1;
-//				end
-//			end
+			//debug
+			if (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1'd1;
+			else VRAM_WRITE_PEND_CNT <= '0;
 		end
 	end
 	
 	bit         FIFO_WRREQ;
 	bit         FIFO_RDREQ;
-	bit [35: 0] FIFO_Q;
+	bit [33: 0] FIFO_Q;
 	bit         FIFO_EMPTY;
 	bit         FIFO_FULL;
-	VDP2_WRITE_FIFO fifo(CLK, {A[18:1],DQM,DI}, FIFO_WRREQ, FIFO_RDREQ, FIFO_Q, FIFO_EMPTY, FIFO_FULL);
-	assign FIFO_WRREQ = VRAM_REQ & ~WE_N & BURST;
+	VDP2_WRITE_FIFO fifo(CLK, {A[18:1],DI}, FIFO_WRREQ, FIFO_RDREQ, FIFO_Q, FIFO_EMPTY, FIFO_FULL);
+	assign FIFO_WRREQ = VRAM_REQ & ~WE_N & ~DTEN_N & BURST;
 	assign FIFO_RDREQ = ~FIFO_EMPTY & ~VRAM_WRITE_PEND[0] & ~VRAM_WRITE_PEND[1] & BURST;
-	wire [18: 1] FIFO_A = FIFO_Q[35:18];
-	wire [ 1: 0] FIFO_DQM = FIFO_Q[17:16];
+	wire [18: 1] FIFO_A = FIFO_Q[33:16];
 	wire [15: 0] FIFO_D = FIFO_Q[15:0];
 	
 	assign RA0_A = VRAMA0_A;
@@ -1901,7 +1833,8 @@ module VDP2 (
 	end
 	//Rotattion parameter window
 	wire RPW_EN = WinTest(W0_HIT_PIPE[16] ^ REGS.WCTLD.RPW0A,W1_HIT_PIPE[16] ^ REGS.WCTLD.RPW1A,0,REGS.WCTLD.RPW0E,REGS.WCTLD.RPW1E,0,REGS.WCTLD.RPLOG);
-	wire R0_RP = REGS.RPMD.RPMD == 2'b11 && RPW_EN;
+	wire R0_RP = !REGS.RPMD.RPMD[1] ? REGS.RPMD.RPMD[0] : 
+	             !REGS.RPMD.RPMD[0] ? CTD[0].TP : RPW_EN;
 	
 	//Windows
 	wire [ 9: 0] WPSX[2] = '{REGS.WPSX0.WxSX,REGS.WPSX1.WxSX};
@@ -1936,16 +1869,18 @@ module VDP2 (
 					end else begin
 						WxSX[N] <= WPSX[N];
 						WxEX[N] <= WPEX[N];
-					end
+					end 
 				end
 			end
 		end
 	end
 	
 	wire W0_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[0][9:1],WxSX[0][0]|HRES[1]} && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[0][9:1],WxEX[0][0]|HRES[1]} &&
-	              SCRNY                  >= REGS.WPSY0.WxSY[8:0]              && SCRNY                  <= REGS.WPEY0.WxEY[8:0];
+	              SCRNY                  >= REGS.WPSY0.WxSY[8:0]              && SCRNY                  <= REGS.WPEY0.WxEY[8:0] &&
+					  WxEX[0] != 10'h3FF;
 	wire W1_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[1][9:1],WxSX[1][0]|HRES[1]} && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[1][9:1],WxEX[1][0]|HRES[1]} &&
-	              SCRNY                  >= REGS.WPSY1.WxSY[8:0]              && SCRNY                  <= REGS.WPEY1.WxEY[8:0];
+	              SCRNY                  >= REGS.WPSY1.WxSY[8:0]              && SCRNY                  <= REGS.WPEY1.WxEY[8:0] &&
+					  WxEX[1] != 10'h3FF;
 					  
 	bit          W0_HIT_PIPE[24];
 	bit          W1_HIT_PIPE[24];
@@ -2553,39 +2488,78 @@ module VDP2 (
 	end
 
 	//Dots data
-	DotsBuffer_t N0DB, N1DB, N2DB, N3DB, N4DB, N5DB;
-	DotData_t RxDB[2];
+//	DotsBuffer_t N0DB, N1DB, N2DB, N3DB, N4DB, N5DB;
+//	DotData_t RxDB[2];
+//	always @(posedge CLK or negedge RST_N) begin
+//		if (!RST_N) begin
+//			// synopsys translate_off
+//			RxDB <= '{2{DD_NULL}};
+//			N0DB <= '{16{DD_NULL}};
+//			N1DB <= '{16{DD_NULL}};
+//			N2DB <= '{16{DD_NULL}};
+//			N3DB <= '{16{DD_NULL}};
+//			// synopsys translate_on
+//		end
+//		else if (DOT_CE_R /*|| (DOT_CE_F & HRES[1])*/) begin
+//			if ((SCRNX[2:0] | {HRES[1],2'b00}) == 3'd7) begin
+//				for (int i=0; i<8; i++) begin
+//					N0DB[i] <= N0DB[i+8];
+//					N0DB[i+8] <= MakeDotData({NBG_CDC[3][i],NBG_CDC[1][i],NBG_CDC[2][i],NBG_CDC[0][i]     },NBG_CDP[0][i],NSxREG[0].CHCN);
+//					N4DB[i] <= N4DB[i+8];
+//					N4DB[i+8] <= MakeDotData({24'h000000,                          4'h0,NBG_CDC[0][i][7:4]},NBG_CDP[0][i],NSxREG[0].CHCN);
+//					
+//					N1DB[i] <= N1DB[i+8];
+//					N1DB[i+8] <= MakeDotData({16'h0000,                   NBG_CDC[3][i],NBG_CDC[1][i]     },NBG_CDP[1][i],NSxREG[1].CHCN);
+//					N5DB[i] <= N5DB[i+8];
+//					N5DB[i+8] <= MakeDotData({24'h000000,                          4'h0,NBG_CDC[1][i][7:4]},NBG_CDP[1][i],NSxREG[1].CHCN);
+//					
+//					N2DB[i] <= N2DB[i+8];
+//					N2DB[i+8] <= MakeDotData({24'h000000,                               NBG_CDC[2][i]},NBG_CDP[2][i],(NSxREG[0].CHCN[0] && REGS.ZMCTL.N0ZMHF) || REGS.ZMCTL.N0ZMQT ? NSxREG[0].CHCN : NSxREG[2].CHCN);
+//					N3DB[i] <= N3DB[i+8];
+//					N3DB[i+8] <= MakeDotData({24'h000000,                               NBG_CDC[3][i]},NBG_CDP[3][i],(NSxREG[1].CHCN[0] && REGS.ZMCTL.N1ZMHF) || REGS.ZMCTL.N1ZMQT ? NSxREG[1].CHCN : NSxREG[3].CHCN);
+//				end
+//			end
+//			RxDB[0] <= MakeDotData({RBG_DC[0][3],RBG_DC[0][1],RBG_DC[0][2],RBG_DC[0][0]},RBG_DP[0],RSxREG[0].CHCN);
+//			RxDB[1] <= MakeDotData({RBG_DC[1][3],RBG_DC[1][1],RBG_DC[1][2],RBG_DC[1][0]},RBG_DP[1],NSxREG[0].CHCN);
+//		end
+//	end
+	
+	bit [31:0] N0DC[16], N1DC[16], N2DC[16], N3DC[16], N4DC[16], N5DC[16];
+	bit [31:0] RxDC[2];
+	DotParam_t N0DP[16], N1DP[16], N2DP[16], N3DP[16], N4DP[16], N5DP[16];
+	DotParam_t RxDP[2];
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			// synopsys translate_off
-			RxDB <= '{2{DD_NULL}};
-			N0DB <= '{16{DD_NULL}};
-			N1DB <= '{16{DD_NULL}};
-			N2DB <= '{16{DD_NULL}};
-			N3DB <= '{16{DD_NULL}};
+			
 			// synopsys translate_on
 		end
 		else if (DOT_CE_R /*|| (DOT_CE_F & HRES[1])*/) begin
 			if ((SCRNX[2:0] | {HRES[1],2'b00}) == 3'd7) begin
 				for (int i=0; i<8; i++) begin
-					N0DB[i] <= N0DB[i+8];
-					N0DB[i+8] <= MakeDotData({NBG_CDC[3][i],NBG_CDC[1][i],NBG_CDC[2][i],NBG_CDC[0][i]     },NBG_CDP[0][i],NSxREG[0].CHCN);
-					N4DB[i] <= N4DB[i+8];
-					N4DB[i+8] <= MakeDotData({24'h000000,                          4'h0,NBG_CDC[0][i][7:4]},NBG_CDP[0][i],NSxREG[0].CHCN);
+					N0DC[i] <= N0DC[i+8]; N0DC[i+8] <= {NBG_CDC[3][i],NBG_CDC[1][i],NBG_CDC[2][i],NBG_CDC[0][i]     };
+					N0DP[i] <= N0DP[i+8]; N0DP[i+8] <= NBG_CDP[0][i];
+					N4DC[i] <= N4DC[i+8]; N4DC[i+8] <= {24'h000000,                          4'h0,NBG_CDC[0][i][7:4]};
+					N4DP[i] <= N4DP[i+8]; N4DP[i+8] <= NBG_CDP[0][i];
 					
-					N1DB[i] <= N1DB[i+8];
-					N1DB[i+8] <= MakeDotData({16'h0000,                   NBG_CDC[3][i],NBG_CDC[1][i]     },NBG_CDP[1][i],NSxREG[1].CHCN);
-					N5DB[i] <= N5DB[i+8];
-					N5DB[i+8] <= MakeDotData({24'h000000,                          4'h0,NBG_CDC[1][i][7:4]},NBG_CDP[1][i],NSxREG[1].CHCN);
+					N1DC[i] <= N1DC[i+8]; N1DC[i+8] <= {16'h0000,                   NBG_CDC[3][i],NBG_CDC[1][i]     };
+					N1DP[i] <= N1DP[i+8]; N1DP[i+8] <= NBG_CDP[1][i];
+					N5DC[i] <= N5DC[i+8]; N5DC[i+8] <= {24'h000000,                          4'h0,NBG_CDC[1][i][7:4]};
+					N5DP[i] <= N5DP[i+8]; N5DP[i+8] <= NBG_CDP[1][i];
 					
-					N2DB[i] <= N2DB[i+8];
-					N2DB[i+8] <= MakeDotData({24'h000000,                               NBG_CDC[2][i]},NBG_CDP[2][i],(NSxREG[0].CHCN[0] && REGS.ZMCTL.N0ZMHF) || REGS.ZMCTL.N0ZMQT ? NSxREG[0].CHCN : NSxREG[2].CHCN);
-					N3DB[i] <= N3DB[i+8];
-					N3DB[i+8] <= MakeDotData({24'h000000,                               NBG_CDC[3][i]},NBG_CDP[3][i],(NSxREG[1].CHCN[0] && REGS.ZMCTL.N1ZMHF) || REGS.ZMCTL.N1ZMQT ? NSxREG[1].CHCN : NSxREG[3].CHCN);
+					N2DC[i] <= N2DC[i+8]; N2DC[i+8] <= {24'h000000,                               NBG_CDC[2][i]};
+					N2DP[i] <= N2DP[i+8]; N2DP[i+8] <= NBG_CDP[2][i];
+					
+					N3DC[i] <= N3DC[i+8]; N3DC[i+8] <= {24'h000000,                               NBG_CDC[3][i]};
+					N3DP[i] <= N3DP[i+8]; N3DP[i+8] <= NBG_CDP[3][i];
 				end
 			end
-			RxDB[0] <= MakeDotData({RBG_DC[0][3],RBG_DC[0][1],RBG_DC[0][2],RBG_DC[0][0]},RBG_DP[0],RSxREG[0].CHCN);
-			RxDB[1] <= MakeDotData({RBG_DC[1][3],RBG_DC[1][1],RBG_DC[1][2],RBG_DC[1][0]},RBG_DP[1],NSxREG[0].CHCN);
+			
+			RxDC[0] <= {RBG_DC[0][3],RBG_DC[0][1],RBG_DC[0][2],RBG_DC[0][0]};
+			RxDP[0] <= RBG_DP[0];
+			
+			RxDC[1] <= {RBG_DC[1][3],RBG_DC[1][1],RBG_DC[1][2],RBG_DC[1][0]};
+			RxDP[1] <= RBG_DP[1];
 		end
 	end
 	
@@ -2643,6 +2617,10 @@ module VDP2 (
 //	end
 	
 	DotData_t R0DOT, N0DOT, N1DOT, N2DOT, N3DOT;
+	bit [31:0] N0DOTDC, N1DOTDC, N2DOTDC, N3DOTDC;
+	bit [31:0] R0DOTDC;
+	DotParam_t N0DOTDP, N1DOTDP, N2DOTDP, N3DOTDP;
+	DotParam_t R0DOTDP;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			// synopsys translate_off
@@ -2654,28 +2632,68 @@ module VDP2 (
 			// synopsys translate_on
 		end
 		else if (DOT_CE_R || (DOT_CE_F & HRES[1])) begin
-			R0DOT <= RxDB[0];
+//			R0DOT <= RxDB[0];
+//			
+//			if (RSxREG[1].ON)
+//				N0DOT <= RxDB[1];
+//			else if (NSxREG[0].CHCN == 3'b000 && REGS.ZMCTL.N0ZMHF)
+//				N0DOT <= !NCX[0].INT[3] ? N0DB[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N4DB[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+//			else if (NSxREG[0].CHCN == 3'b001 && REGS.ZMCTL.N0ZMHF)
+//				N0DOT <= !NCX[0].INT[3] ? N0DB[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N2DB[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+//			else
+//				N0DOT <= N0DB[NCX[0].INT[3:0]];
+//			
+//			if (NSxREG[1].CHCN == 3'b000 && REGS.ZMCTL.N1ZMHF)
+//				N1DOT <= !NCX[1].INT[3] ? N1DB[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N5DB[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+//			else if (NSxREG[1].CHCN == 3'b001 && REGS.ZMCTL.N1ZMHF)
+//				N1DOT <= !NCX[1].INT[3] ? N1DB[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N3DB[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+//			else
+//				N1DOT <= N1DB[NCX[1].INT[3:0]];
+//				
+//			N2DOT <= N2DB[NCX[2].INT[3:0]];
+//			N3DOT <= N3DB[NCX[3].INT[3:0]];
 			
-			if (RSxREG[1].ON)
-				N0DOT <= RxDB[1];
-			else if (NSxREG[0].CHCN == 3'b000 && REGS.ZMCTL.N0ZMHF)
-				N0DOT <= !NCX[0].INT[3] ? N0DB[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N4DB[{NCX[0].INT[4],NCX[0].INT[2:0]}];
-			else if (NSxREG[0].CHCN == 3'b001 && REGS.ZMCTL.N0ZMHF)
-				N0DOT <= !NCX[0].INT[3] ? N0DB[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N2DB[{NCX[0].INT[4],NCX[0].INT[2:0]}];
-			else
-				N0DOT <= N0DB[NCX[0].INT[3:0]];
+			R0DOTDC <= RxDC[0];
+			R0DOTDP <= RxDP[0];
 			
-			if (NSxREG[1].CHCN == 3'b000 && REGS.ZMCTL.N1ZMHF)
-				N1DOT <= !NCX[1].INT[3] ? N1DB[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N5DB[{NCX[1].INT[4],NCX[1].INT[2:0]}];
-			else if (NSxREG[1].CHCN == 3'b001 && REGS.ZMCTL.N1ZMHF)
-				N1DOT <= !NCX[1].INT[3] ? N1DB[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N3DB[{NCX[1].INT[4],NCX[1].INT[2:0]}];
-			else
-				N1DOT <= N1DB[NCX[1].INT[3:0]];
+			if (RSxREG[1].ON) begin
+				N0DOTDC <= RxDC[1];
+				N0DOTDP <= RxDP[1];
+			end else if (NSxREG[0].CHCN == 3'b000 && REGS.ZMCTL.N0ZMHF) begin
+				N0DOTDC <= !NCX[0].INT[3] ? N0DC[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N4DC[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+				N0DOTDP <= !NCX[0].INT[3] ? N0DP[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N4DP[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+			end else if (NSxREG[0].CHCN == 3'b001 && REGS.ZMCTL.N0ZMHF) begin
+				N0DOTDC <= !NCX[0].INT[3] ? N0DC[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N2DC[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+				N0DOTDP <= !NCX[0].INT[3] ? N0DP[{NCX[0].INT[4],NCX[0].INT[2:0]}] : N2DP[{NCX[0].INT[4],NCX[0].INT[2:0]}];
+			end else begin
+				N0DOTDC <= N0DC[NCX[0].INT[3:0]];
+				N0DOTDP <= N0DP[NCX[0].INT[3:0]];
+			end
+			
+			if (NSxREG[1].CHCN == 3'b000 && REGS.ZMCTL.N1ZMHF) begin
+				N1DOTDC <= !NCX[1].INT[3] ? N1DC[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N5DC[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+				N1DOTDP <= !NCX[1].INT[3] ? N1DP[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N5DP[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+			end else if (NSxREG[1].CHCN == 3'b001 && REGS.ZMCTL.N1ZMHF) begin
+				N1DOTDC <= !NCX[1].INT[3] ? N1DC[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N3DC[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+				N1DOTDP <= !NCX[1].INT[3] ? N1DP[{NCX[1].INT[4],NCX[1].INT[2:0]}] : N3DP[{NCX[1].INT[4],NCX[1].INT[2:0]}];
+			end else begin
+				N1DOTDC <= N1DC[NCX[1].INT[3:0]];
+				N1DOTDP <= N1DP[NCX[1].INT[3:0]];
+			end
 				
-			N2DOT <= N2DB[NCX[2].INT[3:0]];
-			N3DOT <= N3DB[NCX[3].INT[3:0]];
+			N2DOTDC <= N2DC[NCX[2].INT[3:0]];
+			N2DOTDP <= N2DP[NCX[2].INT[3:0]];
+			
+			N3DOTDC <= N3DC[NCX[3].INT[3:0]];
+			N3DOTDP <= N3DP[NCX[3].INT[3:0]];
 		end
 	end
+	
+	assign R0DOT = MakeDotData(R0DOTDC,R0DOTDP,RSxREG[0].CHCN);
+	assign N0DOT = MakeDotData(N0DOTDC,N0DOTDP,NSxREG[0].CHCN);
+	assign N1DOT = MakeDotData(N1DOTDC,N1DOTDP,NSxREG[1].CHCN);
+	assign N2DOT = MakeDotData(N2DOTDC,N2DOTDP,(NSxREG[0].CHCN[0] && REGS.ZMCTL.N0ZMHF) || REGS.ZMCTL.N0ZMQT ? NSxREG[0].CHCN : NSxREG[2].CHCN);
+	assign N3DOT = MakeDotData(N3DOTDC,N3DOTDP,(NSxREG[1].CHCN[0] && REGS.ZMCTL.N1ZMHF) || REGS.ZMCTL.N1ZMQT ? NSxREG[1].CHCN : NSxREG[3].CHCN);
 								 
 	//Sprite data
 	SpriteDotData_t SDOT;
@@ -2975,9 +2993,9 @@ module VDP2 (
 		else begin
 			if (CE_R) begin
 				case (REGS.RAMCTL.CRMD)
-					2'b00: begin DC = Color555To888(PAL0_Q);                       CC =             PAL0_Q[15]; end
+					2'b00: begin DC = Color555To888(PAL0_Q);                       CC =              PAL0_Q[15]; end
 					2'b01: begin DC = Color555To888(!PAL_N[10] ? PAL0_Q : PAL1_Q); CC = !PAL_N[10] ? PAL0_Q[15] : PAL1_Q[15]; end
-					default: begin DC = {PAL0_Q[7:0],PAL1_Q};                      CC =             PAL0_Q[15]; end
+					default: begin DC = {PAL0_Q[7:0],PAL1_Q};                      CC =              PAL0_Q[15]; end
 				endcase
 				case (DOTCLK_DIV & {~HRES[1],1'b1})
 					2'd0: {CC_FST,DC_FST_LATCH} <= {CC,DC};
@@ -3025,8 +3043,8 @@ module VDP2 (
 	
 	
 	//Color RAM
-	wire        PAL_SEL = !CS_N && !DTEN_N && !AD_N && A[20:19] == 2'b10;	//100000-17FFFF
-	wire        PAL_WE = PAL_SEL & ~WE_N & ~REQ_N;
+	wire        PAL_SEL = !CS_N && !AD_N && A[20:19] == 2'b10;	//100000-17FFFF
+	wire        PAL_WE = PAL_SEL && !WE_N && !DTEN_N && !REQ_N;
 	wire [10:1] IO_PAL_A   = REGS.RAMCTL.CRMD == 2'b10 ? A[11:2] : A[10:1];
 	wire        IO_PAL0_RD = REGS.RAMCTL.CRMD == 2'b10 ? ~A[1] : ~A[11];
 	wire        IO_PAL1_RD = REGS.RAMCTL.CRMD == 2'b10 ?  A[1] :  A[11];
@@ -3062,7 +3080,8 @@ module VDP2 (
 		.WREN_B(IO_PAL1_WE),
 		.Q_B(PAL1_DO)
 	);
-	wire [15:0] PAL_DO = IO_PAL0_RD ? PAL0_DO : PAL1_DO;
+	wire [15:0] PAL_DO = IO_PAL0_RD ? PAL0_DO : 
+	                     IO_PAL1_RD ? PAL1_DO : 16'hFFFF;
 	
 	bit  [10:1] CT_CRAM_A;
 	bit  [31:0] CT_CRAM_Q;
@@ -3089,9 +3108,9 @@ module VDP2 (
 	end
 	
 	//Registers
-	wire VRAM_SEL = ~A[20] & ~CS_N & ~DTEN_N & ~AD_N ;	//000000-0FFFFF
+	wire VRAM_SEL = ~A[20] & ~CS_N & ~AD_N ;	//000000-0FFFFF
 	wire VRAM_REQ = VRAM_SEL & ~REQ_N;
-	wire REG_SEL = (A[20:18] == 3'b110) & ~CS_N & ~DTEN_N & ~AD_N;
+	wire REG_SEL = (A[20:18] == 3'b110) & ~CS_N & ~AD_N;
 	
 	bit [20:1] A;
 	bit        WE_N;
@@ -3250,7 +3269,7 @@ module VDP2 (
 				
 		end else begin
 			if (REG_SEL && !REQ_N) begin
-				if (!WE_N) begin
+				if (!WE_N && !DTEN_N) begin
 					case ({A[8:1],1'b0})
 						9'h000: REGS.TVMD <= DI & TVMD_MASK;
 						9'h002: REGS.EXTEN <= DI & EXTEN_MASK;
@@ -3526,9 +3545,6 @@ module VDP2 (
 //				if ((VRAM_BUF_WE[0] || VRAM_BUF_WE[1]) /*&& (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])*/) VRAM_WRDY <= 0;
 //			end
 			
-			//debug
-			if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1'd1;
-			else VRAM_WRITE_PEND_CNT <= '0;
 		end
 	end
 	

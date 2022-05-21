@@ -167,10 +167,10 @@ module SCSP (
 	bit        DMA_WR;
 	bit        DMA_EXEC;
 	
-	bit [20:1] SCU_A[2];
-	bit [15:0] SCU_D[2];
-	bit        SCU_WE_N[2];
-	bit  [1:0] SCU_DQM[2];
+//	bit [20:1] SCU_A[2];
+//	bit [15:0] SCU_D[2];
+//	bit        SCU_WE_N[2];
+//	bit  [1:0] SCU_DQM[2];
 	
 	bit  [1:0] CLK_CNT;
 	always @(posedge CLK) if (CE) CLK_CNT <= CLK_CNT + 2'd1;
@@ -830,7 +830,7 @@ module SCSP (
 	bit  [1:0] DQM;
 	bit        BURST;
 	
-	wire SCU_REQ = ~DTEN_N & ~AD_N & ~CS_N & ~REQ_N;	//25A00000-25BFFFFF
+	wire SCU_REQ = ~AD_N & ~CS_N & ~REQ_N;	//25A00000-25BFFFFF
 	bit SCU_PEND[2];
 	bit SCU_RDY;
 	bit SCPU_PEND;
@@ -880,38 +880,22 @@ module SCSP (
 			
 //			SCU_SEL_OLD <= SCU_SEL;
 			if (SCU_REQ && WE_N) begin
-				SCU_A[0] <= A;
-				SCU_WE_N[0] <= WE_N;
-				SCU_DQM[0] <= DQM;
+//				SCU_A[0] <= A;
+//				SCU_WE_N[0] <= WE_N;
+//				SCU_DQM[0] <= DQM;
 				SCU_PEND[0] <= 1;
-//				if (BURST) A <= A + 20'd1;
 				SCU_RDY <= 0;
-			end else if (SCU_REQ && !WE_N) begin
-//				if (!SCU_PEND[0]) begin
-					SCU_A[0] <= A;
-					SCU_D[0] <= DI;
-					SCU_WE_N[0] <= WE_N;
-					SCU_DQM[0] <= DQM;
-					SCU_PEND[0] <= 1;
-//					if (BURST) A <= A + 20'd1;
-//				end else begin
-//					SCU_A[1] <= A;
-//					SCU_D[1] <= DI;
-//					SCU_WE_N[1] <= WE_N;
-//					SCU_DQM[1] <= DQM;
-//					SCU_PEND[1] <= 1;
-//					if (BURST) A <= A + 20'd1;
-					SCU_RDY <= 0;
-//				end
+			end else if (SCU_REQ && !WE_N && !DTEN_N) begin
+//				SCU_A[0] <= A;
+//				SCU_D[0] <= DI;
+//				SCU_WE_N[0] <= WE_N;
+//				SCU_DQM[0] <= DQM;
+				SCU_PEND[0] <= 1;
+				SCU_RDY <= 0;
 			end
 			
 			if ((MEM_ST == MS_SCU_WAIT && RAM_RDY) || (REG_ST == MS_SCU_WAIT && REG_RDY)) begin
-//				SCU_A[0] <= SCU_A[1];
-//				SCU_D[0] <= SCU_D[1];
-//				SCU_WE_N[0] <= SCU_WE_N[1];
-//				SCU_DQM[0] <= SCU_DQM[1];
-				SCU_PEND[0] <= SCU_PEND[1];
-//				SCU_PEND[1] <= 0;
+				SCU_PEND[0] <= 0;
 				SCU_RDY <= 1;
 			end
 			
@@ -948,12 +932,12 @@ module SCSP (
 						MEM_ST <= MS_SCPU_WAIT;
 //						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h001682) || ({SCA[20:1],1'b0} == 21'h00168C) || ({SCA[20:1],1'b0} == 21'h001696);
 						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h0015F2) || ({SCA[20:1],1'b0} == 21'h0015FC) || ({SCA[20:1],1'b0} == 21'h001606);
-					end else if (!SCU_A[0][20] && SCU_PEND[0] && CYCLE_START) begin
-						MEM_A <= SCU_A[0][18:1];
-						MEM_D <= SCU_D[0];
-						MEM_WE <= ~{2{SCU_WE_N[0]}} & ~SCU_DQM[0];
-						MEM_RD <= SCU_WE_N[0];
-						MEM_CS <= 1;
+					end else if (!A[20] && SCU_PEND[0] && CYCLE_START) begin
+						MEM_A <= A[18:1];
+						MEM_D <= DI;
+						MEM_WE <= ~{2{WE_N}} & ~DQM;
+						MEM_RD <= WE_N;
+						MEM_CS <= ~A[19];
 //						if (!SCU_WE_N) SCU_PEND <= 0;
 						MEM_ST <= MS_SCU_WAIT;
 					end
@@ -1026,11 +1010,11 @@ module SCSP (
 						REG_RD <= 0;
 						REG_CS <= 1;
 						REG_ST <= MS_DMA_WAIT;
-					end else if (SCU_A[0][20] && SCU_PEND[0]) begin
-						REG_A <= SCU_A[0][11:1];
-						REG_D <= SCU_D[0];
-						REG_WE <= ~{2{SCU_WE_N[0]}} & ~SCU_DQM[0];
-						REG_RD <= SCU_WE_N[0];
+					end else if (A[20] && SCU_PEND[0]) begin
+						REG_A <= A[11:1];
+						REG_D <= DI;
+						REG_WE <= ~{2{WE_N}} & ~DQM;
+						REG_RD <= WE_N;
 						REG_CS <= 1;
 						REG_ST <= MS_SCU_WAIT;
 					end else if (SCA[20] && SCPU_PEND) begin
@@ -1432,12 +1416,14 @@ module SCSP (
 	//COEF,100700-10077F
 	wire       COEF_SEL = REG_A[11:7] == 5'b01110 & REG_CS;
 	bit [15:0] COEF_RAM_Q;
-	SCSP_RAM_8X2 #(6) COEF_RAM (CLK, REG_A[6:1], REG_D & COEF_MASK, (REG_WE & {2{COEF_SEL}}), (REG_RDEN ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
+//	SCSP_RAM_8X2 #(6) COEF_RAM (CLK, REG_A[6:1], REG_D & COEF_MASK, (REG_WE & {2{COEF_SEL}}), (REG_RDEN ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
+	SCSP_COEF_RAM COEF_RAM (CLK, REG_A[6:1], REG_D & COEF_MASK, (REG_WE & {2{COEF_SEL}}), (REG_RDEN ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
 	
 	//MADRS,100780-1007BF
 	wire       MADRS_SEL = REG_A[11:6] == 6'b011110 & REG_CS;
 	bit [15:0] MADRS_RAM_Q;
-	SCSP_RAM_8X2 #(5) MADRS_RAM (CLK, REG_A[5:1], REG_D & MADRS_MASK, (REG_WE & {2{MADRS_SEL}}), (REG_RDEN ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
+//	SCSP_RAM_8X2 #(5) MADRS_RAM (CLK, REG_A[5:1], REG_D & MADRS_MASK, (REG_WE & {2{MADRS_SEL}}), (REG_RDEN ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
+	SCSP_ADRS_RAM MADRS_RAM (CLK, REG_A[5:1], REG_D & MADRS_MASK, (REG_WE & {2{MADRS_SEL}}), (REG_RDEN ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
 	
 	//MPRO,100800-100BFF
 	wire       MPRO_SEL = REG_A[11:10] == 2'b10;
@@ -1446,26 +1432,29 @@ module SCSP (
 	wire       MPRO2_SEL = MPRO_SEL & (REG_A[2:1] == 3'h4>>1) & REG_CS;
 	wire       MPRO3_SEL = MPRO_SEL & (REG_A[2:1] == 3'h6>>1) & REG_CS;
 	bit [63:0] MPRO_RAM_Q;
-	SCSP_RAM_8X2 #(7) MPRO0_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[63:48], (REG_WE & {2{MPRO0_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[63:48]);
-	SCSP_RAM_8X2 #(7) MPRO1_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[47:32], (REG_WE & {2{MPRO1_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[47:32]);
-	SCSP_RAM_8X2 #(7) MPRO2_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[31:16], (REG_WE & {2{MPRO2_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[31:16]);
-	SCSP_RAM_8X2 #(7) MPRO3_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[15: 0], (REG_WE & {2{MPRO3_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[15: 0]);
+//	SCSP_BRAM_8X2 #(7) MPRO0_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[63:48], (REG_WE & {2{MPRO0_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[63:48]);
+//	SCSP_BRAM_8X2 #(7) MPRO1_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[47:32], (REG_WE & {2{MPRO1_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[47:32]);
+//	SCSP_BRAM_8X2 #(7) MPRO2_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[31:16], (REG_WE & {2{MPRO2_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[31:16]);
+//	SCSP_BRAM_8X2 #(7) MPRO3_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[15: 0], (REG_WE & {2{MPRO3_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[15: 0]);
+	SCSP_MPRO_RAM MPRO_RAM (CLK, REG_A[9:3], {4{REG_D}} & MPRO_MASK, ({4{REG_WE}} & {{2{MPRO0_SEL}},{2{MPRO1_SEL}},{2{MPRO2_SEL}},{2{MPRO3_SEL}}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q);
 	
 	//TEMP,100C00-100DFF
 	wire       TEMP_SEL = REG_A[11:9] == 3'b110;
-	wire       TEMP1_SEL = TEMP_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
 	wire       TEMP0_SEL = TEMP_SEL & (REG_A[1:1] == 2'h0>>1) & REG_CS;
+	wire       TEMP1_SEL = TEMP_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
 	bit [31:0] TEMP_RAM_Q;
-	SCSP_RAM_8X2 #(7) TEMP1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[31:16] : DSP_TEMP_D), (REG_WE & {2{TEMP1_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[31:16]);
-	SCSP_RAM_8X2 #(7) TEMP0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[15: 0] : DSP_TEMP_D), (REG_WE & {2{TEMP0_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[15: 0]);
+//	SCSP_RAM_8X2 #(7) TEMP1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[31:16] : DSP_TEMP_D), (REG_WE & {2{TEMP0_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[31:16]);
+//	SCSP_RAM_8X2 #(7) TEMP0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[15: 0] : DSP_TEMP_D), (REG_WE & {2{TEMP1_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[15: 0]);
+	SCSP_TEMP_RAM TEMP_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? {2{REG_D}} & TEMP_MASK : {8'h00,DSP_TEMP_D}), ({2{REG_WE}} & {{2{TEMP0_SEL}},{2{TEMP1_SEL}}}) | {4{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q);
 	
 	//MEMS,100E00-100E7F
 	wire       MEMS_SEL = REG_A[11:7] == 5'b11100;
-	wire       MEMS1_SEL = MEMS_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
 	wire       MEMS0_SEL = MEMS_SEL & (REG_A[1:1] == 2'h0>>1) & REG_CS;
+	wire       MEMS1_SEL = MEMS_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
 	bit [31:0] MEMS_RAM_Q;
-	SCSP_RAM_8X2 #(5) MEMS1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[31:16] : DSP_MEMS_D), (REG_WE & {2{MEMS1_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[31:16]);
-	SCSP_RAM_8X2 #(5) MEMS0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[15: 0] : DSP_MEMS_D), (REG_WE & {2{MEMS0_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[15: 0]);
+//	SCSP_RAM_8X2 #(5) MEMS1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[31:16] : DSP_MEMS_D), (REG_WE & {2{MEMS0_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[31:16]);
+//	SCSP_RAM_8X2 #(5) MEMS0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[15: 0] : DSP_MEMS_D), (REG_WE & {2{MEMS1_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[15: 0]);
+	SCSP_MEMS_RAM MEMS_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? {2{REG_D}} & MEMS_MASK : {8'h00,DSP_MEMS_D}), (REG_WE & {{2{MEMS0_SEL}},{2{MEMS1_SEL}}}) | {4{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q);
 	
 	//EFREG,100EC0-100EDF
 	wire       EFREG_SEL = REG_A[11:5] == 7'b1110110 & REG_CS;
@@ -1815,6 +1804,407 @@ module SCSP_RAM_8X2
 		altdpram_component_h.wraddress_reg = "INCLOCK",
 		altdpram_component_h.wrcontrol_aclr = "OFF",
 		altdpram_component_h.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_COEF_RAM
+(
+	input          CLK,
+	
+	input  [ 5: 0] WADDR,
+	input  [15: 0] DATA,
+	input  [ 1: 0] WREN,
+	input  [ 5: 0] RADDR,
+	output [15: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [15:0] MEM [64];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RADDR];
+	
+`else
+
+	wire [15:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({16{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 64,
+		altsyncram_component.numwords_b = 64,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 6,
+		altsyncram_component.widthad_b = 6,
+		altsyncram_component.width_a = 16,
+		altsyncram_component.width_b = 16,
+		altsyncram_component.width_byteena_a = 2;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_ADRS_RAM
+(
+	input          CLK,
+	
+	input  [ 4: 0] WADDR,
+	input  [15: 0] DATA,
+	input  [ 1: 0] WREN,
+	input  [ 4: 0] RADDR,
+	output [15: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [15:0] MEM [32];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RADDR];
+	
+`else
+
+	wire [15:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({16{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 16,
+		altsyncram_component.width_b = 16,
+		altsyncram_component.width_byteena_a = 2;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_TEMP_RAM
+(
+	input          CLK,
+	
+	input  [ 6: 0] WADDR,
+	input  [31: 0] DATA,
+	input  [ 3: 0] WREN,
+	input  [ 6: 0] RADDR,
+	output [31: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [31:0] MEM [128];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RADDR];
+	
+`else
+
+	wire [31:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({32{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 128,
+		altsyncram_component.numwords_b = 128,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 7,
+		altsyncram_component.widthad_b = 7,
+		altsyncram_component.width_a = 32,
+		altsyncram_component.width_b = 32,
+		altsyncram_component.width_byteena_a = 4;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_MEMS_RAM
+(
+	input          CLK,
+	
+	input  [ 4: 0] WADDR,
+	input  [31: 0] DATA,
+	input  [ 3: 0] WREN,
+	input  [ 4: 0] RADDR,
+	output [31: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [31:0] MEM [32];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RADDR];
+	
+`else
+
+	wire [31:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({32{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 32,
+		altsyncram_component.width_b = 32,
+		altsyncram_component.width_byteena_a = 4;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+
+module SCSP_MPRO_RAM
+(
+	input         CLK,
+	
+	input  [6:0] WADDR,
+	input            [63:0] DATA,
+	input             [7:0] WREN,
+	input  [6:0] RADDR,
+	output           [63:0] Q
+);
+
+`ifdef SIM
+	
+	reg [63:0] MEM [128];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RADDR];
+	
+`else
+
+	wire [63:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({64{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 128,
+		altsyncram_component.numwords_b = 128,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 7,
+		altsyncram_component.widthad_b = 7,
+		altsyncram_component.width_a = 64,
+		altsyncram_component.width_b = 64,
+		altsyncram_component.width_byteena_a = 8;
 	
 	assign Q = sub_wire0;
 	

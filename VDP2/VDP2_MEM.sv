@@ -244,46 +244,107 @@ endmodule
 
 module VDP2_WRITE_FIFO (
 	input	        CLK,
-	input	 [35:0] DATA,
+	input	 [33:0] DATA,
 	input	        WRREQ,
 	input	        RDREQ,
-	output [35:0] Q,
+	output [33:0] Q,
 	output	     EMPTY,
 	output	     FULL
 );
 
-	wire  sub_wire0;
-	wire  sub_wire1;
-	wire [35:0] sub_wire2;
-
-	scfifo	scfifo_component (
-				.clock (CLK),
-				.data (DATA),
-				.rdreq (RDREQ),
-				.wrreq (WRREQ),
-				.empty (sub_wire0),
-				.full (sub_wire1),
-				.q (sub_wire2),
-				.aclr (),
-				.almost_empty (),
-				.almost_full (),
-				.sclr (),
-				.usedw ());
-	defparam
-		scfifo_component.add_ram_output_register = "OFF",
-		scfifo_component.intended_device_family = "Cyclone V",
-		scfifo_component.lpm_hint = "RAM_BLOCK_TYPE=MLAB",
-		scfifo_component.lpm_numwords = 8,
-		scfifo_component.lpm_showahead = "ON",
-		scfifo_component.lpm_type = "scfifo",
-		scfifo_component.lpm_width = 36,
-		scfifo_component.lpm_widthu = 3,
-		scfifo_component.overflow_checking = "OFF",
-		scfifo_component.underflow_checking = "OFF",
-		scfifo_component.use_eab = "OFF";
+	wire [33: 0] sub_wire0;
+	bit  [ 2: 0] RADDR;
+	bit  [ 2: 0] WADDR;
+	bit  [ 3: 0] AMOUNT;
+	
+	always @(posedge CLK) begin
+		if (WRREQ && !AMOUNT[3]) begin
+			WADDR <= WADDR + 3'd1;
+		end
+		if (RDREQ && AMOUNT) begin
+			RADDR <= RADDR + 3'd1;
+		end
 		
-	assign Q = sub_wire2;
-	assign EMPTY = sub_wire0;
-	assign FULL = sub_wire1;
+		if (WRREQ && !RDREQ && !AMOUNT[3]) begin
+			AMOUNT <= AMOUNT + 4'd1;
+		end else if (!WRREQ && RDREQ && AMOUNT) begin
+			AMOUNT <= AMOUNT - 4'd1;
+		end
+	end
+	assign EMPTY = ~|AMOUNT;
+	assign FULL = AMOUNT[3];
+	
+	altdpram	altdpram_component (
+				.data (DATA),
+				.inclock (CLK),
+				.rdaddress (RADDR),
+				.wraddress (WADDR),
+				.wren (WRREQ),
+				.q (sub_wire0),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component.indata_aclr = "OFF",
+		altdpram_component.indata_reg = "INCLOCK",
+		altdpram_component.intended_device_family = "Cyclone V",
+		altdpram_component.lpm_type = "altdpram",
+		altdpram_component.outdata_aclr = "OFF",
+		altdpram_component.outdata_reg = "UNREGISTERED",
+		altdpram_component.ram_block_type = "MLAB",
+		altdpram_component.rdaddress_aclr = "OFF",
+		altdpram_component.rdaddress_reg = "UNREGISTERED",
+		altdpram_component.rdcontrol_aclr = "OFF",
+		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component.width = 34,
+		altdpram_component.widthad = 3,
+		altdpram_component.width_byteena = 1,
+		altdpram_component.wraddress_aclr = "OFF",
+		altdpram_component.wraddress_reg = "INCLOCK",
+		altdpram_component.wrcontrol_aclr = "OFF",
+		altdpram_component.wrcontrol_reg = "INCLOCK";
+		
+	assign Q = sub_wire0;
+		
+		
+		
+//	wire  sub_wire0;
+//	wire  sub_wire1;
+//	wire [35:0] sub_wire2;
+//
+//	scfifo	scfifo_component (
+//				.clock (CLK),
+//				.data (DATA),
+//				.rdreq (RDREQ),
+//				.wrreq (WRREQ),
+//				.empty (sub_wire0),
+//				.full (sub_wire1),
+//				.q (sub_wire2),
+//				.aclr (),
+//				.almost_empty (),
+//				.almost_full (),
+//				.sclr (),
+//				.usedw ());
+//	defparam
+//		scfifo_component.add_ram_output_register = "OFF",
+//		scfifo_component.intended_device_family = "Cyclone V",
+//		scfifo_component.lpm_hint = "RAM_BLOCK_TYPE=MLAB",
+//		scfifo_component.lpm_numwords = 8,
+//		scfifo_component.lpm_showahead = "ON",
+//		scfifo_component.lpm_type = "scfifo",
+//		scfifo_component.lpm_width = 36,
+//		scfifo_component.lpm_widthu = 3,
+//		scfifo_component.overflow_checking = "OFF",
+//		scfifo_component.underflow_checking = "OFF",
+//		scfifo_component.use_eab = "OFF";
+//		
+//	assign Q = sub_wire2;
+//	assign EMPTY = sub_wire0;
+//	assign FULL = sub_wire1;
 
 endmodule

@@ -897,7 +897,7 @@ module Saturn (
 	assign SHCE_R =  SHCLK & CD_CE;
 	assign SHCE_F = ~SHCLK & CD_CE;
 	
-	SH1 #("cdb105.mif") sh1
+	SH1 #("rtl/cdb105m.mif") sh1
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
