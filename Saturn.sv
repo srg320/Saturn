@@ -110,7 +110,6 @@ module Saturn (
 	
 	input       [6:0] SCRN_EN,
 	input       [1:0] SND_EN,
-	input             SSH_EN,
 	input             DBG_PAUSE,
 	input             DBG_BREAK,
 	input             DBG_RUN,
