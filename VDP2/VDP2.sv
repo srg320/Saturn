@@ -29,18 +29,18 @@ module VDP2 (
 	
 	input             PAL,
 	
-	output     [18:1] RA0_A,
+	output     [17:1] RA0_A,
 	output     [16:1] RA1_A,
-	output     [31:0] RA_D,
-	output      [3:0] RA_WE,
+	output     [63:0] RA_D,
+	output      [7:0] RA_WE,
 	output            RA_RD,
 	input      [31:0] RA0_Q,
 	input      [31:0] RA1_Q,
 	
-	output     [18:1] RB0_A,
+	output     [17:1] RB0_A,
 	output     [16:1] RB1_A,
-	output     [31:0] RB_D,
-	output      [3:0] RB_WE,
+	output     [63:0] RB_D,
+	output      [7:0] RB_WE,
 	output            RB_RD,
 	input      [31:0] RB0_Q,
 	input      [31:0] RB1_Q,
@@ -63,8 +63,9 @@ module VDP2 (
 	input             H320_END_INC,
 	input             H320_END_DEC,
 	input             H352_END_INC,
-	input             H352_END_DEC,
-	
+	input             H352_END_DEC
+`ifdef DEBUG
+                     ,
 	output VRAMAccessState_t VA_PIPE0,
 	output NVRAMAccess_t NBG_A0VA_DBG,
 //	output [18: 1] NxVS_ADDR0,
@@ -102,7 +103,10 @@ module VDP2 (
 	output [15:0] VRAM_WRITE_PEND_CNT,
 	output RotCoord_t   RPK_DBG,
 	output [31:0] KAx0_DBG,
+	output [3:0] RA_D_ERR,
+	output [3:0] RB_D_ERR,
 	output [15:0] REG_DBG
+`endif
 );
 	
 	//H 427/455
@@ -130,12 +134,12 @@ module VDP2 (
 	VDP2Regs_t REGS;
 	
 	
-	bit [18:1] VRAM_A[2];
+	bit [18:1] VRAM_WA;
 	bit [18:1] VRAM_RA;
-	bit [31:0] VRAM_D[2];
-	bit  [3:0] VRAM_WE[2];
+	bit [63:0] VRAM_D;
+	bit  [7:0] VRAM_WE;
 	bit        VRAM_WRITE_SLOT;
-	bit        VRAM_WRITE_PEND[2];
+	bit        VRAM_WRITE_PEND;
 	bit        VRAM_READ_PEND;
 	
 //	wire VRAMA0_WRITE = (VRAM_A[0][18:17] == 2'b00);
@@ -163,12 +167,12 @@ module VDP2 (
 	ScrollData_t VS[2];
 	RotCoord_t   RxX[2],RxY[2];
 	bit  [31: 0] RxKA[2];
-	bit  [18: 1] VRAMA0_A, VRAMB0_A;
+	bit  [17: 1] VRAMA0_A, VRAMB0_A;
 	bit  [16: 1] VRAMA1_A, VRAMB1_A;
-	bit  [31: 0] VRAMA_D, VRAMB_D;
-	bit  [15: 0] VRAMA0_Q, VRAMA1_Q, VRAMB0_Q, VRAMB1_Q;
-	bit  [ 3: 0] VRAMA0_WE, VRAMA1_WE, VRAMB0_WE, VRAMB1_WE;
+	bit  [63: 0] VRAMA_D, VRAMB_D;
+	bit  [ 7: 0] VRAMA_WE, VRAMB_WE;
 	bit          VRAMA0_RD, VRAMA1_RD, VRAMB0_RD, VRAMB1_RD;
+	bit  [15: 0] VRAMA0_Q, VRAMA1_Q, VRAMB0_Q, VRAMB1_Q;
 	bit          VRAM_READ_PIPE[2];
 	
 	bit  [15: 0] PAL0_Q, PAL1_Q;
@@ -293,7 +297,7 @@ module VDP2 (
 			
 			if (V_CNT >= VBL_START && V_CNT <= VRES_NTSC - 2) begin
 				HRES <= REGS.TVMD.HRESO[1:0];
-				VRES <= REGS.TVMD.VRESO[1:0];
+				VRES <= !PAL && REGS.TVMD.VRESO[1] ? 2'b01 : REGS.TVMD.VRESO[1:0];
 				DISP <= REGS.TVMD.DISP;
 			end
 		end
@@ -702,8 +706,6 @@ module VDP2 (
 		VA_PIPE[0].W1_HIT = W1_HIT;
 	end
 	
-	assign VA_PIPE0 = VA_PIPE[0];
-	
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			// synopsys translate_off
@@ -801,8 +803,6 @@ module VDP2 (
 		RBG_B1VA.CH = |VA_PIPE[0].RxB1CH;
 		RBG_B1VA.CT = |VA_PIPE[0].RxB1CT;
 		RBG_B1VA.Rx = VA_PIPE[0].RxB1PN[1] | VA_PIPE[0].RxB1CH[1] | VA_PIPE[0].RxB1CT[1];
-		
-		NBG_A0VA_DBG = NBG_A0VA;
 	end
 	
 	always_comb begin
@@ -815,8 +815,10 @@ module VDP2 (
 		NxOFFY[2] = NY[2];
 		NxOFFY[3] = NY[3];
 	end
+`ifdef DEBUG
 	assign NxOFFX0_DBG = NxOFFX[0];
 	assign NxOFFY0_DBG = NxOFFY[0];
+`endif
 	
 	
 	bit  [19: 1] NxPN_ADDR[4];
@@ -882,11 +884,8 @@ module VDP2 (
 	bit  [ 8: 0] LN_OFFS;
 	bit  [ 7: 2] RP_POS;
 	bit  [ 1: 0] VRAM_BANK;
-	bit          VRAM_WRITE_PEND_CLR[2];
-//	bit          VRAM_READ_PEND_CLR;
-//	bit          VRAM_WRITE_PIPE;
+	bit          VRAM_WRITE_PEND_CLR;
 	always @(posedge CLK or negedge RST_N) begin
-//		bit CS_N_OLD;
 		bit FIFO_EMPTY_OLD;
 		
 		if (!RST_N) begin
@@ -894,10 +893,8 @@ module VDP2 (
 			VRAMA1_A <= '0;
 			VRAMB0_A <= '0;
 			VRAMB1_A <= '0;
-			VRAMA0_WE <= 0;
-			VRAMA1_WE <= 0;
-			VRAMB0_WE <= 0;
-			VRAMB1_WE <= 0;
+			VRAMA_WE <= '0;
+			VRAMB_WE <= '0;
 			VRAMA0_RD <= 0;
 			VRAMA1_RD <= 0;
 			VRAMB0_RD <= 0;
@@ -908,85 +905,63 @@ module VDP2 (
 			RP_POS <= '0;
 			LS_POS <= '0;
 			
-			VRAM_WRITE_PEND <= '{0,0};
+			VRAM_WRITE_PEND <= 0;
 			VRAM_READ_PEND <= 0;
 			VRAM_RRDY <= 1;
 			VRAM_WRDY <= 1;
-			
-//			CS_N_OLD <= 1;
 		end else begin
-			VRAM_WRITE_PEND_CLR = '{2{0}};
-//			VRAM_READ_PEND_CLR <= 0;
+			VRAM_WRITE_PEND_CLR = 0;
 			if (DOT_CE_F) begin
-				VRAMA0_WE <= 0;
-				VRAMA1_WE <= 0;
-				VRAMB0_WE <= 0;
-				VRAMB1_WE <= 0;
+				VRAMA_WE <= '0;
+				VRAMB_WE <= '0;
 				VRAMA0_RD <= 0;
 				VRAMA1_RD <= 0;
 				VRAMB0_RD <= 0;
 				VRAMB1_RD <= 0;
 				VRAM_READ_PIPE[0] <= 0;
-//				VRAM_WRITE_PIPE <= 0;
 				if (!DISP || VBLANK2 || (!REGS.BGON.N0ON && !REGS.BGON.N1ON && !REGS.BGON.N2ON && !REGS.BGON.N3ON && !REGS.BGON.R0ON)) begin
-					if (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1]) begin
-						VRAMA0_A <= {VRAM_A[0][18:2],1'b0};
-						VRAMA1_A <= {VRAM_A[0][16:2],1'b0};
-						VRAMB0_A <= {VRAM_A[1][18:2],1'b0};
-						VRAMB1_A <= {VRAM_A[1][16:2],1'b0};
-						VRAMA_D <= VRAM_D[0];
-						VRAMB_D <= VRAM_D[1];
-						VRAMA0_WE <= VRAM_WE[0] & {4{VRAM_WRITE_PEND[0] /*& ~VRAM_READ_PEND*/}};
-						VRAMA1_WE <= VRAM_WE[0] & {4{VRAM_WRITE_PEND[0] /*& ~VRAM_READ_PEND*/}};
-						VRAMB0_WE <= VRAM_WE[1] & {4{VRAM_WRITE_PEND[1] /*& ~VRAM_READ_PEND*/}};
-						VRAMB1_WE <= VRAM_WE[1] & {4{VRAM_WRITE_PEND[1] /*& ~VRAM_READ_PEND*/}};
-						VRAM_WRITE_PEND_CLR = '{2{1}};
-//						VRAM_WRITE_PIPE <= 1;
-					end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin 
-						VRAMA0_A <= {2'b00,VRAM_RA[16:1]};
-						VRAMA1_A <= {      VRAM_RA[16:1]};
-						VRAMB0_A <= {2'b00,VRAM_RA[16:1]};
-						VRAMB1_A <= {      VRAM_RA[16:1]};
-						VRAMA0_RD <= VRAMA0_READ /*& ~VRAM_WRITE_PIPE*/;
-						VRAMA1_RD <= VRAMA1_READ /*& ~VRAM_WRITE_PIPE*/;
-						VRAMB0_RD <= VRAMB0_READ /*& ~VRAM_WRITE_PIPE*/;
-						VRAMB1_RD <= VRAMB1_READ /*& ~VRAM_WRITE_PIPE*/;
-//						VRAM_READ_PEND_CLR <= 1;
+					if (VRAM_WRITE_PEND) begin
+						VRAMA0_A <= {VRAM_WA[17:2],1'b0};
+						VRAMA1_A <= {VRAM_WA[16:2],1'b0};
+						VRAMB0_A <= {VRAM_WA[17:2],1'b0};
+						VRAMB1_A <= {VRAM_WA[16:2],1'b0};
+						VRAMA_D <= VRAM_D;
+						VRAMB_D <= VRAM_D;
+						VRAMA_WE <= VRAM_WE & {8{~VRAM_WA[18]}};
+						VRAMB_WE <= VRAM_WE & {8{ VRAM_WA[18]}};
+						VRAM_WRITE_PEND_CLR = 1;
+					end else if (VRAM_READ_PEND) begin 
+						VRAMA0_A <= {1'b0,VRAM_RA[16:1]};
+						VRAMA1_A <= {     VRAM_RA[16:1]};
+						VRAMB0_A <= {1'b0,VRAM_RA[16:1]};
+						VRAMB1_A <= {     VRAM_RA[16:1]};
+						VRAMA0_RD <= VRAMA0_READ;
+						VRAMA1_RD <= VRAMA1_READ;
+						VRAMB0_RD <= VRAMB0_READ;
+						VRAMB1_RD <= VRAMB1_READ;
 						VRAM_READ_PEND <= 0;
 						VRAM_READ_PIPE[0] <= 1;
 					end
 				end else if (NBG_FETCH || NCH_FETCH || RBG_FETCH || RCH_FETCH || NVCS_FETCH) begin
 					if (NBG_A0VA.PN && NxPN_ADDR[NBG_A0VA.Nx][18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,NxPN_ADDR[NBG_A0VA.Nx][16:1]};
+						VRAMA0_A <= {1'b0,NxPN_ADDR[NBG_A0VA.Nx][16:1]};
 						VRAMA0_RD <= 1;
 					end else if (NBG_A0VA.CH && NxCH_ADDR[NBG_A0VA.Nx][18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,NxCH_ADDR[NBG_A0VA.Nx][16:1]};
+						VRAMA0_A <= {1'b0,NxCH_ADDR[NBG_A0VA.Nx][16:1]};
 						VRAMA0_RD <= 1;
 					end else	if (NBG_A0VA.VS && NxVS_ADDR[18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,NxVS_ADDR[16:1]};
+						VRAMA0_A <= {1'b0,NxVS_ADDR[16:1]};
 						VRAMA0_RD <= 1;
 					end else if (RBG_A0VA.PN && RxPN_ADDR[RBG_A0VA.Rx][18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,RxPN_ADDR[RBG_A0VA.Rx][16:1]};
+						VRAMA0_A <= {1'b0,RxPN_ADDR[RBG_A0VA.Rx][16:1]};
 						VRAMA0_RD <= 1;
 					end else if (RBG_A0VA.CH && RxCH_ADDR[RBG_A0VA.Rx][18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,RxCH_ADDR[RBG_A0VA.Rx][16:1]};
+						VRAMA0_A <= {1'b0,RxCH_ADDR[RBG_A0VA.Rx][16:1]};
 						VRAMA0_RD <= 1;
 					end else if (RBG_A0VA.CT && RxCT_ADDR[18:17] == 2'b00) begin
-						VRAMA0_A <= {2'b00,RxCT_ADDR[16:1]};
+						VRAMA0_A <= {1'b0,RxCT_ADDR[16:1]};
 						VRAMA0_RD <= 1;
-					end /*else	if (NBG_A0VA.CPUA && ((VRAM_READ_PEND && (VRAMA0_READ || VRAMA1_READ)) || (VRAM_WRITE_PEND[0] && (VRAMA0_WRITE || VRAMA1_WRITE)))) begin
-						VRAMA0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-						VRAMA1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-						VRAMA0_D <= VRAM_DI[0];
-						VRAMA1_D <= VRAM_DI[0];
-						VRAMA0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA0_WRITE}};
-						VRAMA1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA1_WRITE}};
-						VRAMA0_RD <= VRAM_READ_PEND & VRAMA0_READ;
-						VRAMA1_RD <= VRAM_READ_PEND & VRAMA1_READ;
-						VRAM_READ_PIPE[0] <= VRAM_READ_PEND;
-						if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
-						else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR <= 1;
-					end*/
+					end
 					
 					if (NBG_A1VA.PN && NxPN_ADDR[NBG_A1VA.Nx][18:17] == 2'b01) begin
 						VRAMA1_A <= {NxPN_ADDR[NBG_A1VA.Nx][16:1]};
@@ -1010,65 +985,42 @@ module VDP2 (
 					
 					if (!NBG_A0VA.PN && !RBG_A0VA.PN && !NBG_A0VA.CH && !RBG_A0VA.CH && !RBG_A0VA.CT && !NBG_A0VA.VS &&
 						 !NBG_A1VA.PN && !RBG_A1VA.PN && !NBG_A1VA.CH && !RBG_A1VA.CH && !RBG_A1VA.CT && !NBG_A1VA.VS) begin
-						if (/*NBG_A0VA.CPUA &&*/ ((VRAM_READ_PEND && (VRAMA0_READ || VRAMA1_READ)) || 
-														  (VRAM_WRITE_PEND[0] && !VRAM_A[0][18]) || (VRAM_WRITE_PEND[1] && !VRAM_A[1][18]))) begin
-							if (VRAM_WRITE_PEND[0]) begin
-								VRAMA0_A <= {1'b0,VRAM_A[0][17:2],1'b0};
-								VRAMA_D <= VRAM_D[0];
-								VRAMA0_WE <= VRAM_WE[0];
-								VRAMA1_WE <= VRAM_WE[0];
-								VRAM_WRITE_PEND_CLR[0] = 1;
-//								VRAM_WRITE_PIPE <= 1;
-							end else if (VRAM_WRITE_PEND[1]) begin
-								VRAMA0_A <= {1'b0,VRAM_A[1][17:2],1'b0};
-								VRAMA_D <= VRAM_D[1];
-								VRAMA0_WE <= VRAM_WE[1];
-								VRAMA1_WE <= VRAM_WE[1];
-								VRAM_WRITE_PEND_CLR[1] = 1;
-//								VRAM_WRITE_PIPE <= 1;
-							end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin
-								VRAMA0_A <= {2'b00,VRAM_RA[16:1]};
-								VRAMA1_A <= {      VRAM_RA[16:1]};
+						if (/*NBG_A0VA.CPUA &&*/ ((VRAM_READ_PEND && (VRAMA0_READ || VRAMA1_READ)) || (VRAM_WRITE_PEND && !VRAM_WA[18]))) begin
+							if (VRAM_WRITE_PEND) begin
+								VRAMA0_A <= {VRAM_WA[17:2],1'b0};
+								VRAMA_D <= VRAM_D;
+								VRAMA_WE <= VRAM_WE;
+								VRAM_WRITE_PEND_CLR = 1;
+							end else if (VRAM_READ_PEND) begin
+								VRAMA0_A <= {1'b0,VRAM_RA[16:1]};
+								VRAMA1_A <= {     VRAM_RA[16:1]};
 								VRAMA0_RD <= VRAMA0_READ;
 								VRAMA1_RD <= VRAMA1_READ;
 								VRAM_READ_PIPE[0] <= 1;
-//								VRAM_READ_PEND_CLR <= 1;
 								VRAM_READ_PEND <= 0;
 							end
 						end
 					end
 					
 					if (NBG_B0VA.PN && NxPN_ADDR[NBG_B0VA.Nx][18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,NxPN_ADDR[NBG_B0VA.Nx][16:1]};
+						VRAMB0_A <= {1'b0,NxPN_ADDR[NBG_B0VA.Nx][16:1]};
 						VRAMB0_RD <= 1;
 					end else	if (NBG_B0VA.CH && NxCH_ADDR[NBG_B0VA.Nx][18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,NxCH_ADDR[NBG_B0VA.Nx][16:1]};
+						VRAMB0_A <= {1'b0,NxCH_ADDR[NBG_B0VA.Nx][16:1]};
 						VRAMB0_RD <= 1;
 					end else	if (NBG_B0VA.VS && NxVS_ADDR[18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,NxVS_ADDR[16:1]};
+						VRAMB0_A <= {1'b0,NxVS_ADDR[16:1]};
 						VRAMB0_RD <= 1;
 					end else if (RBG_B0VA.PN && RxPN_ADDR[RBG_B0VA.Rx][18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,RxPN_ADDR[RBG_B0VA.Rx][16:1]};
+						VRAMB0_A <= {1'b0,RxPN_ADDR[RBG_B0VA.Rx][16:1]};
 						VRAMB0_RD <= 1;
 					end else	if (RBG_B0VA.CH && RxCH_ADDR[RBG_B0VA.Rx][18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,RxCH_ADDR[RBG_B0VA.Rx][16:1]};
+						VRAMB0_A <= {1'b0,RxCH_ADDR[RBG_B0VA.Rx][16:1]};
 						VRAMB0_RD <= 1;
 					end else if (RBG_B0VA.CT && RxCT_ADDR[18:17] == 2'b10) begin
-						VRAMB0_A <= {2'b00,RxCT_ADDR[16:1]};
+						VRAMB0_A <= {1'b0,RxCT_ADDR[16:1]};
 						VRAMB0_RD <= 1;
-					end /*else	if (NBG_B0VA.CPUA && ((VRAM_READ_PEND && (VRAMB0_READ || VRAMB1_READ)) || (VRAM_WRITE_PEND[0] && (VRAMB0_WRITE || VRAMB1_WRITE)))) begin
-						VRAMB0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-						VRAMB1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-						VRAMB0_D <= VRAM_DI[0];
-						VRAMB1_D <= VRAM_DI[0];
-						VRAMB0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND  & VRAMB0_WRITE}};
-						VRAMB1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND  & VRAMB1_WRITE}};
-						VRAMB0_RD <= VRAM_READ_PEND & VRAMB0_READ;
-						VRAMB1_RD <= VRAM_READ_PEND & VRAMB1_READ;
-						VRAM_READ_PIPE[0] <= VRAM_READ_PEND;
-						if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
-						else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR <= 1;
-					end*/
+					end
 					
 					if (NBG_B1VA.PN && NxPN_ADDR[NBG_B1VA.Nx][18:17] == 2'b11) begin
 						VRAMB1_A <= {NxPN_ADDR[NBG_B1VA.Nx][16:1]};
@@ -1092,117 +1044,87 @@ module VDP2 (
 					
 					if (!NBG_B0VA.PN && !RBG_B0VA.PN && !NBG_B0VA.CH && !RBG_B0VA.CH && !RBG_B0VA.CH && !NBG_B0VA.VS &&
 						 !NBG_B1VA.PN && !RBG_B1VA.PN && !NBG_B1VA.CH && !RBG_B1VA.CH && !RBG_B1VA.CH && !NBG_B1VA.VS) begin
-						if (/*NBG_B0VA.CPUA &&*/ ((VRAM_READ_PEND && (VRAMB0_READ || VRAMB1_READ)) || 
-														  (VRAM_WRITE_PEND[0] && VRAM_A[0][18]) || (VRAM_WRITE_PEND[1] && VRAM_A[1][18]))) begin
-							if (VRAM_WRITE_PEND[0]) begin
-								VRAMB0_A <= {1'b1,VRAM_A[0][17:2],1'b0};
-								VRAMB_D <= VRAM_D[0];
-								VRAMB0_WE <= VRAM_WE[0];
-								VRAMB1_WE <= VRAM_WE[0];
-								VRAM_WRITE_PEND_CLR[0] = 1;
-//								VRAM_WRITE_PIPE <= 1;
-							end else if (VRAM_WRITE_PEND[1]) begin
-								VRAMB0_A <= {1'b1,VRAM_A[1][17:2],1'b0};
-								VRAMB_D <= VRAM_D[1];
-								VRAMB0_WE <= VRAM_WE[1];
-								VRAMB1_WE <= VRAM_WE[1];
-								VRAM_WRITE_PEND_CLR[1] = 1;
-//								VRAM_WRITE_PIPE <= 1;
-							end else if (VRAM_READ_PEND /*&& !VRAM_WRITE_PIPE*/) begin
-								VRAMB0_A <= {2'b00,VRAM_RA[16:1]};
-								VRAMB1_A <= {      VRAM_RA[16:1]};
+						if (/*NBG_B0VA.CPUA &&*/ ((VRAM_READ_PEND && (VRAMB0_READ || VRAMB1_READ)) || (VRAM_WRITE_PEND && VRAM_WA[18]))) begin
+							if (VRAM_WRITE_PEND) begin
+								VRAMB0_A <= {VRAM_WA[17:2],1'b0};
+								VRAMA_D <= VRAM_D;//////////////////////
+								VRAMB_D <= VRAM_D;
+								VRAMB_WE <= VRAM_WE;
+								VRAM_WRITE_PEND_CLR = 1;
+							end else if (VRAM_READ_PEND) begin
+								VRAMB0_A <= {1'b0,VRAM_RA[16:1]};
+								VRAMB1_A <= {     VRAM_RA[16:1]};
 								VRAMB0_RD <= VRAMB0_READ;
 								VRAMB1_RD <= VRAMB1_READ;
 								VRAM_READ_PIPE[0] <= 1;
-//								VRAM_READ_PEND_CLR <= 1;
 								VRAM_READ_PEND <= 0;
 							end
 						end
 					end
 				end else if (LS_FETCH) begin
-					VRAMA0_A <= {2'b00,NxLS_ADDR[LS_POS[2]][16:1]};
+					VRAMA0_A <= {1'b0,NxLS_ADDR[LS_POS[2]][16:1]};
 					VRAMA1_A <= {      NxLS_ADDR[LS_POS[2]][16:1]};
-					VRAMB0_A <= {2'b00,NxLS_ADDR[LS_POS[2]][16:1]};
+					VRAMB0_A <= {1'b0,NxLS_ADDR[LS_POS[2]][16:1]};
 					VRAMB1_A <= {      NxLS_ADDR[LS_POS[2]][16:1]};
 					VRAMA0_RD <= ~NxLS_ADDR[LS_POS[2]][18];
 					VRAMA1_RD <= ~NxLS_ADDR[LS_POS[2]][18];
 					VRAMB0_RD <= NxLS_ADDR[LS_POS[2]][18];
 					VRAMB1_RD <= NxLS_ADDR[LS_POS[2]][18];
 				end else if (LW_FETCH) begin
-					VRAMA0_A <= {2'b00,LW_ADDR[LW_POS][16:1]};
+					VRAMA0_A <= {1'b0,LW_ADDR[LW_POS][16:1]};
 					VRAMA1_A <= {      LW_ADDR[LW_POS][16:1]};
-					VRAMB0_A <= {2'b00,LW_ADDR[LW_POS][16:1]};
+					VRAMB0_A <= {1'b0,LW_ADDR[LW_POS][16:1]};
 					VRAMB1_A <= {      LW_ADDR[LW_POS][16:1]};
 					VRAMA0_RD <= ~LW_ADDR[LW_POS][18];
 					VRAMA1_RD <= ~LW_ADDR[LW_POS][18];
 					VRAMB0_RD <= LW_ADDR[LW_POS][18];
 					VRAMB1_RD <= LW_ADDR[LW_POS][18];
 				end else if (RPA_FETCH || RPB_FETCH) begin
-					VRAMA0_A <= {2'b00,RxRP_ADDR[16:1]};
+					VRAMA0_A <= {1'b0,RxRP_ADDR[16:1]};
 					VRAMA1_A <= {      RxRP_ADDR[16:1]};
-					VRAMB0_A <= {2'b00,RxRP_ADDR[16:1]};
+					VRAMB0_A <= {1'b0,RxRP_ADDR[16:1]};
 					VRAMB1_A <= {      RxRP_ADDR[16:1]};
 					VRAMA0_RD <= ~RxRP_ADDR[18];
 					VRAMA1_RD <= ~RxRP_ADDR[18];
 					VRAMB0_RD <= RxRP_ADDR[18];
 					VRAMB1_RD <= RxRP_ADDR[18];
 				end else if (RCTA_FETCH) begin
-					VRAMA0_A <= {2'b00,RxCTA_ADDR[16:1]};
+					VRAMA0_A <= {1'b0,RxCTA_ADDR[16:1]};
 					VRAMA1_A <= {      RxCTA_ADDR[16:1]};
-					VRAMB0_A <= {2'b00,RxCTA_ADDR[16:1]};
+					VRAMB0_A <= {1'b0,RxCTA_ADDR[16:1]};
 					VRAMB1_A <= {      RxCTA_ADDR[16:1]};
 					VRAMA0_RD <= ~RxCTA_ADDR[18];
 					VRAMA1_RD <= ~RxCTA_ADDR[18];
 					VRAMB0_RD <= RxCTA_ADDR[18];
 					VRAMB1_RD <= RxCTA_ADDR[18];
 				end else if (RCTB_FETCH) begin
-					VRAMA0_A <= {2'b00,RxCTB_ADDR[16:1]};
+					VRAMA0_A <= {1'b0,RxCTB_ADDR[16:1]};
 					VRAMA1_A <= {      RxCTB_ADDR[16:1]};
-					VRAMB0_A <= {2'b00,RxCTB_ADDR[16:1]};
+					VRAMB0_A <= {1'b0,RxCTB_ADDR[16:1]};
 					VRAMB1_A <= {      RxCTB_ADDR[16:1]};
 					VRAMA0_RD <= ~RxCTB_ADDR[18];
 					VRAMA1_RD <= ~RxCTB_ADDR[18];
 					VRAMB0_RD <= RxCTB_ADDR[18];
 					VRAMB1_RD <= RxCTB_ADDR[18];
 				end else if (BACK_FETCH) begin
-					VRAMA0_A <= {2'b00,BS_ADDR[16:1]};
+					VRAMA0_A <= {1'b0,BS_ADDR[16:1]};
 					VRAMA1_A <= {      BS_ADDR[16:1]};
-					VRAMB0_A <= {2'b00,BS_ADDR[16:1]};
+					VRAMB0_A <= {1'b0,BS_ADDR[16:1]};
 					VRAMB1_A <= {      BS_ADDR[16:1]};
 					VRAMA0_RD <= ~BS_ADDR[18];
 					VRAMA1_RD <= ~BS_ADDR[18];
 					VRAMB0_RD <= BS_ADDR[18];
 					VRAMB1_RD <= BS_ADDR[18];
 				end else if (LN_FETCH) begin
-					VRAMA0_A <= {2'b00,LN_ADDR[16:1]};
+					VRAMA0_A <= {1'b0,LN_ADDR[16:1]};
 					VRAMA1_A <= {      LN_ADDR[16:1]};
-					VRAMB0_A <= {2'b00,LN_ADDR[16:1]};
+					VRAMB0_A <= {1'b0,LN_ADDR[16:1]};
 					VRAMB1_A <= {      LN_ADDR[16:1]};
 					VRAMA0_RD <= ~LN_ADDR[18];
 					VRAMA1_RD <= ~LN_ADDR[18];
 					VRAMB0_RD <= LN_ADDR[18];
 					VRAMB1_RD <= LN_ADDR[18];
-				end /*else begin
-					VRAMA0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-					VRAMA1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-					VRAMB0_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-					VRAMB1_A <= VRAM_READ_PEND ? VRAM_RA[16:1] : VRAM_A[0][16:1];
-					VRAMA0_D <= VRAM_DI[0];
-					VRAMA1_D <= VRAM_DI[0];
-					VRAMB0_D <= VRAM_DI[0];
-					VRAMB1_D <= VRAM_DI[0];
-					VRAMA0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA0_WRITE}};
-					VRAMA1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMA1_WRITE}};
-					VRAMB0_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMB0_WRITE}};
-					VRAMB1_WE <= VRAM_WE[0] & {2{VRAM_WRITE_PEND[0] & ~VRAM_READ_PEND & VRAMB1_WRITE}};
-					VRAMA0_RD <= VRAM_READ_PEND & VRAMA0_READ;
-					VRAMA1_RD <= VRAM_READ_PEND & VRAMA1_READ;
-					VRAMB0_RD <= VRAM_READ_PEND & VRAMB0_READ;
-					VRAMB1_RD <= VRAM_READ_PEND & VRAMB1_READ;
-					VRAM_READ_PIPE[0] <= VRAM_READ_PEND;
-					if (VRAM_READ_PEND) VRAM_READ_PEND_CLR <= 1;
-					else if (VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND_CLR <= 1;
-				end*/
+				end
 				
 				VRAM_READ_PIPE[1] <= VRAM_READ_PIPE[0];
 			end
@@ -1302,17 +1224,6 @@ module VDP2 (
 					VRAM_READ_PIPE[1] <= 0;
 					if (!VRAM_RRDY) VRAM_RRDY <= 1;
 				end
-				
-//				if (VRAM_WRITE_PIPE) begin
-//					if (VRAM_WRITE_PEND[0]) begin
-//						VRAM_WRITE_PEND_CLR[0] = 1;
-//					end
-//					if (VRAM_WRITE_PEND[1]) begin
-//						VRAM_WRITE_PEND_CLR[1] = 1;
-//					end
-//					VRAM_WRITE_PIPE <= 0;
-//				end
-						
 			end
 			
 			if (VRAM_REQ && WE_N) begin
@@ -1321,99 +1232,80 @@ module VDP2 (
 				VRAM_RRDY <= 0;
 			end
 			
-			//Write single
-			if (VRAM_WRITE_PEND_CLR[0] && !BURST) begin
-				VRAM_WRITE_PEND[0] <= 0;
-				VRAM_WE[0] <= '0;
-				VRAM_WRDY <= 1;
-			end
-			if (VRAM_WRITE_PEND_CLR[1] && !BURST) begin
-				VRAM_WRITE_PEND[1] <= 0;
-				VRAM_WE[1] <= '0;
+			if (VRAM_WRITE_PEND_CLR) begin
+				VRAM_WRITE_PEND <= 0;
+				VRAM_WE <= '0;
 				VRAM_WRDY <= 1;
 			end
 			
+			//Write single
 			if (VRAM_REQ && !WE_N && !DTEN_N && !BURST) begin
 				case (A[2:1])
 					2'b00: begin
-						VRAM_A[0] <= A[18:1];
-						VRAM_D[0][31:16] <= DI;
-						VRAM_WE[0][3:2] <= ~{2{WE_N}} & ~DQM;
-						VRAM_WRITE_PEND[0] <= 1;
+						VRAM_WA <= A[18:1];
+						VRAM_D[63:48] <= DI;
+						VRAM_WE[7:6] <= ~{2{WE_N}} & ~DQM;
+						VRAM_WRITE_PEND <= 1;
 					end
 					2'b01: begin
-						VRAM_A[0] <= A[18:1];
-						VRAM_D[0][15:0] <= DI;
-						VRAM_WE[0][1:0] <= ~{2{WE_N}} & ~DQM;
-						VRAM_WRITE_PEND[0] <= 1;
+						VRAM_WA <= A[18:1];
+						VRAM_D[47:32] <= DI;
+						VRAM_WE[5:4] <= ~{2{WE_N}} & ~DQM;
+						VRAM_WRITE_PEND <= 1;
 					end
 					2'b10: begin
-						VRAM_A[1] <= A[18:1];
-						VRAM_D[1][31:16] <= DI;
-						VRAM_WE[1][3:2] <= ~{2{WE_N}} & ~DQM;
-						VRAM_WRITE_PEND[1] <= 1;
+						VRAM_WA <= A[18:1];
+						VRAM_D[31:16] <= DI;
+						VRAM_WE[3:2] <= ~{2{WE_N}} & ~DQM;
+						VRAM_WRITE_PEND <= 1;
 					end
 					2'b11: begin
-						VRAM_A[1] <= A[18:1];
-						VRAM_D[1][15:0] <= DI;
-						VRAM_WE[1][1:0] <= ~{2{WE_N}} & ~DQM;
-						VRAM_WRITE_PEND[1] <= 1;
+						VRAM_WA <= A[18:1];
+						VRAM_D[15:0] <= DI;
+						VRAM_WE[1:0] <= ~{2{WE_N}} & ~DQM;
+						VRAM_WRITE_PEND <= 1;
 					end
 				endcase
 				VRAM_WRDY <= 0;
 			end
 			
 			//Write burst
-			if (VRAM_WRITE_PEND_CLR[0] && BURST) begin
-				VRAM_WRITE_PEND[0] <= 0;
-				VRAM_WE[0] <= '0;
-			end
-			if (VRAM_WRITE_PEND_CLR[1] && BURST) begin
-				VRAM_WRITE_PEND[1] <= 0;
-				VRAM_WE[1] <= '0;
-			end
-			
-//			FIFO_RDREQ <= 0;
-			if (!FIFO_EMPTY && !VRAM_WRITE_PEND[0] && !VRAM_WRITE_PEND[1] && BURST /*&& CE_R*/) begin
+			if (!FIFO_EMPTY && !VRAM_WRITE_PEND && BURST) begin
 				case (FIFO_A[2:1])
 					2'b00: begin
-						VRAM_A[0] <= FIFO_A[18:1];
-						VRAM_D[0][31:16] <= FIFO_D;
-						VRAM_WE[0][3:2] <= 2'b11;//FIFO_DQM;
+						VRAM_WA <= FIFO_A[18:1];
+						VRAM_D[63:48] <= FIFO_D;
+						VRAM_WE[7:6] <= 2'b11;//FIFO_DQM;
 					end
 					2'b01: begin
-						VRAM_A[0] <= FIFO_A[18:1];
-						VRAM_D[0][15:0] <= FIFO_D;
-						VRAM_WE[0][1:0] <= 2'b11;//FIFO_DQM;
+						VRAM_WA <= FIFO_A[18:1];
+						VRAM_D[47:32] <= FIFO_D;
+						VRAM_WE[5:4] <= 2'b11;//FIFO_DQM;
 					end
 					2'b10: begin
-						VRAM_A[1] <= FIFO_A[18:1];
-						VRAM_D[1][31:16] <= FIFO_D;
-						VRAM_WE[1][3:2] <= 2'b11;//FIFO_DQM;
+						VRAM_WA <= FIFO_A[18:1];
+						VRAM_D[31:16] <= FIFO_D;
+						VRAM_WE[3:2] <= 2'b11;//FIFO_DQM;
 					end
 					2'b11: begin
-						VRAM_A[1] <= FIFO_A[18:1];
-						VRAM_D[1][15:0] <= FIFO_D;
-						VRAM_WE[1][1:0] <= 2'b11;//FIFO_DQM;
-						VRAM_WRITE_PEND[0] <= |VRAM_WE[0];
-						VRAM_WRITE_PEND[1] <= 1;
+						VRAM_WA <= FIFO_A[18:1];
+						VRAM_D[15:0] <= FIFO_D;
+						VRAM_WE[1:0] <= 2'b11;//FIFO_DQM;
+						VRAM_WRITE_PEND <= 1;
 					end
 				endcase
-//				FIFO_RDREQ <= 1;
 			end
 			
-//			CS_N_OLD <= CS_N;
 			FIFO_EMPTY_OLD <= FIFO_EMPTY;
-//			if (CS_N && !CS_N_OLD && BURST) begin
 			if (CS_N && FIFO_EMPTY && !FIFO_EMPTY_OLD && BURST) begin
-				if (!VRAM_WRITE_PEND[0]) VRAM_WRITE_PEND[0] <= |VRAM_WE[0];
-				if (!VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND[1] <= |VRAM_WE[1];
+				if (!VRAM_WRITE_PEND) VRAM_WRITE_PEND <= |VRAM_WE;
 			end
-			
 			
 			//debug
-			if (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1]) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1'd1;
+`ifdef DEBUG
+			if (VRAM_WRITE_PEND) VRAM_WRITE_PEND_CNT <= VRAM_WRITE_PEND_CNT + 1'd1;
 			else VRAM_WRITE_PEND_CNT <= '0;
+`endif
 		end
 	end
 	
@@ -1424,20 +1316,20 @@ module VDP2 (
 	bit         FIFO_FULL;
 	VDP2_WRITE_FIFO fifo(CLK, {A[18:1],DI}, FIFO_WRREQ, FIFO_RDREQ, FIFO_Q, FIFO_EMPTY, FIFO_FULL);
 	assign FIFO_WRREQ = VRAM_REQ & ~WE_N & ~DTEN_N & BURST;
-	assign FIFO_RDREQ = ~FIFO_EMPTY & ~VRAM_WRITE_PEND[0] & ~VRAM_WRITE_PEND[1] & BURST;
+	assign FIFO_RDREQ = ~FIFO_EMPTY & ~VRAM_WRITE_PEND & BURST;
 	wire [18: 1] FIFO_A = FIFO_Q[33:16];
 	wire [15: 0] FIFO_D = FIFO_Q[15:0];
 	
 	assign RA0_A = VRAMA0_A;
 	assign RA1_A = VRAMA1_A;
 	assign RA_D = VRAMA_D;
-	assign RA_WE = VRAMA0_WE | VRAMA1_WE;
+	assign RA_WE = VRAMA_WE;
 	assign RA_RD = VRAMA0_RD | VRAMA1_RD;
 	
 	assign RB0_A = VRAMB0_A;
 	assign RB1_A = VRAMB1_A;
 	assign RB_D = VRAMB_D;
-	assign RB_WE = VRAMB0_WE | VRAMB1_WE;
+	assign RB_WE = VRAMB_WE;
 	assign RB_RD = VRAMB0_RD | VRAMB1_RD;
 
 	wire [15:0] VRAM_DO = VRAMA0_READ ? VRAMA0_Q :
@@ -1827,8 +1719,9 @@ module VDP2 (
 					RxY[1] <= RES;
 				end
 			end
-			
+`ifdef DEBUG
 			RPK_DBG = MULT1;
+`endif
 		end
 	end
 	//Rotattion parameter window
@@ -2836,10 +2729,12 @@ module VDP2 (
 					SEC = FST; SEC_PRI = FST_PRI;
 					FST = {SCAOS,SCCEN,SCCM3,SCCRT,SCOEN,SCOSL,1'b0,SDOT.P,SDOT.DC}; FST_PRI = SPRIN;
 				end
+`ifdef DEBUG
 				FST_PRI5_DBG <= FST_PRI;
 				SEC_PRI5_DBG <= SEC_PRI;
 				THD_PRI5_DBG <= THD_PRI;
 				FTH_PRI5_DBG <= FTH_PRI;
+`endif
 			
 				if          (R0ON && R0PRIN && R0PRIN > FST_PRI) begin
 					FTH = THD; FTH_PRI = THD_PRI;
@@ -2851,10 +2746,12 @@ module VDP2 (
 					THD = SEC; THD_PRI = SEC_PRI;
 					SEC = {R0CAOS,R0CCEN,R0CCM3,R0CCRT,R0COEN,R0COSL,R0SDEN,R0DOT.P,R0DOT.DC}; SEC_PRI = R0PRIN;
 				end
+`ifdef DEBUG
 				FST_PRI4_DBG <= FST_PRI;
 				SEC_PRI4_DBG <= SEC_PRI;
 				THD_PRI4_DBG <= THD_PRI;
 				FTH_PRI4_DBG <= FTH_PRI;
+`endif
 				
 				if          (N0ON && N0PRIN && N0PRIN > FST_PRI) begin
 					FTH = THD; FTH_PRI = THD_PRI;
@@ -2869,10 +2766,12 @@ module VDP2 (
 					FTH = THD; FTH_PRI = THD_PRI;
 					THD = {N0CAOS,N0CCEN,N0CCM3,N0CCRT,N0COEN,N0COSL,N0SDEN,N0DOT.P,N0DOT.DC}; THD_PRI = N0PRIN;
 				end
+`ifdef DEBUG
 				FST_PRI0_DBG <= FST_PRI;
 				SEC_PRI0_DBG <= SEC_PRI;
 				THD_PRI0_DBG <= THD_PRI;
 				FTH_PRI0_DBG <= FTH_PRI;
+`endif
 				
 				if          (N1ON && N1PRIN && N1PRIN > FST_PRI) begin
 					FTH = THD; FTH_PRI = THD_PRI;
@@ -2889,10 +2788,12 @@ module VDP2 (
 				end else if (N1ON && N1PRIN && N1PRIN > FTH_PRI) begin
 					FTH = {N1CAOS,N1CCEN,N1CCM3,N1CCRT,N1COEN,N1COSL,N1SDEN,N1DOT.P,N1DOT.DC}; FTH_PRI = N1PRIN;
 				end
+`ifdef DEBUG
 				FST_PRI1_DBG <= FST_PRI;
 				SEC_PRI1_DBG <= SEC_PRI;
 				THD_PRI1_DBG <= THD_PRI;
 				FTH_PRI1_DBG <= FTH_PRI;
+`endif
 				
 				if          (N2ON && N2PRIN && N2PRIN > FST_PRI) begin
 					FTH = THD; FTH_PRI = THD_PRI;
@@ -2909,10 +2810,12 @@ module VDP2 (
 				end else if (N2ON && N2PRIN && N2PRIN > FTH_PRI) begin
 					FTH = {N2CAOS,N2CCEN,N2CCM3,N2CCRT,N2COEN,N2COSL,N2SDEN,N2DOT.P,N2DOT.DC}; FTH_PRI = N2PRIN;
 				end
+`ifdef DEBUG
 //				FST_PRI2_DBG <= FST_PRI;
 //				SEC_PRI2_DBG <= SEC_PRI;
 //				THD_PRI2_DBG <= THD_PRI;
 //				FTH_PRI2_DBG <= FTH_PRI;
+`endif
 				
 				if          (N3ON && N3PRIN && N3PRIN > FST_PRI) begin
 					FTH = THD; FTH_PRI = THD_PRI;
@@ -2929,10 +2832,12 @@ module VDP2 (
 				end else if (N3ON && N3PRIN && N3PRIN > FTH_PRI) begin
 					FTH = {N3CAOS,N3CCEN,N3CCM3,N3CCRT,N3COEN,N3COSL,N3SDEN,N3DOT.P,N3DOT.DC}; FTH_PRI = N3PRIN;
 				end
+`ifdef DEBUG
 //				FST_PRI3_DBG <= FST_PRI;
 //				SEC_PRI3_DBG <= SEC_PRI;
 //				THD_PRI3_DBG <= THD_PRI;
 //				FTH_PRI3_DBG <= FTH_PRI;
+`endif
 			end else begin
 				FST = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,BACK_DC & {24{REGS.TVMD.BDCLMD}}};
 				SEC = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,BACK_DC & {24{REGS.TVMD.BDCLMD}}};
@@ -3043,7 +2948,7 @@ module VDP2 (
 	
 	
 	//Color RAM
-	wire        PAL_SEL = !CS_N && !AD_N && A[20:19] == 2'b10;	//100000-17FFFF
+	wire        PAL_SEL = (A[20:19] == 2'b10) && !CS_N && !AD_N;	//100000-17FFFF
 	wire        PAL_WE = PAL_SEL && !WE_N && !DTEN_N && !REQ_N;
 	wire [10:1] IO_PAL_A   = REGS.RAMCTL.CRMD == 2'b10 ? A[11:2] : A[10:1];
 	wire        IO_PAL0_RD = REGS.RAMCTL.CRMD == 2'b10 ? ~A[1] : ~A[11];
@@ -3444,23 +3349,12 @@ module VDP2 (
 	bit  [3:0] VRAM_BUF_WE[2];
 	bit VRAM_RRDY;
 	bit VRAM_WRDY;
-//	bit VRAM_WRITE_LATCH;
 	always @(posedge CLK or negedge RST_N) begin
-//		bit CS_N_OLD;
-		bit VRAM_READ_END_OLD;
-		
 		if (!RST_N) begin
 			A <= '0;
 			WE_N <= 1;
 			DQM <= '1;
 			BURST <= 0;
-			
-//			VRAM_WRITE_PEND <= '{0,0};
-//			VRAM_READ_PEND <= 0;
-//			VRAM_RRDY <= 1;
-//			VRAM_WRDY <= 1;
-//			
-//			CS_N_OLD <= 1;
 		end
 		else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
@@ -3473,89 +3367,23 @@ module VDP2 (
 					DQM <= DI[13:12];
 				end
 			end
-			if (BURST && (VRAM_SEL || REG_SEL || PAL_SEL) && !REQ_N) begin
+			if (/*BURST &&*/ (VRAM_SEL || REG_SEL || PAL_SEL) && !REQ_N) begin
 				A <= A + 20'd1;
 			end
-			
-			
-//			VRAM_READ_END_OLD <= VRAM_READ_PIPE[1];
-//			if (VRAM_REQ && WE_N) 
-//				VRAM_RRDY <= 0;
-//			else if (!VRAM_READ_PIPE[1] && VRAM_READ_END_OLD && !VRAM_RRDY)
-//				VRAM_RRDY <= 1;
-//			
-//			if (VRAM_REQ && WE_N) begin
-//				VRAM_RA <= A[18:1];
-//				VRAM_READ_PEND <= 1;
-//			end else if (VRAM_READ_PEND_CLR) begin
-//				VRAM_READ_PEND <= 0;
-//			end
-//
-//			if (VRAM_WRITE_PEND_CLR[0]) begin
-//				VRAM_WE[0] <= '0;
-//				VRAM_WRITE_PEND[0] <= 0;
-//			end
-//			if (VRAM_WRITE_PEND_CLR[1]) begin
-//				VRAM_WE[1] <= '0;
-//				VRAM_WRITE_PEND[1] <= 0;
-//			end
-//			if (!VRAM_WRITE_PEND[0] && !VRAM_WRITE_PEND[1] && DOT_CE_F) begin
-//				if (VRAM_BUF_WE[0] || VRAM_BUF_WE[1]) begin
-//					VRAM_A <= VRAM_BUF_A;
-//					VRAM_D <= VRAM_BUF_D;
-//					VRAM_WE <= VRAM_BUF_WE;
-//					VRAM_WRITE_PEND[0] <= |VRAM_BUF_WE[0];
-//					VRAM_WRITE_PEND[1] <= |VRAM_BUF_WE[1];
-//					
-//					VRAM_BUF_WE <= '{2{'0}};
-//					VRAM_WRDY <= 1;
-//				end
-//			end
-//			
-//			if (VRAM_REQ && !WE_N) begin
-//				case (A[2:1])
-//					2'b00: begin
-//						VRAM_BUF_A[0] <= A[18:1];
-//						VRAM_BUF_D[0][31:16] <= DI;
-//						VRAM_BUF_WE[0][3:2] <= ~{2{WE_N}} & ~DQM;
-//					end
-//					2'b01: begin
-//						VRAM_BUF_A[0] <= A[18:1];
-//						VRAM_BUF_D[0][15:0] <= DI;
-//						VRAM_BUF_WE[0][1:0] <= ~{2{WE_N}} & ~DQM;
-//						if (!BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//					end
-//					2'b10: begin
-//						VRAM_BUF_A[1] <= A[18:1];
-//						VRAM_BUF_D[1][31:16] <= DI;
-//						VRAM_BUF_WE[1][3:2] <= ~{2{WE_N}} & ~DQM;
-//					end
-//					2'b11: begin
-//						VRAM_BUF_A[1] <= A[18:1];
-//						VRAM_BUF_D[1][15:0] <= DI;
-//						VRAM_BUF_WE[1][1:0] <= ~{2{WE_N}} & ~DQM;
-//						if (!BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//						else if (BURST && (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])) VRAM_WRDY <= 0;
-//					end
-//				endcase
-//			end
-//			
-//			CS_N_OLD <= CS_N;
-//			if (/*VRAM_SEL && !WE_N &&*/ CS_N && !CS_N_OLD) begin
-//				if ((VRAM_BUF_WE[0] || VRAM_BUF_WE[1]) /*&& (VRAM_WRITE_PEND[0] || VRAM_WRITE_PEND[1])*/) VRAM_WRDY <= 0;
-//			end
-			
 		end
 	end
 	
 	
-	assign RDY_N = ~VRAM_RRDY | ~VRAM_WRDY | (FIFO_FULL & BURST);
+	assign RDY_N = REG_SEL || PAL_SEL ? 1'b0 : ~VRAM_RRDY | ~VRAM_WRDY | (FIFO_FULL & BURST);
 	
 	assign DO = REG_SEL ? REG_DO : 
 	            PAL_SEL ? PAL_DO : 
 					VRAM_DO;
 	
 	//debug
+`ifdef DEBUG
+	assign VA_PIPE0 = VA_PIPE[0];
+	assign NBG_A0VA_DBG = NBG_A0VA;
 //	assign N0SCX = SCX[0];
 //	assign N0SCY = SCY[0];
 //	assign CH_PIPE0 = RBG_CH_PIPE[0];
@@ -3581,8 +3409,11 @@ module VDP2 (
 //	assign DOT_SEC_DBG = DOT_SEC;
 //	assign DOT_THD_DBG = DOT_THD;
 	assign KAx0_DBG = KAx[0];
-	assign REG_DBG = REGS.TVMD^REGS.EXTEN^REGS.RAMCTL^REGS.BGON^REGS.MZCTL^REGS.SFSEL^REGS.SFCODE^REGS.ZMCTL^REGS.SCRCTL^REGS.RPMD^REGS.RPRCTL^
-							REGS.KTCTL^REGS.KTAOF^REGS.OVPNRA^REGS.OVPNRB^REGS.WCTLA^REGS.WCTLB^REGS.WCTLC^REGS.WCTLD^REGS.SPCTL^REGS.SDCTL^REGS.CRAOFA^REGS.CRAOFB^REGS.LNCLEN^
-							REGS.SFPRMD^REGS.CCCTL^REGS.SFCCMD^REGS.CCRSA^REGS.CCRSB^REGS.CCRSC^REGS.CCRSD^REGS.CCRNA^REGS.CCRNB^REGS.CCRR^REGS.CCRLB^REGS.CLOFEN^REGS.CLOFSL;
-	
+	assign RA_D_ERR = {RA_D[63:48] != 16'd0,RA_D[47:32] != 16'd0,RA_D[31:16] != 16'd0,RA_D[15:0] != 16'd0};
+	assign RB_D_ERR = {RB_D[47:32] != 16'd0,RB_D[47:32] != 16'd0,RB_D[31:16] != 16'd0,RB_D[15:0] != 16'd0};
+//	assign REG_DBG = REGS.TVMD^REGS.EXTEN^REGS.RAMCTL^REGS.BGON^REGS.MZCTL^REGS.SFSEL^REGS.SFCODE^REGS.ZMCTL^REGS.SCRCTL^REGS.RPMD^REGS.RPRCTL^
+//							REGS.KTCTL^REGS.KTAOF^REGS.OVPNRA^REGS.OVPNRB^REGS.WCTLA^REGS.WCTLB^REGS.WCTLC^REGS.WCTLD^REGS.SPCTL^REGS.SDCTL^REGS.CRAOFA^REGS.CRAOFB^REGS.LNCLEN^
+//							REGS.SFPRMD^REGS.CCCTL^REGS.SFCCMD^REGS.CCRSA^REGS.CCRSB^REGS.CCRSC^REGS.CCRSD^REGS.CCRNA^REGS.CCRNB^REGS.CCRR^REGS.CCRLB^REGS.CLOFEN^REGS.CLOFSL;
+`endif
+
 endmodule

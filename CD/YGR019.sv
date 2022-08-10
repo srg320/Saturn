@@ -39,10 +39,8 @@ module YGR019 (
 
 	input             CDD_CE,	//44100Hz*2*2
 		
-	input      [15:0] CD_D,
+	input      [17:0] CD_D,
 	input             CD_CK,
-	input             CD_SPEED,
-	input             CD_AUDIO,
 	
 	output     [15:0] CD_SL,
 	output     [15:0] CD_SR,
@@ -81,7 +79,7 @@ module YGR019 (
 	
 	bit        CDFIFO_RD;
 	bit        CDFIFO_WR;
-	bit [15:0] CDFIFO_Q;
+	bit [17:0] CDFIFO_Q;
 	bit        CDFIFO_EMPTY;
 	bit        CDFIFO_FULL;
 	bit        CD_CK_OLD;
@@ -103,6 +101,9 @@ module YGR019 (
 		.empty(CDFIFO_EMPTY),
 		.full(CDFIFO_FULL)
 	);
+	
+	wire CD_SPEED = CDFIFO_Q[16];
+	wire CD_AUDIO = CDFIFO_Q[17];
 	
 	wire SCU_REG_SEL = (AA[14:12] == 3'b000) & ~ACS2_N;
 	wire SH_REG_SEL = (SA[21:20] == 2'b00) & ~SCS2_N;
@@ -371,15 +372,15 @@ module YGR019 (
 										REG1A[7] <= 1; 
 									end
 								end else if (CDD_CNT == 12'd12) begin
-									DBG_HEADER[31:16] <= CDFIFO_Q;
+									DBG_HEADER[31:16] <= CDFIFO_Q[15:0];
 								end else if (CDD_CNT == 12'd14) begin
 									CDIRQ[4] <= 1;
-									DBG_HEADER[15:0] <= CDFIFO_Q;
+									DBG_HEADER[15:0] <= CDFIFO_Q[15:0];
 								end else if (CDD_CNT == 12'd2352-2) begin
 									CDD_SYNCED <= 0;
 									CDD_CNT <= 12'd0;
 								end
-								CDD_DATA <= CDFIFO_Q;
+								CDD_DATA <= CDFIFO_Q[15:0];
 								CDD_PEND <= CDD_SYNCED;
 								
 								CD_SL <= '0;

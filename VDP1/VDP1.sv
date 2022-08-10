@@ -41,8 +41,10 @@ module VDP1 (
 	input      [15:0] FB1_Q,
 	output      [1:0] FB1_WE,
 	output            FB1_RD,
-	input             FB_RDY,
+	input             FB_RDY
 	
+`ifdef DEBUG
+	                  ,
 	output            DBG_START,
 	output            DBG_CMD_END,
 	output     [15:0] ORIG_C_DBG,
@@ -60,8 +62,8 @@ module VDP1 (
 	output  CMDSRCA_t DBG_CMD_CMDSRCA_LAST,
 	output      [7:0] DBG_CMD_CNT,
 	output      [7:0] DBG_CMD_WAIT_CNT,
-	output      [7:0] CPU_VRAM_RDY_CNT,
 	output            DIV_B_ZERO
+`endif
 );
 	import VDP1_PKG::*;
 	
@@ -136,10 +138,6 @@ module VDP1 (
 	bit [15:0] IO_VRAM_D;
 	bit  [1:0] IO_VRAM_WE;
 	bit [15:0] IO_VRAM_DO;
-	bit        CPU_VRAM_READ_PEND;
-	bit        CPU_VRAM_WRITE_PEND;
-	bit        CPU_VRAM_RRDY;
-	bit        CPU_VRAM_WRDY;
 	bit        VRAM_DONE;
 	
 	typedef enum bit [2:0] {
@@ -194,7 +192,9 @@ module VDP1 (
 	bit [10:0] DIV_B;
 	bit [21:0] DIV_R;
 	VDP1_DIV DIV(.numer({DIV_A,11'h000}), .denom(DIV_B), .quotient(DIV_R));
+`ifdef DEBUG
 	assign DIV_B_ZERO = ~|DIV_B;
+`endif
 	
 	CMDTBL_t   CMD;
 	Clip_t     SYS_CLIP;
@@ -320,13 +320,17 @@ module VDP1 (
 				end
 					
 				CMDS_READ: begin
+`ifdef DEBUG
 					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
+`endif
 					CMD_READ <= 0;
 					if (VRAM_DONE) begin 
 						LOPR <= COPR;
 						COPR <= CMD_ADDR[18:3];
 						CMD_ST <= CMDS_EXEC;
+`ifdef DEBUG
 						DBG_CMD_WAIT_CNT <= '0;
+`endif
 					end
 				end
 					
@@ -396,15 +400,18 @@ module VDP1 (
 							4'h9: SYS_CLIP <= {11'h000,11'h000,{1'b0,CMD.CMDXC.COORD[9:0]},{2'b00,CMD.CMDYC.COORD[8:0]}};
 							4'hA: LOC_COORD <= {CMD.CMDXA.COORD,CMD.CMDYA.COORD};
 						endcase
+`ifdef DEBUG
 						if (DBG_CMD_CNT == 16) begin
 							DBG_CMD_ADDR16 <= CMD_ADDR;
-							
 						end
+`endif
 					end
 				end
 				
 				CMDS_CLT_LOAD: begin
+`ifdef DEBUG
 					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
+`endif
 					CLT_READ <= 0;
 					if (VRAM_DONE) begin 
 						if (CMD.CMDCTRL.COMM == 4'h0) begin
@@ -414,7 +421,9 @@ module VDP1 (
 						end else begin
 							CMD_ST <= CMDS_DSPR_START;
 						end
+`ifdef DEBUG
 						DBG_CMD_WAIT_CNT <= '0;
+`endif
 					end
 				end
 				
@@ -474,12 +483,16 @@ module VDP1 (
 				end
 				
 				CMDS_SPR_READ: begin
+`ifdef DEBUG
 					DBG_CMD_WAIT_CNT <= DBG_CMD_WAIT_CNT + 1'd1;
+`endif
 					SPR_READ <= 0;
 					if (VRAM_DONE) begin 
 						if (CMD.CMDCTRL.COMM >= 4'h2) CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
 						else CMD_ST <= CMDS_SPR_DRAW;
+`ifdef DEBUG
 						DBG_CMD_WAIT_CNT <= '0;
+`endif
 					end
 				end
 				
@@ -847,22 +860,27 @@ module VDP1 (
 					
 					if (CMD.CMDCTRL.END || CMD.CMDCTRL.COMM >= 4'hC) begin
 						CMD_ST <= CMDS_IDLE;
+`ifdef DEBUG
 						DBG_CMD_CNT <= '0;
+`endif
 					end else begin
 						CMD_READ <= 1;
 						CMD_ST <= CMDS_READ;
+`ifdef DEBUG
 						DBG_CMD_CNT <= DBG_CMD_CNT + 1'd1;
 						DBG_CMD_ADDR_LAST <= CMD_ADDR;
 						DBG_CMD_CMDSRCA_LAST <= CMD.CMDSRCA;
+`endif
 					end
 				end
 			endcase
 		end
 	end
-	
+`ifdef DEBUG
 	assign DBG_START = (CMD_ST == CMDS_IDLE && (FRAME_START /*|| FRAME_START_PEND*/));
 	assign DBG_CMD_END = (CMD_ST == CMDS_END);
 	assign DBG_LINE_OVER = LINE_SX > 11'd200 || LINE_SY > 11'd200;
+`endif
 		
 	assign PAT = GetPattern(SPR_DATA, CMD.CMDPMOD.CM, TEXT_X[12:11] ^ {2{CMD.CMDCTRL.DIR[0]}} ^ {2{DIR[0]}});
 	
@@ -934,6 +952,7 @@ module VDP1 (
 		FB_DRAW_D = CALC_C;
 		FB_DRAW_WE = (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & (UCLIP | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH);
 	end
+`ifdef DEBUG
 	assign ORIG_C_DBG = ORIG_C;
 	assign DRAW_X_DBG = DRAW_X;
 	assign DRAW_Y_DBG = DRAW_Y;
@@ -942,7 +961,8 @@ module VDP1 (
 	assign UCLIP_DBG = UCLIP;
 	
 	assign DBG_DRAW_OVER = DRAW_X[10:8] == 3'b011 || DRAW_X[10:8] == 3'b101 || DRAW_Y[10:8] == 2'b011 || DRAW_Y[10:8] == 3'b101;
-	
+`endif
+
 	//FB out
 	bit         HBL_SKIP;
 	bit [ 8: 0] OUT_X, ERASE_X;
@@ -1020,7 +1040,20 @@ module VDP1 (
 	wire CPU_VRAM_REQ = (A[20:19] == 2'b00) & ~AD_N & ~CS_N & ~REQ_N;	//000000-07FFFF
 	wire CPU_FB_REQ = (A[20:19] == 2'b01) & ~AD_N & ~CS_N & ~REQ_N;	//080000-0FFFFF
 	bit [18: 1] VRAM_LAST_A;
+	bit [18: 1] CPU_RA;
+	bit [18: 1] CPU_WA;
+	bit [15: 0] CPU_D;
+	bit [ 1: 0] CPU_WE;
+	bit [18: 1] SAVE_WA;
+	bit [15: 0] SAVE_D;
+	bit [ 1: 0] SAVE_WE;
+	bit         CPU_VRAM_RPEND;
+	bit         CPU_VRAM_RRDY;
+	bit         CPU_FB_RPEND;
 	bit         CPU_FB_RRDY;
+	bit         CPU_VRAM_WPEND;
+	bit         CPU_VRAM_WRDY;
+	bit         CPU_FB_WPEND;
 	bit         CPU_FB_WRDY;
 	always @(posedge CLK or negedge RST_N) begin
 		bit        CMD_READ_PEND;
@@ -1054,9 +1087,13 @@ module VDP1 (
 			DQM <= '1;
 			BURST <= 0;
 //			CPU_VRAM_LOCK <= 0;
+			CPU_VRAM_RPEND <= 0;
 			CPU_VRAM_RRDY <= 1;
+			CPU_VRAM_WPEND <= 0;
 			CPU_VRAM_WRDY <= 1;
+			CPU_FB_RPEND <= 0;
 			CPU_FB_RRDY <= 1;
+			CPU_FB_WPEND <= 0;
 			CPU_FB_WRDY <= 1;
 		end 
 //		else if (FRAME_START) begin
@@ -1077,49 +1114,105 @@ module VDP1 (
 					DQM <= DI[13:12];
 				end
 			end
+			if (CS_N && BURST) begin
+				BURST <= 0;
+			end
 			
 			if (CMD_READ && !CMD_READ_PEND) CMD_READ_PEND <= 1;
 			if (SPR_READ && !SPR_READ_PEND) SPR_READ_PEND <= 1;
 			if (CLT_READ && !CLT_READ_PEND) CLT_READ_PEND <= 1;
 			
-			if (CPU_VRAM_REQ && !WE_N && !DTEN_N && CPU_VRAM_WRDY) CPU_VRAM_WRDY <= 0;
-			if (CPU_VRAM_REQ &&  WE_N &&  DTEN_N && CPU_VRAM_RRDY) CPU_VRAM_RRDY <= 0;
+			if ((CPU_VRAM_REQ || CPU_FB_REQ) &&  WE_N &&  DTEN_N) begin 
+				CPU_RA <= A[18:1];
+				if (CPU_VRAM_REQ) begin
+					CPU_VRAM_RPEND <= 1;
+					CPU_VRAM_RRDY <= 0;
+				end 
+				if (CPU_FB_REQ) begin
+					CPU_FB_RPEND <= 1;
+					CPU_FB_RRDY <= 0;
+				end
+				A <= A + 20'd1;
+			end
 			
-			/*if (CE_R)*/ VRAM_DONE <= 0;
+			if (CPU_VRAM_REQ && !WE_N && !DTEN_N) begin
+				if (!CPU_VRAM_WPEND) begin
+					CPU_WA <= A[18:1];
+					CPU_D <= DI;
+					CPU_WE <= ~{2{WE_N}} & ~DQM;
+					CPU_VRAM_WPEND <= 1;
+				end else begin
+					SAVE_WA <= A[18:1];
+					SAVE_D <= DI;
+					SAVE_WE <= ~{2{WE_N}} & ~DQM;
+					CPU_VRAM_WRDY <= 0;
+				end
+				A <= A + 20'd1;
+			end
+			if (!CPU_VRAM_WRDY && !CPU_VRAM_WPEND) begin
+				CPU_WA <= SAVE_WA;
+				CPU_D <= SAVE_D;
+				CPU_WE <= SAVE_WE;
+				CPU_VRAM_WPEND <= 1;
+				CPU_VRAM_WRDY <= 1;
+			end
+			
+			if (CPU_FB_REQ && !WE_N && !DTEN_N) begin
+				if (CPU_FB_REQ && !CPU_FB_WPEND) begin
+					CPU_WA <= A[18:1];
+					CPU_D <= DI;
+					CPU_WE <= ~{2{WE_N}} & ~DQM;
+					CPU_FB_WPEND <= 1;
+				end else begin
+					SAVE_WA <= A[18:1];
+					SAVE_D <= DI;
+					SAVE_WE <= ~{2{WE_N}} & ~DQM;
+					CPU_FB_WRDY <= 0;
+				end
+				A <= A + 20'd1;
+			end
+			if (!CPU_FB_WRDY && !CPU_FB_WPEND) begin
+				CPU_WA <= SAVE_WA;
+				CPU_D <= SAVE_D;
+				CPU_WE <= SAVE_WE;
+				CPU_FB_WPEND <= 1;
+				CPU_FB_WRDY <= 1;
+			end
+			
+			VRAM_DONE <= 0;
 			CLT_WE <= 0;
 			case (VRAM_ST)
 				VS_IDLE: begin
-					if ((CPU_VRAM_REQ && !WE_N && !DTEN_N) || !CPU_VRAM_WRDY) begin
+					if (CPU_VRAM_WPEND) begin
 						if (VRAM_RDY) begin
-							VRAM_A <= A[18:1];
-							VRAM_D <= DI;
-							VRAM_WE <= ~{2{WE_N}} & ~DQM;
+							VRAM_A <= CPU_WA;
+							VRAM_D <= CPU_D;
+							VRAM_WE <= CPU_WE;
 							VRAM_RD <= 0;
-							A <= A + 20'd1;
-							CPU_VRAM_WRDY <= 1;
+							CPU_VRAM_WPEND <= 0;
 							VRAM_ST <= VS_CPU_WRITE;
 						end
-					end else if ((CPU_VRAM_REQ && WE_N && DTEN_N) || !CPU_VRAM_RRDY) begin
+					end else if (CPU_VRAM_RPEND) begin
 						begin
-							VRAM_A <= A[18:1];
+							VRAM_A <= CPU_RA;
 							VRAM_WE <= '0;
 							VRAM_RD <= 1;
-							A <= A + 20'd1;
+							CPU_VRAM_RPEND <= 0;
 							VRAM_ST <= VS_CPU_READ;
 						end
-					end else if (CMD_READ_PEND && !FRAME_START) begin
+					end else if (CMD_READ_PEND && !FRAME_START && !BURST) begin
 						CMD_READ_PEND <= 0;
 						VRAM_A <= CMD_ADDR;
 						VRAM_WE <= '0;
 						VRAM_RD <= 1;
 						VRAM_ST <= VS_CMD_READ;
-					end else if (SPR_READ_PEND && !FRAME_START) begin
+					end else if (SPR_READ_PEND && !FRAME_START && !BURST) begin
 						SPR_READ_PEND <= 0;
 						VRAM_A <= SPR_ADDR[18:1];
 						VRAM_WE <= '0;
 						VRAM_RD <= 1;
 						VRAM_ST <= VS_PAT_READ;
-					end else if (CLT_READ_PEND && !FRAME_START) begin
+					end else if (CLT_READ_PEND && !FRAME_START && !BURST) begin
 						CLT_READ_PEND <= 0;
 						VRAM_A <= CLT_ADDR;
 						VRAM_WE <= '0;
@@ -1144,7 +1237,6 @@ module VDP1 (
 				end
 				
 				VS_CPU_READ: begin
-//					VRAM_ST <= VS_CPU_READ_END;
 					if (VRAM_RDY && CE_R) begin
 						IO_VRAM_DO <= VRAM_Q[31:16];
 						VRAM_RD <= 0;
@@ -1267,8 +1359,8 @@ module VDP1 (
 			end
 			
 			
-			if (CPU_FB_REQ && !WE_N && !DTEN_N && CPU_FB_WRDY) CPU_FB_WRDY <= 0;
-			if (CPU_FB_REQ &&  WE_N &&  DTEN_N && CPU_FB_RRDY) CPU_FB_RRDY <= 0;
+//			if (CPU_FB_REQ && !WE_N && !DTEN_N && CPU_FB_WRDY) CPU_FB_WRDY <= 0;
+//			if (CPU_FB_REQ &&  WE_N &&  DTEN_N && CPU_FB_RRDY) CPU_FB_RRDY <= 0;
 			
 			case (FB_ST)
 				FS_IDLE: begin
@@ -1284,20 +1376,19 @@ module VDP1 (
 							FB_D <= {FB_DRAW_D[7:0],FB_DRAW_D[7:0]};
 							FB_WE <= {~DRAW_X[0],DRAW_X[0]};
 						end
-					end else if ((CPU_FB_REQ && !WE_N && !DTEN_N) || !CPU_FB_WRDY) begin
+					end else if (CPU_FB_WPEND) begin
 						if (FB_RDY) begin
-							FB_A <= A[17:1];
-							FB_D <= DI;
-							FB_WE <= ~{2{WE_N}} & ~DQM;
-							A <= A + 20'd1;
-							CPU_FB_WRDY <= 1;
+							FB_A <= CPU_WA[17:1];
+							FB_D <= CPU_D;
+							FB_WE <= CPU_WE;
+							CPU_FB_WPEND <= 0;
 							FB_ST <= FS_CPU_WRITE;
 						end
-					end else if ((CPU_FB_REQ && WE_N && DTEN_N) || !CPU_FB_RRDY) begin
+					end else if (CPU_FB_RPEND) begin
 						begin
-							FB_A <= A[17:1];
+							FB_A <= CPU_RA[17:1];
 							FB_RD <= 1;
-							A <= A + 20'd1;
+							CPU_FB_RPEND <= 0;
 							FB_ST <= FS_CPU_READ;
 						end
 					end
@@ -1322,51 +1413,6 @@ module VDP1 (
 	end
 	
 	COL_TBL CLT(.CLK(CLK), .WRADDR(CLT_WA), .DATA(CLT_D), .WREN(CLT_WE), .RDADDR(CLT_RA), .Q(CLT_Q));
-
-//	always @(posedge CLK or negedge RST_N) begin
-//		bit VRAM_SEL_OLD;
-//		
-//		if (!RST_N) begin
-//			CPU_VRAM_RRDY <= 1;
-//			CPU_VRAM_WRDY <= 1;
-//			CPU_VRAM_READ_PEND <= 0;
-//			CPU_VRAM_WRITE_PEND <= 0;
-//		end
-//		else begin
-//			VRAM_SEL_OLD <= CPU_VRAM_SEL;
-//			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && WE_N && !CPU_VRAM_READ_PEND) begin
-//				IO_VRAM_RA <= A[18:1];
-//				CPU_VRAM_READ_PEND <= 1;
-//			end else if (VRAM_ST == VS_CPU_READ_END && VRAM_RDY && !VRAM_WE && CPU_VRAM_READ_PEND && !CPU_VRAM_WRITE_PEND) begin
-//				CPU_VRAM_READ_PEND <= 0;
-//			end
-//			
-//			if (CPU_VRAM_SEL && !VRAM_SEL_OLD && WE_N && CPU_VRAM_RRDY) begin
-//				CPU_VRAM_RRDY <= 0;
-//			end else if (VRAM_ST == VS_CPU_READ_END && VRAM_RDY && !VRAM_WE && !CPU_VRAM_RRDY) begin
-//				CPU_VRAM_RRDY <= 1;
-//			end
-//			
-//			if (CPU_VRAM_SEL && !WE_N && !CPU_VRAM_WRITE_PEND && !CPU_VRAM_READ_PEND && CE_R) begin
-//				IO_VRAM_WA <= A[18:1];
-//				IO_VRAM_D <= DI;
-//				IO_VRAM_WE <= ~{2{WE_N}} & ~DQM;
-//				CPU_VRAM_WRITE_PEND <= 1;
-//			end else if (VRAM_ST == VS_CPU_WRITE && CPU_VRAM_WRITE_PEND) begin
-//				CPU_VRAM_WRITE_PEND <= 0;
-//			end
-//			
-//			if (CPU_VRAM_SEL /*&& !VRAM_SEL_OLD*/ && !WE_N && CPU_VRAM_WRDY /*&& CPU_VRAM_WRITE_PEND && CE_F*/) begin
-//				CPU_VRAM_WRDY <= 0;
-//			end else if (VRAM_ST == VS_CPU_WRITE && !CPU_VRAM_WRDY) begin
-//				CPU_VRAM_WRDY <= 1;
-//			end
-//			
-////			if (!CPU_VRAM_RDY) CPU_VRAM_RDY_CNT <= CPU_VRAM_RDY_CNT + 1'd1;
-////			else CPU_VRAM_RDY_CNT <= '0;
-//		end
-//	end
-
 
 	//Registers
 	wire REG_REQ = (A[20:19] == 2'b10) & ~AD_N & ~CS_N & ~REQ_N;
@@ -1403,10 +1449,6 @@ module VDP1 (
 			VBLANK_ERASE <= 0;
 			DRAW_TERMINATE <= 0;
 			VBE_CHECK <= 0;
-					
-//			FRAME <= 0;
-			FRAMES_DBG <= '0;
-			START_DRAW_CNT <= '0;
 		end else if (!RES_N) begin
 				
 		end else begin
@@ -1425,7 +1467,12 @@ module VDP1 (
 					endcase
 //					if (A[5:1] == 5'h00>>1 && DI[3]) VBLANK_ERASE <= 1;
 					if (A[5:1] == 5'h02>>1 && DI[1]) FRAME_ERASECHANGE_PEND <= 1;
-					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin START_DRAW_PEND <= 1; START_DRAW_CNT <= START_DRAW_CNT + 8'd1; end
+					if (A[5:1] == 5'h04>>1 && DI[1:0] == 2'b01) begin 
+						START_DRAW_PEND <= 1; 
+`ifdef DEBUG
+						START_DRAW_CNT <= START_DRAW_CNT + 8'd1; 
+`endif
+					end
 					if (A[5:1] == 5'h0C>>1 && DI[1]) DRAW_TERMINATE <= 1;
 				end else begin
 					case ({A[5:1],1'b0})
@@ -1440,14 +1487,15 @@ module VDP1 (
 			
 			HTIM_N_OLD <= HTIM_N;
 			VTIM_N_OLD <= VTIM_N;
+`ifdef DEBUG
 			if (VTIM_N && !VTIM_N_OLD) begin
 				FRAMES_DBG <= FRAMES_DBG + 8'd1;
 			end
+`endif
 			
 			if (CMD_ST == CMDS_END && CMD.CMDCTRL.END /*&& !EDSR.CEF*/) begin
 				EDSR.CEF <= 1;
 				IRQ_N <= 0;
-//				FRAMES_DBG <= 16'd0;
 			end
 
 			FRAME_START <= 0;
@@ -1467,7 +1515,6 @@ module VDP1 (
 					EDSR.CEF <= 0;
 					EDSR.BEF <= EDSR.CEF;
 					FRAME_ERASECHANGE_PEND <= 0;
-					FRAMES_DBG <= 8'd0;
 				end else*/ if (!FBCR.FCM) begin
 					FB_SEL <= ~FB_SEL;
 					FRAME_ERASE <= 1;
@@ -1476,7 +1523,9 @@ module VDP1 (
 						EDSR.CEF <= 0;
 						EDSR.BEF <= EDSR.CEF;
 					end
+`ifdef DEBUG
 					FRAMES_DBG <= 8'd0;
+`endif
 				end else if (FRAME_ERASECHANGE_PEND && FBCR.FCT) begin
 					FB_SEL <= ~FB_SEL;
 					if (PTMR.PTM == 2'b10) begin
@@ -1485,7 +1534,9 @@ module VDP1 (
 						EDSR.BEF <= EDSR.CEF;
 					end
 					FRAME_ERASECHANGE_PEND <= 0;
+`ifdef DEBUG
 					FRAMES_DBG <= 8'd0;
+`endif
 				end else if (FRAME_ERASECHANGE_PEND && !FBCR.FCT) begin
 					FRAME_ERASE <= 1;
 					FRAME_ERASECHANGE_PEND <= 0;
@@ -1515,7 +1566,5 @@ module VDP1 (
 	            A[20:19] == 2'b00 ? IO_VRAM_DO : 
 					                    IO_FB_DO;
 	assign RDY_N = ~CPU_VRAM_RRDY | ~CPU_VRAM_WRDY | ~CPU_FB_RRDY | ~CPU_FB_WRDY;//~((CPU_VRAM_SEL & CPU_VRAM_RRDY & CPU_VRAM_WRDY) | CPU_FB_SEL | REG_SEL);
-	
-//	assign IRQ_N = ~EDSR.CEF;
 	
 endmodule

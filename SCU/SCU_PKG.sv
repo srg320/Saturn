@@ -180,7 +180,7 @@ package SCU_PKG;
 		bit         PADI;			//R/W
 		bit         SMI;			//R/W
 		bit         SRI;			//R/W
-		bit         PEI;			//R/W
+		bit         DSPEI;		//R/W
 		bit         T1I;			//R/W
 		bit         T0I;			//R/W
 		bit         HBII;			//R/W

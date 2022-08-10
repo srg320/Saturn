@@ -293,7 +293,7 @@ module SCU_DSP (
 				end
 				if (DECI.CTL.BTM || DECI.CTL.LPS) begin
 					if (LOP) begin
-						LOP <= LOP - 8'd1;
+						LOP <= LOP - 12'd1;
 						if (DECI.CTL.BTM) PC <= TOP;
 						if (DECI.CTL.LPS) PC <= PC - 8'd1;//?
 					end

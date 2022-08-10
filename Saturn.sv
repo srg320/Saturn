@@ -43,16 +43,16 @@ module Saturn (
 	
 	output     [18:1] VDP2_RA0_A,
 	output     [16:1] VDP2_RA1_A,
-	output     [31:0] VDP2_RA_D,
-	output      [3:0] VDP2_RA_WE,
+	output     [63:0] VDP2_RA_D,
+	output      [7:0] VDP2_RA_WE,
 	output            VDP2_RA_RD,
 	input      [31:0] VDP2_RA0_Q,
 	input      [31:0] VDP2_RA1_Q,
 	
 	output     [18:1] VDP2_RB0_A,
 	output     [16:1] VDP2_RB1_A,
-	output     [31:0] VDP2_RB_D,
-	output      [3:0] VDP2_RB_WE,
+	output     [63:0] VDP2_RB_D,
+	output      [7:0] VDP2_RB_WE,
 	output            VDP2_RB_RD,
 	input      [31:0] VDP2_RB0_Q,
 	input      [31:0] VDP2_RB1_Q,
@@ -64,6 +64,7 @@ module Saturn (
 	output            SCSP_RAM_RD,
 	output            SCSP_RAM_CS,
 	input      [15:0] SCSP_RAM_Q,
+	output            SCSP_RAM_RFS,
 	input             SCSP_RAM_RDY,
 
 	input             CD_CE,
@@ -76,8 +77,6 @@ module Saturn (
 	output            CD_DEMP,
 	input      [17:0] CD_D,
 	input             CD_CK,
-	input             CD_SPEED,
-	input             CD_AUDIO,
 	output     [18:1] CD_RAM_A,
 	output     [15:0] CD_RAM_D,
 	output      [1:0] CD_RAM_WE,
@@ -122,19 +121,26 @@ module Saturn (
 	output reg        DBG_HOOK
 );
 
-	bit BREAK,START;
+	bit BREAK;
+	bit START;
+`ifdef DEBUG
+	bit VDP1_CMD_END,VDP1_START;
+`endif
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			BREAK <= 0;
 			START <= 0;
 		end
 		else begin
+`ifdef DEBUG
 			if (VDP1_START) begin
 				BREAK <= DBG_BREAK;
 				START <= 1;
 			end else if (VDP1_CMD_END && START) begin
 				BREAK <= DBG_BREAK;
-			end else if (DBG_RUN) begin
+			end else 
+`endif
+			if (DBG_RUN) begin
 				BREAK <= 0;
 			end 
 		end
@@ -651,7 +657,6 @@ module Saturn (
 		.JOY2(JOY2)
 	);
 	
-	bit VDP1_CMD_END,VDP1_START;
 	VDP1 VDP1
 	(
 		.CLK(CLK),
@@ -696,10 +701,13 @@ module Saturn (
 		.FB1_WE(VDP1_FB1_WE),
 		.FB1_RD(VDP1_FB1_RD),
 		.FB1_Q(VDP1_FB1_Q),
-		.FB_RDY(VDP1_FB_RDY),
+		.FB_RDY(VDP1_FB_RDY)
 		
+`ifdef DEBUG
+		,
 		.DBG_START(VDP1_START),
 		.DBG_CMD_END(VDP1_CMD_END)
+`endif
 	);
 	
 	VDP2 VDP2
@@ -820,6 +828,7 @@ module Saturn (
 		.RAM_RD(SCSP_RAM_RD),
 		.RAM_CS(SCSP_RAM_CS),
 		.RAM_Q(SCSP_RAM_Q),
+		.RAM_RFS(SCSP_RAM_RFS),
 		.RAM_RDY(SCSP_RAM_RDY),
 		
 		.ESL(CD_SL),
@@ -986,8 +995,6 @@ module Saturn (
 		
 		.CD_D(CD_D),
 		.CD_CK(CD_CK),
-		.CD_SPEED(CD_SPEED),
-		.CD_AUDIO(CD_AUDIO),
 		
 		.CD_SL(CD_SL),
 		.CD_SR(CD_SR)

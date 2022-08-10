@@ -51,15 +51,15 @@ module CDFIFO (
 	q);
 
 	input	  clock;
-	input	[15:0]  data;
+	input	[17:0]  data;
 	input	  rdreq;
 	input	  wrreq;
 	output	  empty;
 	output	  full;
-	output	[15:0]  q;
+	output	[17:0]  q;
 
 `ifdef SIM
-	reg [15:0] MEM [4096];
+	reg [17:0] MEM [4096];
 	reg [11:0] rd_pos,wr_pos,amount;
 
 	initial begin
@@ -95,17 +95,17 @@ module CDFIFO (
 		end
 	end
 		
-	wire [15:0] q = MEM[rd_pos];
+	wire [17:0] q = MEM[rd_pos];
 	wire full = (amount == 12'hFFF);
 	wire empty = (amount == 12'h000);
 `else
 
 	wire  sub_wire0;
 	wire  sub_wire1;
-	wire [15:0] sub_wire2;
+	wire [17:0] sub_wire2;
 	wire  empty = sub_wire0;
 	wire  full = sub_wire1;
-	wire [15:0] q = sub_wire2[15:0];
+	wire [17:0] q = sub_wire2[17:0];
 
 	scfifo	scfifo_component (
 				.clock (clock),
@@ -128,7 +128,7 @@ module CDFIFO (
 		scfifo_component.lpm_numwords = 4096,
 		scfifo_component.lpm_showahead = "ON",
 		scfifo_component.lpm_type = "scfifo",
-		scfifo_component.lpm_width = 16,
+		scfifo_component.lpm_width = 18,
 		scfifo_component.lpm_widthu = 12,
 		scfifo_component.overflow_checking = "ON",
 		scfifo_component.underflow_checking = "ON",
