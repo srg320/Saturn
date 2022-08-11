@@ -351,12 +351,14 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b001000),
-		
+		.MD(6'b001000)
+`ifdef DEBUG
+		,
 		.DBG_REGN('0),
 		.DBG_REGQ(),
 		.DBG_RUN(1),
 		.DBG_BREAK()
+`endif
 	);
 	
 	SH7604 SSH
@@ -415,12 +417,14 @@ module Saturn (
 		.SCKO(),
 		.SCKI(1'b1),
 		
-		.MD(6'b101000),
-		
+		.MD(6'b101000)
+`ifdef DEBUG
+		,
 		.DBG_REGN('0),
 		.DBG_REGQ(),
 		.DBG_RUN(1),
 		.DBG_BREAK()
+`endif
 	);
 	
 	assign MSHIRL_N  = CIRL_N;
