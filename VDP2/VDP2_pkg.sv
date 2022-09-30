@@ -2098,6 +2098,7 @@ package VDP2_PKG;
 	{
 		bit         P;
 		bit         TP;
+		bit         WN;
 		bit         SD;
 		bit [ 2: 0] PR;
 		bit [ 2: 0] CC;
@@ -2105,39 +2106,39 @@ package VDP2_PKG;
 	} SpriteDotData_t;
 	parameter SpriteDotData_t SDD_NULL = {1'b0,1'b0,1'b0,3'b000,3'b000,15'h0000};
 	
-	function SpriteDotData_t SpriteData(input bit [3:0] SPTYPE, input bit SPCLMD, input bit [15:0] DATA);
+	function SpriteDotData_t SpriteData(input SPCTL_t SPCTL, input bit [15:0] DATA);
 		SpriteDotData_t SDD;
-		bit          SD;
+		bit          MSB;
 		bit    [2:0] PR;
 		bit    [2:0] CC;
 		bit   [10:0] DC;
 		bit   [23:0] RGB;
 	
-		case (SPTYPE)
-		4'h0: begin SD = 1'b0    ; PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
-		4'h1: begin SD = 1'b0    ; PR = {DATA[15],DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
-		4'h2: begin SD = DATA[15]; PR = {1'b0    ,1'b0    ,DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
-		4'h3: begin SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
-		4'h4: begin SD = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {DATA[12],DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
-		4'h5: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,1'b0    ,DATA[11]}; DC = {         DATA[10:0]}; end
-		4'h6: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
-		4'h7: begin SD = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {DATA[11],DATA[10],DATA[ 9]}; DC = {2'b00   ,DATA[ 8:0]}; end
-		4'h8: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {4'b0000 ,DATA[ 6:0]}; end
-		4'h9: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
-		4'hA: begin SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {5'b00000,DATA[ 5:0]}; end
-		4'hB: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
-		4'hC: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
-		4'hD: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
-		4'hE: begin SD = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
-		4'hF: begin SD = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
+		case (SPCTL.SPTYPE)
+		4'h0: begin MSB = 1'b0    ; PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h1: begin MSB = 1'b0    ; PR = {DATA[15],DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h2: begin MSB = DATA[15]; PR = {1'b0    ,1'b0    ,DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h3: begin MSB = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {1'b0    ,DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h4: begin MSB = DATA[15]; PR = {1'b0    ,DATA[14],DATA[13]}; CC = {DATA[12],DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
+		4'h5: begin MSB = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,1'b0    ,DATA[11]}; DC = {         DATA[10:0]}; end
+		4'h6: begin MSB = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {1'b0    ,DATA[11],DATA[10]}; DC = {1'b0    ,DATA[ 9:0]}; end
+		4'h7: begin MSB = DATA[15]; PR = {DATA[14],DATA[13],DATA[12]}; CC = {DATA[11],DATA[10],DATA[ 9]}; DC = {2'b00   ,DATA[ 8:0]}; end
+		4'h8: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {4'b0000 ,DATA[ 6:0]}; end
+		4'h9: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hA: begin MSB = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hB: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {5'b00000,DATA[ 5:0]}; end
+		4'hC: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hD: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,DATA[ 7]}; CC = {1'b0    ,1'b0    ,DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hE: begin MSB = 1'b0    ; PR = {1'b0    ,DATA[ 7],DATA[ 6]}; CC = {1'b0    ,1'b0    ,1'b0    }; DC = {3'b000  ,DATA[ 7:0]}; end
+		4'hF: begin MSB = 1'b0    ; PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
 		endcase
 		
 		RGB = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};
 		
-		if (SPCLMD && DATA[15])
-			SDD = {1'b0,1'b0,1'b0,3'h0,3'h0,RGB          };
+		if (SPCTL.SPCLMD && DATA[15])
+			SDD = {1'b0, 1'b0, 1'b0,               1'b0, 3'h0, 3'h0, RGB          };
 		else
-			SDD = {1'b1,~|DC,SD  ,PR  ,CC  ,{13'h0000,DC}};
+			SDD = {1'b1, ~|DC,  MSB, MSB&~SPCTL.SPWINEN, PR  , CC  , {13'h0000,DC}};
 
 		return SDD;
 	endfunction

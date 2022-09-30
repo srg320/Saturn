@@ -51,7 +51,10 @@ module YGR019 (
 //	output     [7:0] FIFO_CNT_DBG,
 //	output     [7:0] ABUS_WAIT_CNT_DBG,
 	output reg  HOOK,
-	output reg  HOOK2
+	output reg  HOOK2,
+	output reg [7:0] DBG_E0_CNT,
+	output reg [7:0] DBG_E1_CNT,
+	output     [11:0] DBG_CDD_CNT
 );
 	import YGR019_PKG::*;
 
@@ -67,6 +70,8 @@ module YGR019 (
 	bit [15:0] REG08;
 	bit [15:0] REG1A;
 	//bit [15:0] REG1C;
+	
+	bit  [2:0] SIRQL;
 	
 	bit [15:0] FIFO_BUF[8];
 	bit  [2:0] FIFO_WR_POS;
@@ -84,6 +89,7 @@ module YGR019 (
 	bit        CDFIFO_FULL;
 	bit        CD_CK_OLD;
 	bit [15:0] CDD_DATA;
+	bit [15:0] CDD_DATA2;
 	
 	bit        CDD_CE_DIV;
 	always @(posedge CLK) if (CDD_CE) CDD_CE_DIV <= ~CDD_CE_DIV;
@@ -112,7 +118,7 @@ module YGR019 (
 	bit        ABUS_WAIT;
 	bit [15:0] SH_REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
-//		bit        AWR_N_OLD;
+		bit        AWR_N_OLD;
 		bit        ARD_N_OLD;
 		bit        SCU_REG_SEL_OLD;
 		bit        SWR_N_OLD;
@@ -159,9 +165,11 @@ module YGR019 (
 			CDD_PEND <= 0;
 			CDDA_CHAN <= 0;
 			
-			SIRQL_N <= 1;
+			SIRQL <= '0;
 			
 			HOOK <= 0;
+			DBG_E0_CNT <= '0;
+			DBG_E1_CNT <= '0;
 		end else begin
 			if (!RES_N) begin
 				
@@ -170,7 +178,7 @@ module YGR019 (
 //				FIFO_DEC_AMOUNT = 0;
 
 				if (/*!SCU_DATA_WAIT &&*/ CE_R) begin
-//					AWR_N_OLD <= AWRL_N & AWRU_N;
+					AWR_N_OLD <= AWRL_N & AWRU_N;
 					ARD_N_OLD <= ARD_N;
 				end
 				
@@ -180,16 +188,18 @@ module YGR019 (
 				
 //				if (ABUS_WAIT_CNT_DBG < 8'hF0 && CE_R) ABUS_WAIT_CNT_DBG <= ABUS_WAIT_CNT_DBG + 8'd1;
 				
+//				if (CE_R) SIRQL[0] <= 0; 
+				
 				if (SCU_REG_SEL) begin
-					if ((!AWRL_N || !AWRU_N) /*&& AWR_N_OLD && !ABUS_WAIT_EN*/ && CE_R) begin
+					if ((!AWRL_N || !AWRU_N) && AWR_N_OLD /*&& !ABUS_WAIT_EN*/ && CE_R) begin
 						case ({AA[5:2],2'b00})
 //							6'h00: DTR <= ADI;
-							6'h08: for (int i=0; i<16; i++) if (!ADI[i]) HIRQ[i] <= 0;
+							6'h08: for (int i=0; i<16; i++) if (!ADI[i] && HIRQ[i]) HIRQ[i] <= 0;
 							6'h0C: HMASK <= ADI;
-							6'h18: begin CR[0] <= ADI; end
+							6'h18: begin CR[0] <= ADI; REG04[1] <= 0; end
 							6'h1C: CR[1] <= ADI;
 							6'h20: CR[2] <= ADI;
-							6'h24: begin CR[3] <= ADI; SIRQL_N <= 0; 
+							6'h24: begin CR[3] <= ADI; if (!SIRQL[0]) SIRQL[0] <= 1; 
 //								CR0[0] <= CR[0][15:8]; 
 //								CR0[1] <= CR0[0]; 
 //								CR0[2] <= CR0[1]; 
@@ -207,17 +217,25 @@ module YGR019 (
 //								CR0[14] <= CR0[13]; 
 //								CR0[15] <= CR0[14];
 								if (CR[0] == 16'h1081 && CR[1] == 16'hAE58) HOOK <= 1;
+								if (CR[0][15:8] == 8'hE0) DBG_E0_CNT <= DBG_E0_CNT + 1'd1;
+								if (CR[0][15:8] == 8'hE1) DBG_E1_CNT <= DBG_E1_CNT + 1'd1;
 							end
 							default:;
 						endcase
 					end else if (!ARD_N && ARD_N_OLD /*&& !ABUS_WAIT_EN*/ && CE_F) begin
 						case ({AA[5:2],2'b00})
 							6'h00: begin
+//								SCU_REG_DO <= FIFO_BUF[FIFO_RD_POS]; 
 								ABUS_WAIT <= 1;
 //								ABUS_WAIT_CNT_DBG <= '0;
 							end
-//							6'h24: begin REG04[1] <= 1; end
-							default: ;
+							6'h08: SCU_REG_DO <= HIRQ;
+							6'h0C: SCU_REG_DO <= HMASK;
+							6'h18: SCU_REG_DO <= RR[0];
+							6'h1C: SCU_REG_DO <= RR[1];
+							6'h20: SCU_REG_DO <= RR[2];
+							6'h24: begin SCU_REG_DO <= RR[3]; REG04[1] <= 1; end
+							default: SCU_REG_DO <= '0;
 						endcase
 					end
 				end else if (SCU_REG_SEL_OLD && ARD_N && !ARD_N_OLD && CE_F) begin
@@ -229,13 +247,19 @@ module YGR019 (
 								FIFO_DREQ_PEND <= 1;
 							end
 						end
-						6'h24: begin REG04[1] <= 1; end
+//						6'h24: begin REG04[1] <= 1; end
 						default:;
 					endcase
 				end
 				
+				if (CE_R) begin
+					SIRQL[1] <= SIRQL[0]; 
+					SIRQL[2] <= SIRQL[1]; 
+				end
+				
 				if (CE_F) begin
 					if (ABUS_WAIT && (!FIFO_EMPTY || TRCTL[3])) begin
+						SCU_REG_DO <= FIFO_BUF[FIFO_RD_POS]; 
 						ABUS_WAIT <= 0;
 //						ABUS_WAIT_CNT_DBG <= 8'hFF;
 					end
@@ -278,7 +302,7 @@ module YGR019 (
 								5'h1A: REG1A <= SDI & REG1A_WMASK;
 		//						5'h1C: REG1C <= SDI;
 								5'h1E: begin 
-									for (int i=0; i<16; i++) if (SDI[i]) HIRQ[i] <= 1;
+									for (int i=0; i<16; i++) if (SDI[i] && !HIRQ[i]) HIRQ[i] <= 1;
 									if (CR[0] == 16'h5100 && RR[3] == 16'h00C8 && SDI[0]) HOOK2 <= HOOK;
 								end
 								default:;
@@ -301,7 +325,7 @@ module YGR019 (
 								5'h10: SH_REG_DO <= CR[0];
 								5'h12: SH_REG_DO <= CR[1];
 								5'h14: SH_REG_DO <= CR[2];
-								5'h16: begin SH_REG_DO <= CR[3]; SIRQL_N <= 1; end
+								5'h16: begin SH_REG_DO <= CR[3]; if (SIRQL[0]) SIRQL[0] <= 0; end
 								5'h1A: SH_REG_DO <= REG1A & REG1A_RMASK;
 								5'h1C: SH_REG_DO <= 16'h0016;//REG1C;
 								default: SH_REG_DO <= '0;
@@ -385,6 +409,7 @@ module YGR019 (
 								
 								CD_SL <= '0;
 								CD_SR <= '0;
+								
 							end else begin
 								CDDA_CHAN <= ~CDDA_CHAN;
 								if (!CDDA_CHAN) CD_SL <= {CDFIFO_Q[7:0],CDFIFO_Q[15:8]};
@@ -396,6 +421,7 @@ module YGR019 (
 						end
 					end
 				end
+				DBG_CDD_CNT <= CDD_CNT;
 				
 				if (SHCE_R) begin
 //					if (DBG_CNT < 8'h80) DBG_CNT <= DBG_CNT + 8'd1;
@@ -418,25 +444,27 @@ module YGR019 (
 		end
 	end
 	
-	always_comb begin
-		case ({AA[5:2],2'b00})
-			6'h00: SCU_REG_DO = FIFO_BUF[FIFO_RD_POS]; 
-			6'h08: SCU_REG_DO = HIRQ;
-			6'h0C: SCU_REG_DO = HMASK;
-			6'h18: SCU_REG_DO = RR[0];
-			6'h1C: SCU_REG_DO = RR[1];
-			6'h20: SCU_REG_DO = RR[2];
-			6'h24: SCU_REG_DO = RR[3];
-			default: SCU_REG_DO = '0;
-		endcase
-	end
+//	always_comb begin
+//		case ({AA[5:2],2'b00})
+//			6'h00: SCU_REG_DO = FIFO_BUF[FIFO_RD_POS]; 
+//			6'h08: SCU_REG_DO = HIRQ;
+//			6'h0C: SCU_REG_DO = HMASK;
+//			6'h18: SCU_REG_DO = RR[0];
+//			6'h1C: SCU_REG_DO = RR[1];
+//			6'h20: SCU_REG_DO = RR[2];
+//			6'h24: SCU_REG_DO = RR[3];
+//			default: SCU_REG_DO = '0;
+//		endcase
+//	end
 
 	assign ADO = SCU_REG_DO;
 	assign AWAIT_N = ~(ABUS_WAIT & ABUS_WAIT_EN);
 	assign ARQT_N = 1;
 	
+//	assign SDO = SH_REG_SEL ? SH_REG_DO : CDD_DATA;
 	assign SDO = !DACK0 /*&& REG1A[7]*/ ? CDD_DATA : SH_REG_DO;
 	
+	assign SIRQL_N = ~|SIRQL;
 	assign SIRQH_N = ~|(CDIRQ & CDMASK);
 	assign DREQ0_N = ~|CDD_DREQ;
 	assign DREQ1_N = ~FIFO_DREQ;

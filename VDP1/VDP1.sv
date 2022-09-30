@@ -165,6 +165,7 @@ module VDP1 (
 		CMDS_SPR_READ,
 		CMDS_SPR_DRAW,
 		CMDS_BACK_READ,
+		CMDS_BACK_DONE,
 		CMDS_POLYGON_START,
 		CMDS_POLYGON_CALCD,
 		CMDS_POLYGON_CALCTDY,
@@ -488,8 +489,12 @@ module VDP1 (
 `endif
 					SPR_READ <= 0;
 					if (VRAM_DONE) begin 
-						if (CMD.CMDCTRL.COMM >= 4'h2) CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
-						else CMD_ST <= CMDS_SPR_DRAW;
+						if (CMD.CMDPMOD.CCB)
+							CMD_ST <= CMDS_BACK_READ;
+						else if (CMD.CMDCTRL.COMM >= 4'h2) 
+							CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
+						else 
+							CMD_ST <= CMDS_SPR_DRAW;
 `ifdef DEBUG
 						DBG_CMD_WAIT_CNT <= '0;
 `endif
@@ -497,6 +502,10 @@ module VDP1 (
 				end
 				
 				CMDS_BACK_READ: begin
+					CMD_ST <= CMDS_BACK_DONE;
+				end
+				
+				CMDS_BACK_DONE: begin
 					if (CMD.CMDCTRL.COMM >= 4'h2) 
 						CMD_ST <= AA ? CMDS_AA_DRAW : CMDS_LINE_DRAW;
 					else
@@ -651,6 +660,8 @@ module VDP1 (
 						if (CMD.CMDCTRL.COMM <= 4'h3) begin
 							SPR_READ <= 1;
 							CMD_ST <= CMDS_SPR_READ;
+						end else if (CMD.CMDPMOD.CCB) begin
+							CMD_ST <= CMDS_BACK_READ;
 						end else begin
 							CMD_ST <= CMDS_LINE_DRAW;
 						end
@@ -889,13 +900,16 @@ module VDP1 (
 	Pattern_t   DRAW_PAT;
 	bit [15: 0] DRAW_BACK_C;
 	bit         FB_DRAW_PEND;
+	bit         FB_READ_PEND;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			FB_DRAW_PEND <= 0;
+			FB_READ_PEND <= 0;
 		end
 		else begin
 			FB_DRAW_PEND <= 0;
-			if (CMD_ST == CMDS_SPR_DRAW || CMD_ST == CMDS_LINE_DRAW || CMD_ST == CMDS_AA_DRAW) begin
+			FB_READ_PEND <= 0;
+			if (CMD_ST == CMDS_SPR_DRAW || CMD_ST == CMDS_LINE_DRAW || CMD_ST == CMDS_AA_DRAW || CMD_ST == CMDS_BACK_READ) begin
 				if (CMD_ST == CMDS_AA_DRAW && (LINE_DIRX^LINE_DIRY)) begin
 					DRAW_X <= LOC_COORD.X + AA_X;
 				end else begin
@@ -907,9 +921,10 @@ module VDP1 (
 					DRAW_Y <= LOC_COORD.Y + LINE_VERTA.Y;
 				end
 				DRAW_PAT <= PAT;
-				DRAW_BACK_C <= FB_DRAW_Q;
+//				DRAW_BACK_C <= FB_DRAW_Q;
 				
-				FB_DRAW_PEND <= 1;
+				FB_DRAW_PEND <= (CMD_ST != CMDS_BACK_READ);
+				FB_READ_PEND <= (CMD_ST == CMDS_BACK_READ);
 			end
 		end
 	end
@@ -927,6 +942,7 @@ module VDP1 (
 		bit [15:0] CALC_C;
 		bit        EC;
 		bit        MESH;
+		bit        IDRAW;
 		
 		if (!CMD.CMDCTRL.COMM[2]) begin
 			case (CMD.CMDPMOD.CM)
@@ -944,13 +960,14 @@ module VDP1 (
 			TP = 0;
 			EC = 0;
 		end
-		CALC_C = !TVMR.TVM[0] ? ColorCalc(ORIG_C,DRAW_BACK_C,CMD.CMDPMOD.CCB,CMD.CMDPMOD.MON) : ORIG_C;
+		CALC_C = !TVMR.TVM[0] ? ColorCalc(ORIG_C,FB_DRAW_Q/*DRAW_BACK_C*/,CMD.CMDPMOD.CCB,CMD.CMDPMOD.MON) : ORIG_C;
 			
 		SCLIP = !DRAW_X[10] && DRAW_X[9:0] <= SYS_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] <= SYS_CLIP.Y2[8:0];
 		UCLIP = !DRAW_X[10] && DRAW_X[9:0] >= USR_CLIP.X1[9:0] && DRAW_X[9:0] <= USR_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] >= USR_CLIP.Y1[8:0] && DRAW_Y[8:0] <= USR_CLIP.Y2[8:0];
 		MESH = ~(DRAW_X[0] ^ DRAW_Y[0]);
+		IDRAW = ~(FBCR.DIL ^ DRAW_Y[0]);
 		FB_DRAW_D = CALC_C;
-		FB_DRAW_WE = (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & (UCLIP | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH);
+		FB_DRAW_WE = (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & (UCLIP | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH) & (IDRAW | ~FBCR.DIE);
 	end
 `ifdef DEBUG
 	assign ORIG_C_DBG = ORIG_C;
@@ -1358,23 +1375,19 @@ module VDP1 (
 				CLT_READ_PEND <= 0;
 			end
 			
-			
-//			if (CPU_FB_REQ && !WE_N && !DTEN_N && CPU_FB_WRDY) CPU_FB_WRDY <= 0;
-//			if (CPU_FB_REQ &&  WE_N &&  DTEN_N && CPU_FB_RRDY) CPU_FB_RRDY <= 0;
-			
 			case (FB_ST)
 				FS_IDLE: begin
 					FB_WE <= '0;
 					FB_RD <= 0;
-					if (FB_DRAW_PEND && FB_DRAW_WE) begin
+					if (FB_READ_PEND || FB_DRAW_PEND) begin
 						if (!TVMR.TVM[0]) begin
-							FB_A <= {DRAW_Y[7:0],DRAW_X[8:0]};
+							FB_A <= {(!FBCR.DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[8:0]};
 							FB_D <= FB_DRAW_D;
-							FB_WE <= 2'b11;
+							FB_WE <= {2{FB_DRAW_WE & FB_DRAW_PEND}};
 						end else begin
-							FB_A <= {DRAW_Y[7:0],DRAW_X[9:1]};
+							FB_A <= {(!FBCR.DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[9:1]};
 							FB_D <= {FB_DRAW_D[7:0],FB_DRAW_D[7:0]};
-							FB_WE <= {~DRAW_X[0],DRAW_X[0]};
+							FB_WE <= {~DRAW_X[0],DRAW_X[0]} & {2{FB_DRAW_WE & FB_DRAW_PEND}};
 						end
 					end else if (CPU_FB_WPEND) begin
 						if (FB_RDY) begin

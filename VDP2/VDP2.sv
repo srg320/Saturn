@@ -93,6 +93,8 @@ module VDP2 (
 //	output ScreenDot_t DOT_THD_DBG,
 	output [2:0] FST_PRI0_DBG, SEC_PRI0_DBG, THD_PRI0_DBG, FTH_PRI0_DBG,
 	output [2:0] FST_PRI1_DBG, SEC_PRI1_DBG, THD_PRI1_DBG, FTH_PRI1_DBG,
+	output [2:0] FST_PRI2_DBG, SEC_PRI2_DBG, THD_PRI2_DBG, FTH_PRI2_DBG,
+	output [2:0] FST_PRI3_DBG, SEC_PRI3_DBG, THD_PRI3_DBG, FTH_PRI3_DBG,
 	output [2:0] FST_PRI4_DBG, SEC_PRI4_DBG, THD_PRI4_DBG, FTH_PRI4_DBG,
 	output [2:0] FST_PRI5_DBG, SEC_PRI5_DBG, THD_PRI5_DBG, FTH_PRI5_DBG,
 //	output [18:0] N0SCX,
@@ -810,10 +812,10 @@ module VDP2 (
 		NxOFFX[1] = NX[1] + NSX[1];
 		NxOFFX[2] = NX[2] + NSX[2];
 		NxOFFX[3] = NX[3] + NSX[3];
-		NxOFFY[0] = NY[0] + NVCSY[0];
-		NxOFFY[1] = NY[1] + NVCSY[1];
-		NxOFFY[2] = NY[2];
-		NxOFFY[3] = NY[3];
+		NxOFFY[0] = NY[0] + NSY[0] + NVCSY[0];
+		NxOFFY[1] = NY[1] + NSY[1] + NVCSY[1];
+		NxOFFY[2] = NY[2] + NSY[2];
+		NxOFFY[3] = NY[3] + NSY[3];
 	end
 `ifdef DEBUG
 	assign NxOFFX0_DBG = NxOFFX[0];
@@ -1342,6 +1344,7 @@ module VDP2 (
 	ScrollData_t NX[4];
 	ScrollData_t NSX[4];
 	ScrollData_t NY[4];
+	ScrollData_t NSY[4];
 	ScrollData_t NVCSY[2];
 	CoordInc_t   LZMX[2];
 	always @(posedge CLK or negedge RST_N) begin
@@ -1357,6 +1360,7 @@ module VDP2 (
 			NX <= '{4{'0}};
 			NSX <= '{4{'0}};
 			NY <= '{4{'0}};
+			NSY <= '{4{'0}};
 			LZMX <= '{2{'0}};
 			// synopsys translate_on
 		end
@@ -1402,16 +1406,19 @@ module VDP2 (
 					      NSX[2] <= NSxREG[2].SCX;
 						end
 						3'b001: begin
-							if (NSxREG[0].LSCY && RD0) NY[0] <= NSxREG[0].SCY + LS_WD[26:8];
-							else if (LAST_LINE)        NY[0] <= NSxREG[0].SCY;
-							else                       NY[0] <= NY[0] + NSxREG[0].ZMY;
+							if (NSxREG[0].LSCY && RD0) begin NSY[0] <= NSxREG[0].SCY + LS_WD[26:8]; 
+							                                 NY[0]  <= (!INTERLACE || !ODD ? '0 : NSxREG[0].ZMY); end
+							else if (LAST_LINE)        begin NSY[0] <= NSxREG[0].SCY;
+							                                 NY[0]  <= (!INTERLACE || !ODD ? '0 : NSxREG[0].ZMY); end
+							else                       begin NY[0]  <= NY[0] + (!INTERLACE ? NSxREG[0].ZMY : NSxREG[0].ZMY<<1); end
 							
-							if (LAST_LINE)             NY[2] <= NSxREG[2].SCY;
-					      else                       NY[2] <= NY[2] + 19'h00100;
+							if (LAST_LINE)             begin NSY[2] <= NSxREG[2].SCY;
+							                                 NY[2]  <= (!INTERLACE || !ODD ? '0 : 19'h00100); end
+					      else                       begin NY[2]  <= NY[2] + (!INTERLACE ? 19'h00100 : 19'h00200); end
 						end
 						3'b010: begin
-							if (!NSxREG[0].LZMX)       LZMX[0] <= NSxREG[0].ZMX;
-							else if (RD0)              LZMX[0] <= LS_WD[18:8];
+							if (!NSxREG[0].LZMX)       begin LZMX[0] <= NSxREG[0].ZMX;                           end
+							else if (RD0)              begin LZMX[0] <= LS_WD[18:8];                             end
 						end
 						
 						3'b100: begin
@@ -1421,16 +1428,19 @@ module VDP2 (
 					      NSX[3] <= NSxREG[3].SCX;
 						end
 						3'b101: begin
-							if (NSxREG[1].LSCY && RD1) NY[1] <= NSxREG[1].SCY + LS_WD[26:8];
-							else if (LAST_LINE)        NY[1] <= NSxREG[1].SCY;
-							else                       NY[1] <= NY[1] + NSxREG[1].ZMY;
+							if (NSxREG[1].LSCY && RD1) begin NSY[1] <= NSxREG[1].SCY + LS_WD[26:8];
+							                                 NY[1]  <= (!INTERLACE || !ODD ? '0 : NSxREG[1].ZMY); end
+							else if (LAST_LINE)        begin NSY[1] <= NSxREG[1].SCY;
+							                                 NY[1]  <= (!INTERLACE || !ODD ? '0 : NSxREG[1].ZMY); end     
+							else                       begin NY[1]  <= NY[1] + (!INTERLACE ? NSxREG[1].ZMY : NSxREG[1].ZMY<<1); end
 							
-							if (LAST_LINE)             NY[3] <= NSxREG[3].SCY;
-					      else                       NY[3] <= NY[3] + 19'h00100;
+							if (LAST_LINE)             begin NSY[3] <= NSxREG[3].SCY;
+							                                 NY[3]  <= (!INTERLACE || !ODD ? '0 : 19'h00100); end
+					      else                       begin NY[3]  <= NY[3] + (!INTERLACE ? 19'h00100 : 19'h00200); end
 						end
 						3'b110: begin
-							if (!NSxREG[1].LZMX)       LZMX[1] <= NSxREG[1].ZMX;
-							else if (RD1)              LZMX[1] <= LS_WD[18:8];
+							if (!NSxREG[1].LZMX)       begin LZMX[1] <= NSxREG[1].ZMX;                           end
+							else if (RD1)              begin LZMX[1] <= LS_WD[18:8];                             end
 						end
 					endcase
 
@@ -1767,12 +1777,15 @@ module VDP2 (
 			end
 		end
 	end
+	wire [ 8: 0] WxSY[2] = '{REGS.WPSY0.WxSY,REGS.WPSY1.WxSY};
+	wire [ 8: 0] WxEY[2] = '{REGS.WPEY0.WxEY,REGS.WPEY1.WxEY};
 	
-	wire W0_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[0][9:1],WxSX[0][0]|HRES[1]} && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[0][9:1],WxEX[0][0]|HRES[1]} &&
-	              SCRNY                  >= REGS.WPSY0.WxSY[8:0]              && SCRNY                  <= REGS.WPEY0.WxEY[8:0] &&
+	wire [8:0] WSCRNY = !INTERLACE ? SCRNY : {SCRNY[7:0],1'b0};
+	wire W0_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[0][9:1],WxSX[0][0]|HRES[1]}    && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[0][9:1],WxEX[0][0]|HRES[1]} &&
+	              WSCRNY                 >= {WxSY[0][8:1],WxSY[0][0]&~INTERLACE} && WSCRNY                 <= {WxEY[0][8:1],WxEY[0][0]&~INTERLACE} &&
 					  WxEX[0] != 10'h3FF;
-	wire W1_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[1][9:1],WxSX[1][0]|HRES[1]} && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[1][9:1],WxEX[1][0]|HRES[1]} &&
-	              SCRNY                  >= REGS.WPSY1.WxSY[8:0]              && SCRNY                  <= REGS.WPEY1.WxEY[8:0] &&
+	wire W1_HIT = {SCRNX,SCRNX0|HRES[1]} >= {WxSX[1][9:1],WxSX[1][0]|HRES[1]}    && {SCRNX,SCRNX0|HRES[1]} <= {WxEX[1][9:1],WxEX[1][0]|HRES[1]} &&
+	              WSCRNY                 >= {WxSY[1][8:1],WxSY[1][0]&~INTERLACE} && WSCRNY                 <= {WxEY[1][8:1],WxEY[1][0]&~INTERLACE} &&
 					  WxEX[1] != 10'h3FF;
 					  
 	bit          W0_HIT_PIPE[24];
@@ -2597,18 +2610,18 @@ module VDP2 (
 			// synopsys translate_on
 		end
 		else if (DOT_CE_R || (DOT_CE_F & HRES[1])) begin
-			SDOT <= SpriteData(REGS.SPCTL.SPTYPE,REGS.SPCTL.SPCLMD,FBD);
+			SDOT <= SpriteData(REGS.SPCTL,FBD);
 		end
 	end
 	
 	//Priority		  
-	wire SW_EN     =   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLC.SPW0A,W1_HIT_PIPE[23] ^ REGS.WCTLC.SPW1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.SPW0E,REGS.WCTLC.SPW1E,REGS.WCTLC.SPSWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.SPLOG);
-	wire RxW_EN[2] = '{WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLC.R0W0A,W1_HIT_PIPE[23] ^ REGS.WCTLC.R0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLC.R0W0E,REGS.WCTLC.R0W1E,REGS.WCTLC.R0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.R0LOG),
+	wire SW_EN     =   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLC.SPW0A,W1_HIT_PIPE[23] ^ REGS.WCTLC.SPW1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLC.SPW0E,REGS.WCTLC.SPW1E,REGS.WCTLC.SPSWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.SPLOG);
+	wire RxW_EN[2] = '{WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLC.R0W0A,W1_HIT_PIPE[23] ^ REGS.WCTLC.R0W1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLC.R0W0E,REGS.WCTLC.R0W1E,REGS.WCTLC.R0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLC.R0LOG),
 	                   0};
-	wire NxW_EN[4] = '{WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLA.N0W0A,W1_HIT_PIPE[23] ^ REGS.WCTLA.N0W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N0W0E,REGS.WCTLA.N0W1E,REGS.WCTLA.N0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N0LOG),
-	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLA.N1W0A,W1_HIT_PIPE[23] ^ REGS.WCTLA.N1W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N1W0E,REGS.WCTLA.N1W1E,REGS.WCTLA.N1SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N1LOG),
-	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLB.N2W0A,W1_HIT_PIPE[23] ^ REGS.WCTLB.N2W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N2W0E,REGS.WCTLB.N2W1E,REGS.WCTLB.N2SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N2LOG),
-	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLB.N3W0A,W1_HIT_PIPE[23] ^ REGS.WCTLB.N3W1A,SDOT.SD ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N3W0E,REGS.WCTLB.N3W1E,REGS.WCTLB.N3SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N3LOG)};
+	wire NxW_EN[4] = '{WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLA.N0W0A,W1_HIT_PIPE[23] ^ REGS.WCTLA.N0W1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N0W0E,REGS.WCTLA.N0W1E,REGS.WCTLA.N0SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N0LOG),
+	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLA.N1W0A,W1_HIT_PIPE[23] ^ REGS.WCTLA.N1W1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLA.N1W0E,REGS.WCTLA.N1W1E,REGS.WCTLA.N1SWE & REGS.SPCTL.SPWINEN,REGS.WCTLA.N1LOG),
+	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLB.N2W0A,W1_HIT_PIPE[23] ^ REGS.WCTLB.N2W1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N2W0E,REGS.WCTLB.N2W1E,REGS.WCTLB.N2SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N2LOG),
+	                   WinTest(W0_HIT_PIPE[23] ^ REGS.WCTLB.N3W0A,W1_HIT_PIPE[23] ^ REGS.WCTLB.N3W1A,SDOT.WN ^ REGS.WCTLC.SPSWA,REGS.WCTLB.N3W0E,REGS.WCTLB.N3W1E,REGS.WCTLB.N3SWE & REGS.SPCTL.SPWINEN,REGS.WCTLB.N3LOG)};
 							 
 	ScreenDot_t DOT_FST, DOT_SEC, DOT_THD, DOT_FTH;
 	always @(posedge CLK or negedge RST_N) begin
@@ -2634,7 +2647,7 @@ module VDP2 (
 			// synopsys translate_on
 		end
 		else if (DOT_CE_R || (DOT_CE_F & HRES[1])) begin
-			SON  =                                                          ~SDOT.TP & ~SDOT.SD &                         SCRN_EN[5] & ~(SW_EN & SCRN_EN[6]);
+			SON  =                                                          ~SDOT.TP  & /*~SDOT.SD &*/                        SCRN_EN[5] & ~(SW_EN & SCRN_EN[6]);
 			R0ON = RSxREG[0].ON &                                           ~R0DOT.TP & ~(CTD[0].TP & REGS.KTCTL.RAKTE) & SCRN_EN[4] & ~(RxW_EN[0] & SCRN_EN[6]);
 			N0ON = NSxREG[0].ON &                                           ~N0DOT.TP &                                   SCRN_EN[0] & ~(NxW_EN[0] & SCRN_EN[6]);
 			N1ON = NSxREG[1].ON & ~NSxREG[0].CHCN[2] &                      ~N1DOT.TP &                                   SCRN_EN[1] & ~(NxW_EN[1] & SCRN_EN[6]);
@@ -2811,10 +2824,10 @@ module VDP2 (
 					FTH = {N2CAOS,N2CCEN,N2CCM3,N2CCRT,N2COEN,N2COSL,N2SDEN,N2DOT.P,N2DOT.DC}; FTH_PRI = N2PRIN;
 				end
 `ifdef DEBUG
-//				FST_PRI2_DBG <= FST_PRI;
-//				SEC_PRI2_DBG <= SEC_PRI;
-//				THD_PRI2_DBG <= THD_PRI;
-//				FTH_PRI2_DBG <= FTH_PRI;
+				FST_PRI2_DBG <= FST_PRI;
+				SEC_PRI2_DBG <= SEC_PRI;
+				THD_PRI2_DBG <= THD_PRI;
+				FTH_PRI2_DBG <= FTH_PRI;
 `endif
 				
 				if          (N3ON && N3PRIN && N3PRIN > FST_PRI) begin
@@ -2833,10 +2846,10 @@ module VDP2 (
 					FTH = {N3CAOS,N3CCEN,N3CCM3,N3CCRT,N3COEN,N3COSL,N3SDEN,N3DOT.P,N3DOT.DC}; FTH_PRI = N3PRIN;
 				end
 `ifdef DEBUG
-//				FST_PRI3_DBG <= FST_PRI;
-//				SEC_PRI3_DBG <= SEC_PRI;
-//				THD_PRI3_DBG <= THD_PRI;
-//				FTH_PRI3_DBG <= FTH_PRI;
+				FST_PRI3_DBG <= FST_PRI;
+				SEC_PRI3_DBG <= SEC_PRI;
+				THD_PRI3_DBG <= THD_PRI;
+				FTH_PRI3_DBG <= FTH_PRI;
 `endif
 			end else begin
 				FST = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,BACK_DC & {24{REGS.TVMD.BDCLMD}}};
@@ -2921,6 +2934,17 @@ module VDP2 (
 				
 				COEN <= DOT_FST.COEN; 
 				COSL <= DOT_FST.COSL;
+				
+				if (HBLANK) begin
+					CFST <= DC_NULL;
+					CSEC <= DC_NULL;
+//					CTHD <= DC_NULL;
+//					CFTH <= DC_NULL;
+					CCEN <= 0;
+					SDEN <= 0;
+					COEN <= 0;
+					COSL <= 0;
+				end
 			end
 		end
 	end
