@@ -49,21 +49,25 @@ module SCSP (
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
 	
-	input       [1:0] SND_EN
+	input       [2:0] SND_EN
 `ifdef DEBUG
                      ,
 	output reg        DBG_68K_ERR,
 	output reg        DBG_SCU_HOOK,
 	output reg  [7:0] DBG_SCU_710,
-	output            SLOT_EN_DBG,
+	output            PCM_EN_DBG,
 	output     [23:0] SCA_DBG,
-	output     [15:0] EVOL_DBG,
-	output SCR0_t     SCR0_DBG_,
+	output     [12:0] ENV_SAMPLE_CNT_DBG,
+	output     [ 2:0] ENV_STEP_CNT_DBG,
+	output     [ 5:0] OP4_EFF_RATE_DBG,
+	output            DECAY1_DBG,
+	output            DECAY2_DBG,
+	output            ATTACK_DBG,
+	output            RELEASE_DBG,
 	output SCR0_t     SCR0_DBG,
 	output SA_t       SA_DBG,
 	output LSA_t      LSA_DBG,
 	output LEA_t      LEA_DBG,
-	output     [15:0] NEW_SA_INT_DBG,
 	output SCR1_t     SCR1_DBG,
 	output SCR2_t     SCR2_DBG,
 	output SCR3_t     SCR3_DBG,
@@ -72,6 +76,14 @@ module SCSP (
 	output SCR6_t     SCR6_DBG,
 	output SCR7_t     SCR7_DBG,
 	output SCR8_t     SCR8_DBG,
+	output EGState_t  EST_DBG,
+	output      [6:0] DSP_MPRO_STEP,
+	output MPRO_t     DSP_MPRO_DBG,
+	output    [23: 0] INPUTS_DBG,
+	output    [23: 0] X_DBG,
+	output    [12: 0] Y_DBG,
+	output    [25: 0] B_DBG,
+	output    [25: 0] MUL_DBG,
 	output     [19:0] ADP_DBG,
 	output signed [15:0] LVL_DBG,
 	output signed [15:0] PAN_L_DBG,
@@ -79,59 +91,56 @@ module SCSP (
 	output            DIR_ACC_L_OF,
 	output            DIR_ACC_R_OF,
 	output            EFF_ACC_L_OF,
-	output            EFF_ACC_R_OF
+	output            EFF_ACC_R_OF,
+	output            SUM_L_OF,
+	output            SUM_R_OF
 `endif
 );
 	import SCSP_PKG::*;
 	
-	SCR_t      SCR[32];
-	CR0_t      CR0;
-	CR1_t      CR1;
-	CR2_t      CR2;
-	CR3_t      CR3;
-	CR4_t      CR4;
-	CR5_t      CR5;
-	CR6_t      CR6;
-	CR7_t      CR7;
-	CR8_t      CR8;
-	CR9_t      CR9;
-	CR10_t     CR10;
-	CR11_t     CR11;
-	CR12_t     CR12;
-	CR13_t     CR13;
-	CR14_t     CR14;
-	CR15_t     CR15;
-	CR16_t     CR16;
-	CR17_t     CR17;
-	CR18_t     CR18;
-	CR19_t     CR19;
-	SCR0_t     SCR0_;
-	SCR0_t     SCR0;
-	SA_t       SA;
-	LSA_t      LSA;
-	LEA_t      LEA;
-	SCR1_t     SCR1;
-	SCR2_t     SCR2;
-	SCR3_t     SCR3;
-	SCR4_t     SCR4;
-	SCR5_t     SCR5;
-	SCR6_t     SCR6;
-	SCR7_t     SCR7;
-	SCR8_t     SCR8;
-//	STACK_t    STACK0;
-//	STACK_t    STACK1;
-	MIXSS_t    DSP_MIXS;
-//	EFREGS_t   EFREGS;
+	CR0_t        CR0;
+	CR1_t        CR1;
+	CR2_t        CR2;
+	CR3_t        CR3;
+	CR4_t        CR4;
+	CR5_t        CR5;
+	CR6_t        CR6;
+	CR7_t        CR7;
+	CR8_t        CR8;
+	CR9_t        CR9;
+	CR10_t       CR10;
+	CR11_t       CR11;
+	CR12_t       CR12;
+	CR13_t       CR13;
+	CR14_t       CR14;
+	CR15_t       CR15;
+	CR16_t       CR16;
+	CR17_t       CR17;
+	CR18_t       CR18;
+	CR19_t       CR19;
+	bit  [ 3: 0] CR4_CA;
 	
-	MPRO_t     DSP_MPRO_Q;
-	TEMP_t     DSP_TEMP_Q;
-	MEMS_t     DSP_MEMS_Q;
-	COEF_t     DSP_COEF_Q;
-	MADRS_t    DSP_MADRS_Q;
-	bit [15:0] DSP_EXTS[2];
-	EFREG_t    DSP_EFREG_Q;
+	SCR0_t       SCR0;
+	SA_t         SA;
+	LSA_t        LSA;
+	LEA_t        LEA;
+	SCR1_t       SCR1;
+	SCR2_t       SCR2;
+	SCR3_t       SCR3;
+	SCR4_t       SCR4;
+	SCR5_t       SCR5;
+	SCR6_t       SCR6;
+	SCR7_t       SCR7;
+	SCR8_t       SCR8;
 	
-	bit  [3:0] CR4_CA;
+	OP2_t        OP2;
+	OP3_t        OP3;
+	OP4_t        OP4;
+	OP5_t        OP5;
+	OP6_t        OP6;
+	OP7_t        OP7;
+	
+	
 	
 	bit [19:0] ADP;
 	bit        WD_READ;
@@ -140,376 +149,492 @@ module SCSP (
 	
 	typedef enum bit [5:0] {
 		MS_IDLE     = 6'b000001,  
-		MS_WD_WAIT  = 6'b000010, 
-		MS_DMA_WAIT = 6'b000100, 
-		MS_SCU_WAIT = 6'b001000, 
-		MS_SCPU_WAIT= 6'b010000,
-		MS_END      = 6'b100000
+		MS_WD_WAIT  = 6'b000010,
+		MS_DSP_WAIT = 6'b000100, 
+		MS_DMA_WAIT = 6'b001000, 
+		MS_SCU_WAIT = 6'b010000, 
+		MS_SCPU_WAIT= 6'b100000
 	} MemState_t;
 	MemState_t MEM_ST;
 	MemState_t REG_ST;
 	
-	bit [18:1] MEM_A;
-	bit [15:0] MEM_D;
-	bit [15:0] MEM_Q;
-	bit  [1:0] MEM_WE;
-	bit        MEM_RD;
-	bit        MEM_CS;
-	bit        MEM_RFS;
+	bit  [18: 1] MEM_A;
+	bit  [15: 0] MEM_D;
+	bit  [15: 0] MEM_Q;
+	bit  [ 1: 0] MEM_WE;
+	bit          MEM_RD;
+	bit          MEM_CS;
+	bit          MEM_RFS;
 	
-	bit [11:1] REG_A;
-	bit [15:0] REG_D;
-	bit [15:0] REG_Q;
-	bit  [1:0] REG_WE;
-	bit        REG_RD;
-	bit        REG_CS;
-	bit        REG_RDY;
+	bit  [11: 1] REG_A;
+	bit  [15: 0] REG_D;
+	bit  [15: 0] REG_Q;
+	bit  [ 1: 0] REG_WE;
+	bit          REG_RD;
 	
-	bit [19:1] DMA_MA;
-	bit [11:1] DMA_RA;
-	bit [10:0] DMA_LEN;
-	bit [15:0] DMA_DAT;
-	bit        DMA_WR;
-	bit        DMA_EXEC;
+	bit  [19: 1] DMA_MA;
+	bit  [11: 1] DMA_RA;
+	bit  [10: 0] DMA_LEN;
+	bit  [15: 0] DMA_DAT;
+	bit          DMA_WR;
+	bit          DMA_EXEC;
 	
-	bit  [1:0] CLK_CNT;
-	always @(posedge CLK) if (CE) CLK_CNT <= CLK_CNT + 2'd1;
-	assign SCCE_R =  CLK_CNT[0] & CE;
-	assign SCCE_F = ~CLK_CNT[0] & CE;
+	bit          CLK_DIV;
+	always @(posedge CLK) if (CE) CLK_DIV <= ~CLK_DIV;
+	assign SCCE_R =  CLK_DIV & CE;
+	assign SCCE_F = ~CLK_DIV & CE;
+		
+	bit  [2:0] CYCLE_NUM;
+	always @(posedge CLK) 
+		if (CLK_DIV && CE) 
+			CYCLE_NUM <= CYCLE_NUM + 3'd1;
+		
+	wire DSP_EN = (CYCLE_NUM[2:1] == 2'b00) || (CYCLE_NUM[2:1] == 2'b10);
+	wire PCM_EN = (CYCLE_NUM[2:1] == 2'b01);
+	wire SLOT_EN = (CYCLE_NUM[2:1] == 2'b11);
 	
-	wire CYCLE_CE_F = CLK_CNT == 2'b01 & CE;
-	wire CYCLE_CE = CLK_CNT == 2'b11 & CE;
+	wire CYCLE0_CE = ~CYCLE_NUM[0] & CLK_DIV & CE;
+	wire CYCLE1_CE =  CYCLE_NUM[0] & CLK_DIV & CE;
+//	wire DSP_CE = DSP_EN & CYCLE1_CE;
+//	wire PCM_CE = PCM_EN & CYCLE1_CE;
+	wire SLOT0_CE = SLOT_EN & CYCLE0_CE;
+	wire SLOT1_CE = SLOT_EN & CYCLE1_CE;
 	
-	bit  [1:0] CYCLE_NUM;
-	always @(posedge CLK) if (CYCLE_CE) CYCLE_NUM <= CYCLE_NUM + 2'd1;
-	wire DSP1_EN = CYCLE_NUM == 2'b00;
-	wire SLOT_EN = CYCLE_NUM == 2'b01;
-	wire DSP2_EN = CYCLE_NUM == 2'b10;
-	wire OUT_EN = CYCLE_NUM == 2'b11;
+	wire SAMPLE_CE = (OP7.SLOT == 5'd0) && (CYCLE_NUM[2:1] == 2'b00) && CYCLE1_CE;
 	
-	wire DSP_CE = (DSP1_EN | DSP2_EN) & CYCLE_CE;
-	wire SLOT_CE = SLOT_EN & CYCLE_CE;
-	wire OUT_CE = OUT_EN & CYCLE_CE;
 	
-	bit        SAMPLE_CE;
-	
-	OPPipe_t    OP2_PIPE;
-	OPPipe_t    OP3_PIPE;
-	OPPipe_t    OP4_PIPE;
-	OPPipe_t    OP5_PIPE;
-	OPPipe_t    OP6_PIPE;
-	OPPipe_t    OP7_PIPE;
-	
-	assign SCR0_ = SCR[OP2_PIPE.SLOT].SCR0;
-	assign SCR0 = SCR_SCR0_Q;
-	assign SA   = SCR_SA_Q;
-	assign LSA  = SCR_LSA_Q;
-	assign LEA  = SCR_LEA_Q;
-	assign SCR1 = SCR_SCR1_Q;
-	assign SCR2 = SCR_SCR2_Q;
-	assign SCR3 = SCR_SCR3_Q;
-	assign SCR4 = SCR_SCR4_Q;
-	assign SCR5 = SCR_SCR5_Q;
-	assign SCR6 = SCR_SCR6_Q;
-	assign SCR7 = SCR_SCR7_Q;
-	assign SCR8 = SCR_SCR8_Q;
-	assign DSP_MPRO_Q = MPRO_RAM_Q;
-	assign DSP_TEMP_Q = TEMP_RAM_Q[23:0];
-	assign DSP_MEMS_Q = MEMS_RAM_Q[23:0];
-	assign DSP_COEF_Q = COEF_RAM_Q;
-	assign DSP_COEF_Q = COEF_RAM_Q;
-	assign DSP_MADRS_Q = MADRS_RAM_Q;
-	assign DSP_EFREG_Q = EFREG_RAM_Q;
-	
-
-	//Operation 1: PG, KEY ON/OFF
-	wire KYONEX_SET = REG_CS & (REG_A[11:10] == 2'b00) & (REG_A[4:1] == 4'b0000) & REG_D[12] & REG_WE[1];
-	bit        KEYON[32];
-	bit  [4:0] SLOT;
-	bit [25:0] PHASE;
-	bit  [7:0] LFOP[32];//LFO position
 	always @(posedge CLK or negedge RST_N) begin
 		bit       KYONEX;
 		bit       KEYON_OLD[32];
 		
 		if (!RST_N) begin
-			KEYON <= '{32{0}};
-			KEYON_OLD <= '{32{0}};
-			KYONEX <= 0;
-			SLOT <= '0;
-			OP2_PIPE <= OP_PIPE_RESET;
+			SCR0 <= '0;
+			SCR1 <= '0;
+			SCR2 <= '0;
+			SCR3 <= '0;
+			SCR4 <= '0;
+			SCR5 <= '0;
+			SCR6 <= '0;
+			SCR7 <= '0;
+			SCR8 <= '0;
+			SA <= '0;
+			LSA <= '0;
+			LEA <= '0;
+			// synopsys translate_off
+			// synopsys translate_on
+		end else if (!RES_N) begin
+			
+		end else begin
+			if (SLOT0_CE) begin
+				SCR0 <= SCR_SCR0_Q;
+				SCR1 <= SCR_SCR1_Q;
+				SCR2 <= SCR_SCR2_Q;
+				SCR3 <= SCR_SCR3_Q;
+				SCR4 <= SCR_SCR4_Q;
+				SCR5 <= SCR_SCR5_Q;
+				SCR6 <= SCR_SCR6_Q;
+				SCR7 <= SCR_SCR7_Q;
+				SCR8 <= SCR_SCR8_Q;
+				SA <= SCR_SA_Q;
+				LSA <= SCR_LSA_Q;
+				LEA <= SCR_LEA_Q;
+			end
 		end
-		else begin
-			if (!KYONEX && KYONEX_SET) begin
-				KYONEX <= 1;
-			end else if (KYONEX && SLOT == 5'd31 && SLOT_CE) begin
-				for (int i=0; i<32; i++) begin
-					KEYON[i] <= SCR[i].SCR0.KB;
+	end
+
+	//Operation 1: PG, KEY ON/OFF
+	bit        SCR0_KB[32];
+	bit        KEYON[32];
+	bit  [4:0] SLOT;
+	
+	wire [25:0] PHASE = PhaseCalc(SCR5);
+	
+	always @(posedge CLK or negedge RST_N) begin
+		bit       KYONEX_PEND;
+		bit       KYONEX;
+		bit       KEYON_OLD[32];
+		
+		if (!RST_N) begin
+			SCR0_KB <= '{32{0}};
+			KEYON <= '{32{0}};
+			KYONEX <= 0;
+			KYONEX_PEND <= 0;
+			// synopsys translate_off
+			SLOT <= '0;
+			OP2 <= OP2_RESET;
+			KEYON_OLD <= '{32{0}};
+			// synopsys translate_on
+		end else if (!RES_N) begin
+			SCR0_KB <= '{32{0}};
+			KEYON <= '{32{0}};
+			KYONEX <= 0;
+			KYONEX_PEND <= 0;
+			SLOT <= '0;
+			OP2 <= OP2_RESET;
+		end else begin
+			if (SLOT1_CE) begin
+				SLOT <= SLOT + 5'd1;
+				if (SLOT == 5'd31) begin
+					KYONEX_PEND <= 0;
+					KYONEX <= KYONEX_PEND;
+				end	
+				if (KYONEX) begin
+					KEYON[SLOT] <= SCR0_KB[SLOT];
 				end
-				KYONEX <= 0;
+				KEYON_OLD[SLOT] <= KEYON[SLOT];
+//				OP2.PLFO <= LFOWave(LFOP_RAM_Q,8'h00,SCR6.PLFOWS) ^ 8'h80;
+				
+				OP2.SLOT <= SLOT;
+				OP2.KON <= KEYON[SLOT] & ~KEYON_OLD[SLOT];
+				OP2.KOFF <= ~KEYON[SLOT] & KEYON_OLD[SLOT];
+				{OP2.PHASE_INT,OP2.PHASE_FRAC} <= {8'h00,PHASE_FRAC_RAM_Q} + PHASE;
+				OP2.BASE_RATE <= BaseRateCalc(SCR5);
 			end
 			
-			if (SLOT_CE) begin
-				PHASE <= PhaseCalc(SCR5);
-				
-//				OP2_PLFO <= LFOWave(LFOP[SLOT],8'h00,SCR6.PLFOWS) ^ 8'h80;
-				
-				KEYON_OLD[SLOT] <= KEYON[SLOT];
-				OP2_PIPE.SLOT <= SLOT;
-				OP2_PIPE.KON <= KEYON[SLOT] & ~KEYON_OLD[SLOT];
-				OP2_PIPE.KOFF <= ~KEYON[SLOT] & KEYON_OLD[SLOT];
-				SLOT <= SLOT + 5'd1;
+			if (REG_A[11:10] == 2'b00 && {REG_A[4:1],1'b0} == 5'h00 && REG_WE[1] && CYCLE1_CE) begin
+				SCR0_KB[REG_A[9:5]] <= REG_D[11];
+				KYONEX_PEND <= REG_D[12];
 			end
 		end
 	end
 	
+	bit  [17:0] PHASE_FRAC_RAM_Q;
+	SCSP_PHASE_RAM PHASE_FRAC_RAM(CLK, OP2.SLOT, OP2.PHASE_FRAC, SLOT1_CE, SLOT, PHASE_FRAC_RAM_Q);
+	
+//	bit  [7:0] LFOP_RAM_Q;
+//	SCSP_LFOP_RAM LFOP_RAM(CLK, OP2.SLOT, OP2.PHASE_FRAC, SLOT1_CE, SLOT, LFOP_RAM_Q);
+	
 	//Operation 2: MD read, ADP
-//	bit [ 7:0] OP2_PLFO;	//Pitch LFO data
-	bit [25:0] NEW_SAO;	//New sample address offset
-	bit        NEW_SADIR;	//New sample address direction
+	bit  [ 9: 0] EVOL;//Current envelope volume
+	EGState_t    EST;//Current envelope state
+	
+	assign {EST,EVOL} = EVOL_RAM_Q;
+	
+	bit [15: 0] SAO;	//Sample offset integer
+	bit         SADIR;//Sample address direction
 	always @(posedge CLK or negedge RST_N) begin
-		bit [ 4:0] S;
-		bit [15:0] LL;
-		bit [15:0] MD;
-		bit [25:0] SAO;
-		bit        SADIR;
-		bit [15:0] NEW_SA_INT;
-		bit [ 9:0] NEW_SA_FRAC;
+		bit [15:0] CUR_SO;
+		bit        CUR_SADIR;
+		bit [15:0] CALC_SO;
+		bit [15:0] MOD_SO;
+		bit [15:0] DELTA;
 		
 		if (!RST_N) begin
+			// synopsys translate_off
+			OP3 <= OP3_RESET;
+			// synopsys translate_on
 			WD_READ <= 0;
-			OP3_SAOI <= '0;
-			OP3_SAOF <= '0;
-			OP3_SADIR <= 0;
-			OP3_PIPE <= OP_PIPE_RESET;
-		end
-		else begin
-			S = OP2_PIPE.SLOT;
+		end else if (!RES_N) begin
+			OP3 <= OP3_RESET;
+			WD_READ <= 0;
+		end else begin
+			{CUR_SADIR,CUR_SO} = SO_RAM_Q;
 			
-			{SADIR,SAO} = SAO_RAM_Q;
+			DELTA = {8'h00,OP2.PHASE_INT};
+			CALC_SO = !CUR_SADIR || SCR0.LPCTL <= 2'b01 ? CUR_SO + DELTA : CUR_SO - DELTA;
 			
-			MD <= MDCalc2(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
-			{NEW_SA_INT,NEW_SA_FRAC} = !SADIR ? SAO + (PHASE + {MD,10'h000}) : SAO - (PHASE + {MD,10'h000});
-			
-			LL = LEA - LSA;
-			if (SLOT_CE) begin
-				NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
-				NEW_SADIR = SADIR;
+			if (SLOT1_CE) begin
+				{SADIR,SAO} <= {CUR_SADIR,CALC_SO};
 				
 				WD_READ <= 0;
-				if (!EVOL_LOW[S]) begin
-					case (SCR0_.LPCTL)
-					2'b00:
-						if (NEW_SA_INT < LEA) begin
-							NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
-						end else begin
-//							EVOL[S] <= 10'h3FF;
-							NEW_SAO = SAO;
+				OP3.LOOP_END <= 0;
+				if (EVOL != 10'h3FF) begin
+					case (SCR0.LPCTL)
+					2'b00: begin
+						if (CALC_SO >= LEA) begin
+							OP3.LOOP_END <= 1;
 						end
-					2'b01:
-						if (NEW_SA_INT < LEA) begin
-							NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
-						end else begin
-							NEW_SAO = {NEW_SA_INT - LL,NEW_SA_FRAC};//{LSA,10'h000};
+					end
+					2'b01: begin
+						if (CALC_SO >= LEA) begin
+							SAO <= {LSA};
 						end
-					2'b10:
-						if (!SADIR) begin
-							if (NEW_SA_INT < LEA) begin
-								NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
-							end else begin
-								NEW_SAO = {LEA,10'h000};
-								NEW_SADIR = 1;
+					end
+					2'b10: begin
+						if (!CUR_SADIR) begin
+							if (CALC_SO >= LEA) begin
+								SAO <= {LEA};
+								SADIR <= 1;
 							end
 						end else begin
-							if (NEW_SA_INT > LSA) begin
-								NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
-							end else begin
-								NEW_SAO = {LEA,10'h000};
-								NEW_SADIR = 1;
+							if (CALC_SO <= LSA) begin
+								SAO <= {LSA};
 							end
 						end
-					2'b11: NEW_SAO = {NEW_SA_INT,NEW_SA_FRAC};
+					end
+					2'b11:  begin
+						
+					end
 					endcase
 					
 					WD_READ <= 1;
-				end
-				{OP3_SADIR,OP3_SAOI,OP3_SAOF} <= {NEW_SADIR,NEW_SAO};
-				
-				if (OP2_PIPE.KON) begin
-					{OP3_SADIR,OP3_SAOI,OP3_SAOF} <= '0;
+				end else begin
+					{SADIR,SAO} <= '0;
 				end
 				
-				OP3_PIPE <= OP2_PIPE;
+				MOD_SO = CUR_SO + MDCalc(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+				ADP <= {SCR0.SAH,SA} + (!SCR0.PCM8B ? {3'b000,MOD_SO,1'b0} : {4'b0000,MOD_SO});
+				
+				OP3.SLOT <= OP2.SLOT;
+				OP3.KON <= OP2.KON;
+				OP3.KOFF <= OP2.KOFF;
+				OP3.PCM8B <= SCR0.PCM8B;
+				OP3.BASE_RATE <= OP2.BASE_RATE;
+				OP3.SBCTL <= SCR0.SBCTL;
+				OP3.SSCTL <= SCR0.SSCTL;
+				OP3.EVOL <= EVOL;
+				OP3.EST <= EST;
 			end
-`ifdef DEBUG
-			NEW_SA_INT_DBG = NEW_SA_INT;
-`endif
 		end
 	end
-	bit [26:0] SAO_RAM_Q;
-	SCSP_SAO_RAM SAO_RAM(CLK, OP3_PIPE.SLOT, {OP3_SADIR,OP3_SAOI,OP3_SAOF}, SLOT_CE, OP2_PIPE.SLOT, SAO_RAM_Q);
-		
-	//Operation 3:  
-	bit [15:0] OP3_SAOI;	//Sample address offset integer
-	bit [ 9:0] OP3_SAOF;	//Sample address offset fractional
-	bit        OP3_SADIR;//Sample address direction
-	assign ADP = {SCR0.SAH,SA} + (!SCR0.PCM8B ? {3'b000,OP3_SAOI,1'b0} : {4'b0000,OP3_SAOI});
+	bit [16:0] SO_RAM_Q;
+	SCSP_SO_RAM SO_RAM(CLK, OP3.SLOT, {SADIR,SAO}, SLOT1_CE, OP2.SLOT, SO_RAM_Q);
 	
+	//Operation 3:  
 	always @(posedge CLK or negedge RST_N) begin
-//		bit [ 4:0] S;
+		bit [15:0] TEMP;
 		
 		if (!RST_N) begin
-			OP4_PIPE <= OP_PIPE_RESET;
+			OP4 <= OP4_RESET;
 			// synopsys translate_off
-			OP4_WD <= 0;
 			// synopsys translate_on
-		end
-		else begin
-//			S = OP3_PIPE.SLOT;
+		end else if (!RES_N) begin
+			OP4 <= OP4_RESET;
+		end else begin
+			TEMP = !OP3.PCM8B ? MEM_WD : !ADP[0] ? {MEM_WD[15:8],8'h00} : {MEM_WD[7:0],8'h00};
 			
-			if (SLOT_CE) begin
-				OP4_WD <= !SCR0.PCM8B ? MEM_WD : !ADP[0] ? {MEM_WD[15:8],8'h00} : {MEM_WD[7:0],8'h00};
-				OP4_PIPE <= OP3_PIPE;
+			if (SLOT1_CE) begin
+				OP4.SLOT <= OP3.SLOT;
+				OP4.KON <= OP3.KON;
+				OP4.KOFF <= OP3.KOFF;
+				OP4.LOOP_END <= OP3.LOOP_END;
+				OP4.BASE_RATE <= OP3.BASE_RATE;
+				OP4.EVOL <= OP3.EVOL;
+				OP4.EST <= OP3.EST;
+				OP4.WD <= SoundSel(TEMP,16'h0000,OP3.SBCTL,OP3.SSCTL);
 			end
 		end
 	end
 	
 	//Operation 4: EG
-	EGState_t    EGST[32]; //Envelope state
-	bit          EVOL_LOW[32]; //Envelope low level
-	bit signed [15:0] OP4_WD; //Wave form data
+	bit  [ 5: 0] EFF_RATE;//Effective rate
+	always_comb begin
+		bit  [ 4: 0] RATE;
+		
+		case (OP4.EST)
+			EST_ATTACK: RATE = SCR1.AR;	
+			EST_DECAY1: RATE = SCR1.D1R;
+			EST_DECAY2: RATE = SCR1.D2R;
+			EST_RELEASE: RATE = SCR2.RR;
+		endcase
+		if (OP4.EST != EST_RELEASE && OP4.KOFF) begin
+			RATE = SCR2.RR;
+		end
+		EFF_RATE = EffRateCalc(OP4.BASE_RATE,RATE,SCR2.KRS);
+	end
+	
+	wire [12: 0] CUR_SAMPLE_CNT = ENV_CNT_RAM_Q[12:0];
+	wire [ 2: 0] CUR_STEP_CNT = ENV_CNT_RAM_Q[15:13];
+	bit  [12: 0] NEW_SAMPLE_CNT;
+	bit  [ 2: 0] NEW_STEP_CNT;
+	bit          ENV_STEP;
+	always_comb begin
+		ENV_STEP = 0;
+		if (!EFF_RATE[5:1] || (OP4.EST == EST_RELEASE && OP4.KON)) begin
+			NEW_SAMPLE_CNT = '0;
+			NEW_STEP_CNT = '0;
+		end else if (!EFF_RATE[5:1] < 6'h30>>1) begin
+			NEW_SAMPLE_CNT = CUR_SAMPLE_CNT + 13'd1;
+			NEW_STEP_CNT = '0;
+			if (CUR_SAMPLE_CNT == ENV_TBL[EFF_RATE][CUR_STEP_CNT].CNT) begin
+				NEW_SAMPLE_CNT = '0;
+				NEW_STEP_CNT = CUR_STEP_CNT + 3'd1;
+				if (ENV_TBL[EFF_RATE][CUR_STEP_CNT].LAST) begin
+					NEW_STEP_CNT = '0;
+				end
+				ENV_STEP = 1;
+			end
+		end else begin
+			NEW_SAMPLE_CNT = CUR_SAMPLE_CNT + 13'd1;
+			if (CUR_SAMPLE_CNT == 13'h0001) begin
+				NEW_SAMPLE_CNT = '0;
+				ENV_STEP = 1;
+			end
+			NEW_STEP_CNT = '0;
+		end
+	end
+	
+	bit  [12: 0] ENV_SAMPLE_CNT;
+	bit  [ 2: 0] ENV_STEP_CNT;
 	always @(posedge CLK or negedge RST_N) begin
-		bit  [10: 0] VOL_NEXT;
+		bit  [10: 0] VOL_CALC;
 		bit  [ 9: 0] NEW_EVOL;
-		bit  [ 4: 0] S;
+		bit  [ 1: 0] NEW_EST;
 		
 		if (!RST_N) begin
-			OP5_PIPE <= OP_PIPE_RESET;
+			OP5 <= OP5_RESET;
 			// synopsys translate_off
-			OP5_WD <= 0;
 			// synopsys translate_on
-			EGST <= '{32{EGS_RELEASE}};
-			EVOL_LOW <= '{32{1}};
-		end
-		else begin
-			S = OP4_PIPE.SLOT;
-			if (SLOT_CE) begin
-				NEW_EVOL = EVOL_RAM_Q;
-				case (EGST[S])
-					EGS_ATTACK: begin
-						VOL_NEXT = {1'b0,EVOL_RAM_Q} - {1'b0,SCR2.AR,5'b11111} + 11'd1;
-						if (!VOL_NEXT[10]) begin
-							NEW_EVOL = VOL_NEXT[9:0];
+		end else if (!RES_N) begin
+			OP5 <= OP5_RESET;
+		end else begin
+`ifdef DEBUG
+			if (CYCLE1_CE) begin
+				DECAY1_DBG <= 0;
+				DECAY2_DBG <= 0;
+				ATTACK_DBG <= 0;
+				RELEASE_DBG <= 0;
+			end
+`endif
+			
+			if (SLOT1_CE) begin
+				ENV_SAMPLE_CNT <= NEW_SAMPLE_CNT;
+				ENV_STEP_CNT <= NEW_STEP_CNT;
+				
+				NEW_EVOL = OP4.EVOL;
+				NEW_EST = OP4.EST;
+				case (OP4.EST)
+					EST_ATTACK: begin
+						VOL_CALC = {1'b0,OP4.EVOL} - (ENV_STEP ? AttackEnvCalc(EFF_RATE,OP4.EVOL) : 11'd0);
+						if (!VOL_CALC[10]) begin
+							NEW_EVOL = VOL_CALC[9:0];
 						end else begin
 							NEW_EVOL = 10'h000;
-							EGST[S] <= EGS_DECAY1;
 						end
-						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
+						if (!VOL_CALC && !SCR2.LPSLNK) begin
+							NEW_EST = EST_DECAY1;
+							ENV_STEP_CNT <= '0;
+`ifdef DEBUG
+							DECAY1_DBG <= 1;
+`endif
+						end
 					end
 					
-					EGS_DECAY1: begin
-						VOL_NEXT = {1'b0,EVOL_RAM_Q} + {1'b0,SCR2.D1R,5'b00000};
-						if (VOL_NEXT[9:5] < SCR1.DL) begin
-							NEW_EVOL = VOL_NEXT[9:0];
-						end else begin
-							NEW_EVOL = VOL_NEXT[9:0];//{SCR[S].SCR1.DL,5'b00000};
-							EGST[S] <= EGS_DECAY2;
-						end
-						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
-					end
-					
-					EGS_DECAY2: begin
-						VOL_NEXT = {1'b0,EVOL_RAM_Q} + {1'b0,SCR2.D2R,5'b00000};
-						if (!VOL_NEXT[10]) begin
-							NEW_EVOL = VOL_NEXT[9:0];
+					EST_DECAY1: begin
+						VOL_CALC = {1'b0,OP4.EVOL} + (ENV_STEP ? DecayEnvCalc(EFF_RATE) : 11'd0);
+						if (!VOL_CALC[10]) begin
+							NEW_EVOL = VOL_CALC[9:0];
 						end else begin
 							NEW_EVOL = 10'h3FF;
 						end
-						if (OP4_PIPE.KOFF) EGST[S] <= EGS_RELEASE;
+						if (VOL_CALC[10] || VOL_CALC[9:5] >= SCR2.DL) begin
+							NEW_EST = EST_DECAY2;
+							ENV_STEP_CNT <= '0;
+`ifdef DEBUG
+							DECAY2_DBG <= 1;
+`endif
+						end
 					end
 					
-					EGS_RELEASE: begin
-						VOL_NEXT = {1'b0,EVOL_RAM_Q} + {1'b0,SCR1.RR,5'b00000};
-						if (!VOL_NEXT[10]) begin
-							NEW_EVOL = VOL_NEXT[9:0];
+					EST_DECAY2: begin
+						VOL_CALC = {1'b0,OP4.EVOL} + (ENV_STEP ? DecayEnvCalc(EFF_RATE) : 11'd0);
+						if (SCR1.D2R == 5'h00) begin
+							NEW_EVOL = OP4.EVOL;
+						end else if (!VOL_CALC[10]) begin
+							NEW_EVOL = VOL_CALC[9:0];
 						end else begin
 							NEW_EVOL = 10'h3FF;
 						end
-						if (OP4_PIPE.KON) begin
-							//NEW_EVOL = 10'h3FF;
-							EGST[S] <= EGS_ATTACK;
+					end
+					
+					EST_RELEASE: begin
+						VOL_CALC = {1'b0,OP4.EVOL} + (ENV_STEP ? DecayEnvCalc(EFF_RATE) : 11'd0);
+						if (!VOL_CALC[10]) begin
+							NEW_EVOL = VOL_CALC[9:0];
+						end else begin
+							NEW_EVOL = 10'h3FF;
 						end
 					end
 				endcase
-				OP5_EVOL <= NEW_EVOL;
-				EVOL_LOW[S] <= &NEW_EVOL;
 				
-				OP5_WD <= OP4_WD;
-				OP5_PIPE <= OP4_PIPE;
+				if (OP4.EST == EST_RELEASE && OP4.KON) begin
+					NEW_EVOL = 10'h3FF;
+					NEW_EST = EST_ATTACK;
+					ENV_SAMPLE_CNT <= '0;
+					ENV_STEP_CNT <= '0;
+`ifdef DEBUG
+					ATTACK_DBG <= 1;
+`endif
+				end else if (OP4.EST != EST_RELEASE && OP4.KOFF) begin
+					VOL_CALC = {1'b0,OP4.EVOL} + (ENV_STEP ? DecayEnvCalc(EFF_RATE) : 11'd0);
+					if (!VOL_CALC[10]) begin
+						NEW_EVOL = VOL_CALC[9:0];
+					end else begin
+						NEW_EVOL = 10'h3FF;
+					end
+					NEW_EST = EST_RELEASE;
+					ENV_SAMPLE_CNT <= '0;
+					ENV_STEP_CNT <= '0;
+`ifdef DEBUG
+					RELEASE_DBG <= 1;
+`endif
+				end else if (OP4.LOOP_END) begin
+					NEW_EVOL = 10'h3FF;
+					NEW_EST = EST_RELEASE;
+					ENV_SAMPLE_CNT <= '0;
+					ENV_STEP_CNT <= '0;
+`ifdef DEBUG
+					RELEASE_DBG <= 1;
+`endif
+				end
+				EVOL_RAM_D <= {NEW_EST,NEW_EVOL};
+				
+				OP5.SLOT <= OP4.SLOT;
+				OP5.KON <= OP4.KON;
+				OP5.KOFF <= OP4.KOFF;
+				OP5.EST <= OP4.EST;
+				OP5.EVOL <= OP4.EVOL;
+				OP5.WD <= OP4.WD;
 			end
 		end
 	end
-	bit [9:0] EVOL_RAM_Q;
-	SCSP_EVOL_RAM EVOL_RAM(CLK, OP5_PIPE.SLOT, OP5_EVOL, SLOT_CE, OP4_PIPE.SLOT, EVOL_RAM_Q);
+	bit [11:0] EVOL_RAM_D;
+	bit [11:0] EVOL_RAM_Q;
+	SCSP_EVOL_RAM EVOL_RAM(CLK, OP5.SLOT, EVOL_RAM_D, SLOT1_CE, OP2.SLOT, EVOL_RAM_Q);
+	
+	bit [15:0] ENV_CNT_RAM_Q;
+	SCSP_ENV_CNT_RAM ENV_CNT_RAM(CLK, OP5.SLOT, {ENV_STEP_CNT,ENV_SAMPLE_CNT}, SLOT1_CE, OP4.SLOT, ENV_CNT_RAM_Q);
 	
 	//Operation 5: Level calculation
-	bit signed [15:0] OP5_WD; //Wave form data
-	bit [ 9:0] OP5_EVOL;
 	always @(posedge CLK or negedge RST_N) begin
-//		bit [ 4:0] S;
-		bit [ 7:0] TL;
-		bit signed [15:0] TEMP;
-		
 		if (!RST_N) begin
-			OP6_PIPE <= OP_PIPE_RESET;
+			OP6 <= OP6_RESET;
 			// synopsys translate_off
-			OP6_SD <= '0;
-			OP6_EVOL <= '0;
-			OP6_SDIR <= 0;
 			// synopsys translate_on
-		end
-		else begin
-//			S = OP5_PIPE.SLOT;
-			TL = SCR3.TL;
-			if (SLOT_CE) begin
-				TEMP = SCR3.SDIR ? OP5_WD : VolCalc(OP5_WD, TL);
-				OP6_SD <= OP5_EVOL != 10'h3FF ? TEMP : '0;
-				OP6_EVOL <= OP5_EVOL;
-				OP6_SDIR <= SCR3.SDIR;
-				OP6_PIPE <= OP5_PIPE;
+		end else if (!RES_N) begin
+			OP6 <= OP6_RESET;
+		end else begin
+			if (SLOT1_CE) begin
+				OP6.SLOT <= OP5.SLOT;
+				OP6.KON <= OP5.KON;
+				OP6.KOFF <= OP5.KOFF;
+				OP6.EVOL <= OP5.EVOL;
+				OP6.SDIR <= SCR3.SDIR;
+				OP6.SD <= OP5.WD;
 			end
-			
-`ifdef DEBUG
-			EVOL_DBG <= TEMP;
-`endif
 		end
 	end
 	
 	//Operation 6: Level calculation
-	bit signed [15:0] OP6_SD;	//Slot out data
-	bit [ 9:0] OP6_EVOL;
-	bit        OP6_SDIR;
 	always @(posedge CLK or negedge RST_N) begin
-//		bit [ 4:0] S;
-//		bit [25:0] TEMP;
-		
 		if (!RST_N) begin
-			OP7_PIPE <= OP_PIPE_RESET;
-		end
-		else begin
-//			S = OP6_PIPE.SLOT;
-			if (SLOT_CE) begin
-//				TEMP = $signed(OP6_SD) * (10'h3FF - OP6_EVOL);
-				OP7_SD <= OP6_SDIR ? OP6_SD : VolCalc(OP6_SD, OP6_EVOL[9:2]);//TEMP[25:10];
-				OP7_PIPE <= OP6_PIPE;
+			OP7 <= OP7_RESET;
+		end else if (!RES_N) begin
+			OP7 <= OP7_RESET;
+		end else begin
+			if (SLOT1_CE) begin
+				OP7.SLOT <= OP6.SLOT;
+				OP7.KON <= OP6.KON;
+				OP7.KOFF <= OP6.KOFF;
+				OP7.SD <= SCR3.SDIR ? OP6.SD : VolCalc(OP6.SD,OP6.EVOL,SCR3.TL);
+				OP7.STWINH <= SCR3.STWINH;
 			end
 		end
 	end
 	
 	//Operation 7: Stack save
 	//Direct out
-	bit signed [15:0] OP7_SD;
-	bit [19:0] DIR_ACC_L,DIR_ACC_R;
+	bit [17:0] DIR_ACC_L,DIR_ACC_R;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
 		bit signed [15:0] TEMP;
@@ -520,20 +645,21 @@ module SCSP (
 			DIR_ACC_L <= 0;
 			DIR_ACC_R <= 0;
 			// synopsys translate_on
-		end
-		else begin
-			S = OP7_PIPE.SLOT;
+		end else if (!RES_N) begin
 			
-			if (SLOT_CE) begin
-				TEMP = LevelCalc(OP7_SD,SCR8.DISDL);
+		end else begin
+			S = OP7.SLOT;
+			
+			if (SLOT1_CE) begin
+				TEMP = LevelCalc(OP7.SD,SCR8.DISDL);
 				PAN_L = PanLCalc(TEMP,SCR8.DIPAN);
 				PAN_R = PanRCalc(TEMP,SCR8.DIPAN);
 				if (S == 5'd0) begin
-					DIR_ACC_L <= {{4{PAN_L[15]}},PAN_L};
-					DIR_ACC_R <= {{4{PAN_R[15]}},PAN_R};
+					DIR_ACC_L <= {{4{PAN_L[15]}},PAN_L[15:2]};
+					DIR_ACC_R <= {{4{PAN_R[15]}},PAN_R[15:2]};
 				end else begin
-					DIR_ACC_L <= DIR_ACC_L + {{4{PAN_L[15]}},PAN_L};
-					DIR_ACC_R <= DIR_ACC_R + {{4{PAN_R[15]}},PAN_R};
+					DIR_ACC_L <= DIR_ACC_L + {{4{PAN_L[15]}},PAN_L[15:2]};
+					DIR_ACC_R <= DIR_ACC_R + {{4{PAN_R[15]}},PAN_R[15:2]};
 				end
 `ifdef DEBUG
 				LVL_DBG <= TEMP;
@@ -544,39 +670,77 @@ module SCSP (
 		end
 	end
 `ifdef DEBUG
-	assign DIR_ACC_L_OF = ^DIR_ACC_L[19:18];
-	assign DIR_ACC_R_OF = ^DIR_ACC_R[19:18];
+	assign DIR_ACC_L_OF = (DIR_ACC_L[17] && DIR_ACC_L[16:15] != 2'b11) || (!DIR_ACC_L[17] && DIR_ACC_L[16:15] != 2'b00);
+	assign DIR_ACC_R_OF = (DIR_ACC_R[17] && DIR_ACC_R[16:15] != 2'b11) || (!DIR_ACC_R[17] && DIR_ACC_R[16:15] != 2'b00);
 `endif
 	
+	//DSP
+	MPRO_t       MPRO_Q;
+	EFREG_t      EFREG_Q;
+	assign MPRO_Q = MPRO_RAM_Q & {64{DSP_MPRO_SET[DSP_MPRO_STEP]}};
+	assign EFREG_Q = EFREG_RAM_Q;
+	
+	bit          DSP_EXEC;
+	bit          DSP_MPRO_SET[128];
+	
 	//DSP input
+	bit  [ 3: 0] PCM_MIXS_RA;
+	bit          PCM_MIXS_RD;
+	bit  [ 3: 0] PCM_MIXS_WA;
+	bit          PCM_MIXS_WE;
+	MIXS_t       PCM_MIXS_D;
+	
+	bit  [15: 0] DSP_EXTS[2];
+	MIXS_t       MIXS_SUM;
+	bit          PCM_MIXS_CLEAR[16];
 	always @(posedge CLK or negedge RST_N) begin
-		bit [ 4:0] S;
-		bit signed [15:0] TEMP;
-		bit signed [15:0] PAN_L,PAN_R;
+		bit [15:0] SD;
 		
 		if (!RST_N) begin
 			// synopsys translate_off
-			DSP_MIXS <= '{16{'0}};
 			DSP_EXTS <= '{2{'0}};
+			MIXS_SUM <= '0;
+			PCM_MIXS_CLEAR <= '{16{0}};
 			// synopsys translate_on
-		end
-		else begin
-			S = OP7_PIPE.SLOT;
+		end else if (!RES_N) begin
+			MIXS_SUM <= '0;
+		end else begin
+			SD = LevelCalc(OP7.SD,SCR7.IMXL);
 			
-			if (SLOT_CE) begin
-				if (S == 5'd0) begin
-					DSP_MIXS <= '{16{'0}};
-				end
-				TEMP = LevelCalc(OP7_SD,SCR7.IMXL);
-				DSP_MIXS[SCR7.ISEL] <= DSP_MIXS[SCR7.ISEL] + {{4{TEMP[15]}},TEMP};
+			if (CYCLE0_CE) begin
+				PCM_MIXS_CLEAR[MPRO_Q.IRA[3:0]] <= 1;
 			end
-			DSP_EXTS[0] <= ESL;
-			DSP_EXTS[1] <= ESR;
+			if (CYCLE1_CE) begin
+				if (CYCLE_NUM[2:1] == 2'b00) begin
+					MIXS_SUM <= {MIXS_RAM_Q[31:16],MIXS_RAM_Q[3:0]};
+					if (PCM_MIXS_CLEAR[SCR7.ISEL]) begin
+						MIXS_SUM <= '0;
+						PCM_MIXS_CLEAR[SCR7.ISEL] <= 0;
+					end
+				end
+				if (CYCLE_NUM[2:1] == 2'b10) begin
+					MIXS_SUM <= MIXS_SUM + {{4{SD[15]}},SD};// + {SD,4'h00};
+				end
+			end
+			
+			if (OP7.SLOT == 5'd31 && SLOT1_CE) begin
+				DSP_EXTS[0] <= !SND_EN[2] ? 16'h0000 : ESL;
+				DSP_EXTS[1] <= !SND_EN[2] ? 16'h0000 : ESR;
+			end
 		end
 	end
+	assign PCM_MIXS_RA = SCR7.ISEL;
+	assign PCM_MIXS_RD = (CYCLE_NUM[2:1] == 2'b00);
+	assign PCM_MIXS_WA = SCR7.ISEL;
+	assign PCM_MIXS_D = MIXS_SUM;
+	assign PCM_MIXS_WE = (CYCLE_NUM[2:1] == 2'b10);
 	
 	//DSP execute
+`ifndef DEBUG
 	bit  [ 6: 0] DSP_MPRO_STEP;
+`endif
+	assign DSP_MPRO_STEP = {OP7.SLOT,CYCLE_NUM[2:1]};
+	
 	bit  [ 6: 0] DSP_TEMP_RA;
 	bit  [ 6: 0] DSP_TEMP_WA;
 	TEMP_t       DSP_TEMP_D;
@@ -587,6 +751,7 @@ module SCSP (
 	bit          DSP_MEMS_WE;
 	bit  [ 5: 0] DSP_COEF_RA;
 	bit  [ 4: 0] DSP_MADRS_RA;
+	bit  [ 3: 0] DSP_MIXS_RA;
 	bit  [ 3: 0] DSP_EFREG_RA;
 	bit  [ 3: 0] DSP_EFREG_WA;
 	bit          DSP_EFREG_WE;
@@ -599,12 +764,19 @@ module SCSP (
 	bit          DSP_READ;
 	bit          DSP_WRITE;
 	
-	wire [23: 0] SHFT_OUT = DSPShifter(SFT_REG, DSP_MPRO_Q.SHFT);
+	wire [23: 0] SHFT_OUT = DSPShifter(SFT_REG, MPRO_Q.SHFT);
 	
 	always @(posedge CLK or negedge RST_N) begin
+		TEMP_t       TEMP_Q;
+		MEMS_t       MEMS_Q;
+		COEF_t       COEF_Q;
+		MADRS_t      MADRS_Q;
+		MIXS_t       MIXS_Q;
+		bit  [15: 0] EXTS_Q;
 		bit  [23: 0] INPUTS;
 		bit  [23: 0] X;
 		bit  [12: 0] Y;
+		bit  [25: 0] BS;
 		bit  [25: 0] B;
 		bit  [23: 0] Y_REG;
 		bit  [12: 0] FRC_REG;
@@ -613,164 +785,199 @@ module SCSP (
 		bit  [16: 1] ADDR;
 		
 		if (!RST_N) begin
-			DSP_MPRO_STEP <= '0;
 			MDEC_CT <= '0;
 			DSP_READ <= 0;
 			DSP_WRITE <= 0;
 			// synopsys translate_off
-			EFREGS <= '{16{'0}};
 			Y_REG <= '0;
 			FRC_REG <= '0;
 			ADRS_REG <= '0;
 			DSP_MEMA_REG <= '0;
-			DSP_INP_REG <= '0;
 			DSP_OUT_REG <= '0;
 			// synopsys translate_on
-		end
-		else begin
-			if (CYCLE_CE) begin
-				DSP_MPRO_STEP <= DSP_MPRO_STEP + 7'd1;
+		end else if (!RES_N) begin
+			MDEC_CT <= '0;
+			DSP_READ <= 0;
+			DSP_WRITE <= 0;
+		end else begin
+			
+			if (!MPRO_Q.IRA[5])
+				INPUTS = MEMS_Q;
+			else if (!MPRO_Q.IRA[4])
+				INPUTS = {MIXS_Q,4'h0};
+			else if (!MPRO_Q.IRA[3:1])
+				INPUTS = {EXTS_Q,8'h00};
+			
+			case (MPRO_Q.XSEL)
+				1'b0: X = TEMP_Q;
+				1'b1: X = INPUTS;
+			endcase
+			case (MPRO_Q.YSEL)
+				2'b00: Y = FRC_REG;
+				2'b01: Y = COEF_Q;
+				2'b10: Y = Y_REG[23:12];
+				2'b11: Y = {1'b0,Y_REG[15:4]};
+			endcase
+			
+			BS = !MPRO_Q.BSEL ? {{2{TEMP_Q[23]}},TEMP_Q} : SFT_REG;
+			if (MPRO_Q.ZERO)
+				B = '0;
+			else if (MPRO_Q.NEGB)
+				B = 26'd0 - BS;
+			else
+				B = BS;
 				
-				if (DSP_MPRO_STEP == 7'd127)
+			MUL = DSPMult(X, Y);
+			
+			ADDR = MADRS_Q + (!MPRO_Q.TABLE ? MDEC_CT : 16'h0000) + (MPRO_Q.ADREB ? {4'h0,ADRS_REG} : 16'h0000) + (MPRO_Q.NXADR ? 16'h0001 : 16'h0000);
+			
+			if (/*DSP_EXEC &&*/ CYCLE0_CE) begin
+				MEMS_Q <= {MEMS_RAM_Q[31:16],MEMS_RAM_Q[7:0]};
+				MIXS_Q <= {MIXS_RAM_Q[31:16],MIXS_RAM_Q[3:0]};
+				EXTS_Q <= DSP_EXTS[MPRO_Q.IRA[0]];
+				TEMP_Q <= {TEMP_RAM_Q[31:16],TEMP_RAM_Q[7:0]};
+				COEF_Q <= COEF_RAM_Q[15:3];
+				MADRS_Q <= MADRS_RAM_Q;
+			end
+			if (/*DSP_EXEC &&*/ CYCLE1_CE) begin
+				if (OP7.SLOT == 5'd31 && SLOT1_CE) 
 					MDEC_CT <= MDEC_CT - 16'd1;
 				
-				if (!DSP_MPRO_Q.IRA[5])
-					INPUTS = DSP_MEMS_Q;
-				else if (!DSP_MPRO_Q.IRA[4])
-					INPUTS = {DSP_MIXS[DSP_MPRO_Q.IRA[3:0]],4'h0};
-				else if (!DSP_MPRO_Q.IRA[3:1])
-					INPUTS = {DSP_EXTS[DSP_MPRO_Q.IRA[0]],8'h00};
-				
-				case (DSP_MPRO_Q.XSEL)
-					1'b0: X = DSP_TEMP_Q;
-					1'b1: X = INPUTS;
-				endcase
-				case (DSP_MPRO_Q.YSEL)
-					2'b00: Y = FRC_REG;
-					2'b01: Y = DSP_COEF_Q.COEF;
-					2'b10: Y = Y_REG[23:12];
-					2'b11: Y = {1'b0,Y_REG[15:4]};
-				endcase
-				
-				B = DSP_MPRO_Q.ZERO ? '0 : !DSP_MPRO_Q.BSEL ? {DSP_TEMP_Q,2'b00} : SFT_REG;
-				MUL = DSPMulti(X, Y);
-				SFT_REG <= MUL + (!DSP_MPRO_Q.NEGB ? B : 26'd0 - B);
+				SFT_REG <= MUL + B;
 
-				if (DSP_MPRO_Q.YRL)
+				if (MPRO_Q.YRL)
 					Y_REG <= INPUTS;
 				
-				if (DSP_MPRO_Q.FRCL) begin
-					if (DSP_MPRO_Q.SHFT == 2'b11)
+				if (MPRO_Q.FRCL) begin
+					if (MPRO_Q.SHFT == 2'b11)
 						FRC_REG <= {1'b0,SHFT_OUT[11:0]};
 					else
 						FRC_REG <= SHFT_OUT[23:11];
 				end
 				
-				if (DSP_MPRO_Q.ADRL) begin
-					if (DSP_MPRO_Q.SHFT == 2'b11)
+				if (MPRO_Q.ADRL) begin
+					if (MPRO_Q.SHFT == 2'b11)
 						ADRS_REG <= SHFT_OUT[23:12];
 					else
-						ADRS_REG <= {4'h0,INPUTS[23:16]};///////
+						ADRS_REG <= {{4{INPUTS[23]}},INPUTS[23:16]};///////
 				end
 				
-				ADDR = DSP_MADRS_Q + (!DSP_MPRO_Q.TABLE ? MDEC_CT : 16'h0000) + (DSP_MPRO_Q.ADREB ? ADRS_REG : 16'h0000) + (DSP_MPRO_Q.NXADR ? 16'h0001 : 16'h0000);
-				DSP_MEMA_REG <= {CR1.RBP,12'h000} + ADDR;//TODO CR1.RBL
+				case (CR1.RBL | {2{MPRO_Q.TABLE}})
+					2'b00: DSP_MEMA_REG <= {CR1.RBP,12'h000} + {6'b000000,ADDR[13:1]};
+					2'b01: DSP_MEMA_REG <= {CR1.RBP,12'h000} + {5'b00000,ADDR[14:1]};
+					2'b10: DSP_MEMA_REG <= {CR1.RBP,12'h000} + {4'b0000,ADDR[15:1]};
+					2'b11: DSP_MEMA_REG <= {CR1.RBP,12'h000} + {3'b000,ADDR[16:1]};
+				endcase
 				DSP_OUT_REG <= SHFT_OUT[23:8];//TODO NOFL
-				DSP_READ <= DSP_MPRO_Q.MRD;
-				DSP_WRITE <= DSP_MPRO_Q.MWT;
+				DSP_READ <= MPRO_Q.MRD;
+				DSP_WRITE <= MPRO_Q.MWT & |CR1.RBP;//TODO
 			end
+`ifdef DEBUG
+			INPUTS_DBG <= INPUTS;
+			X_DBG <= X;
+			Y_DBG <= Y;
+			B_DBG <= B;
+			MUL_DBG <= MUL;
+`endif
 		end
 	end
-	assign DSP_TEMP_RA = DSP_MPRO_Q.TRA + MDEC_CT[6:0];
-	assign DSP_TEMP_WA = DSP_MPRO_Q.TWA + MDEC_CT[6:0];
-	assign DSP_TEMP_WE = DSP_MPRO_Q.TWT;
+	assign DSP_TEMP_RA = MPRO_Q.TRA + MDEC_CT[6:0];
+	assign DSP_TEMP_WA = MPRO_Q.TWA + MDEC_CT[6:0];
+	assign DSP_TEMP_WE = MPRO_Q.TWT;
 	assign DSP_TEMP_D = SHFT_OUT;
 	
-	assign DSP_MEMS_RA = DSP_MPRO_Q.IRA[4:0];
-	assign DSP_MEMS_WA = DSP_MPRO_Q.IWA;
-	assign DSP_MEMS_WE = DSP_MPRO_Q.IWT;
+	assign DSP_MEMS_RA = MPRO_Q.IRA[4:0];
+	assign DSP_MEMS_WA = MPRO_Q.IWA;
+	assign DSP_MEMS_WE = MPRO_Q.IWT;
 	assign DSP_MEMS_D = {DSP_INP_REG,8'h00};//TODO NOFL
 	
-	assign DSP_COEF_RA = DSP_MPRO_Q.COEF;
-	assign DSP_MADRS_RA = DSP_MPRO_Q.MASA;
+	assign DSP_COEF_RA = MPRO_Q.COEF;
+	assign DSP_MADRS_RA = MPRO_Q.MASA;
 	
-	assign DSP_EFREG_RA = OP7_PIPE.SLOT[3:0];
-	assign DSP_EFREG_WA = DSP_MPRO_Q.EWA;
-	assign DSP_EFREG_WE = DSP_MPRO_Q.EWT;
+	assign DSP_MIXS_RA = MPRO_Q.IRA[3:0];
+
+	assign DSP_EFREG_RA = OP7.SLOT[3:0];
+	assign DSP_EFREG_WA = MPRO_Q.EWA;
+	assign DSP_EFREG_WE = MPRO_Q.EWT;
 	assign DSP_EFREG_D = SHFT_OUT[23:8];
 	
 	
 	
 	//Effect out
-	bit signed [19:0] EFF_ACC_L,EFF_ACC_R;
+	bit signed [17:0] EFF_ACC_L,EFF_ACC_R;
 	always @(posedge CLK or negedge RST_N) begin
 		bit [ 4:0] S;
-		bit signed [15:0] TEMP;
-		bit signed [15:0] PAN_L,PAN_R;
+		bit [15:0] TEMP;
+		bit [15:0] PAN_L,PAN_R;
 		
 		if (!RST_N) begin
 			// synopsys translate_off
 			EFF_ACC_L <= '0;
 			EFF_ACC_R <= '0;
 			// synopsys translate_on
-		end
-		else begin
-			S = OP7_PIPE.SLOT;
+		end else if (!RES_N) begin
 			
-			if (OUT_CE) begin
+		end else begin
+			S = OP7.SLOT;
+			
+			if (SLOT1_CE) begin
 				TEMP = '0;
-				PAN_L = '0;
-				PAN_R = '0;
 				if (S <= 5'd15) begin
-					TEMP = LevelCalc(DSP_EFREG_Q,SCR8.EFSDL);//LevelCalc(DSP_MIXS[S[3:0]][19:4],SCR8.EFSDL);
-					PAN_L = PanLCalc(TEMP,SCR8.EFPAN);
-					PAN_R = PanRCalc(TEMP,SCR8.EFPAN);
+					TEMP = LevelCalc(EFREG_Q,SCR8.EFSDL);
 				end else if (S == 5'd16) begin
-					TEMP = LevelCalc(ESL,3'h7/*SCR8.EFSDL*/);
-					PAN_L = PanLCalc(TEMP,5'h1F/*SCR8.EFPAN*/);
+					TEMP = !SND_EN[2] ? 16'h0000 : LevelCalc(ESL,SCR8.EFSDL);
 				end else if (S == 5'd17) begin
-					TEMP = LevelCalc(ESR,3'h7/*SCR8.EFSDL*/);
-					PAN_R = PanRCalc(TEMP,5'h0F/*SCR8.EFPAN*/);
+					TEMP = !SND_EN[2] ? 16'h0000 : LevelCalc(ESR,SCR8.EFSDL);
 				end
-//				PAN_L = PanLCalc(TEMP,SCR8.EFPAN);
-//				PAN_R = PanRCalc(TEMP,SCR8.EFPAN);
+				PAN_L = PanLCalc(TEMP,SCR8.EFPAN);
+				PAN_R = PanRCalc(TEMP,SCR8.EFPAN);
 				
 				if (S == 5'd0) begin
-					EFF_ACC_L <= {{4{PAN_L[15]}},PAN_L};
-					EFF_ACC_R <= {{4{PAN_R[15]}},PAN_R};
+					EFF_ACC_L <= {{4{PAN_L[15]}},PAN_L[15:2]};
+					EFF_ACC_R <= {{4{PAN_R[15]}},PAN_R[15:2]};
 				end else begin
-					EFF_ACC_L <= EFF_ACC_L + {{4{PAN_L[15]}},PAN_L};
-					EFF_ACC_R <= EFF_ACC_R + {{4{PAN_R[15]}},PAN_R};
+					EFF_ACC_L <= EFF_ACC_L + {{4{PAN_L[15]}},PAN_L[15:2]};
+					EFF_ACC_R <= EFF_ACC_R + {{4{PAN_R[15]}},PAN_R[15:2]};
 				end
 			end
 		end
 	end
 `ifdef DEBUG
-	assign EFF_ACC_L_OF = ^EFF_ACC_L[19:18];
-	assign EFF_ACC_R_OF = ^EFF_ACC_R[19:18];
+	assign EFF_ACC_L_OF = (EFF_ACC_L[17] && EFF_ACC_L[16:15] != 2'b11) || (!EFF_ACC_L[17] && EFF_ACC_L[16:15] != 2'b00);
+	assign EFF_ACC_R_OF = (EFF_ACC_R[17] && EFF_ACC_R[16:15] != 2'b11) || (!EFF_ACC_R[17] && EFF_ACC_R[16:15] != 2'b00);
 `endif
 	
 	//Out
-	assign SAMPLE_CE = (OP7_PIPE.SLOT == 5'd31) && CYCLE_NUM == 2'b11 && CYCLE_CE;
-	bit signed [15:0] DIR_L,DIR_R;
-	bit signed [15:0] EFF_L,EFF_R;
+	bit [15:0] DIR_L,DIR_R;
+	bit [15:0] EFF_L,EFF_R;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			// synopsys translate_off
 			DIR_L <= '0;
 			DIR_R <= '0;
 			// synopsys translate_on
+		end else if (!RES_N) begin
+			
 		end else begin
 			if (SAMPLE_CE) begin
-				DIR_L <= SND_EN[0] ? $signed(DIR_ACC_L[19:4]) : 16'sh0000;
-				DIR_R <= SND_EN[0] ? $signed(DIR_ACC_R[19:4]) : 16'sh0000;
-				EFF_L <= SND_EN[1] ? $signed(EFF_ACC_L[19:4]) : 16'sh0000;
-				EFF_R <= SND_EN[1] ? $signed(EFF_ACC_R[19:4]) : 16'sh0000;
+				DIR_L <= !SND_EN[0] ? 16'h0000 : DIR_ACC_L[17] && DIR_ACC_L[16:15] != 2'b11 ? 16'h8000 : !DIR_ACC_L[17] && DIR_ACC_L[16:15] != 2'b00 ? 16'h7FFF : DIR_ACC_L[15:0];
+				DIR_R <= !SND_EN[0] ? 16'h0000 : DIR_ACC_R[17] && DIR_ACC_R[16:15] != 2'b11 ? 16'h8000 : !DIR_ACC_R[17] && DIR_ACC_R[16:15] != 2'b00 ? 16'h7FFF : DIR_ACC_R[15:0];
+				EFF_L <= !SND_EN[1] ? 16'h0000 : EFF_ACC_L[17] && EFF_ACC_L[16:15] != 2'b11 ? 16'h8000 : !EFF_ACC_L[17] && EFF_ACC_L[16:15] != 2'b00 ? 16'h7FFF : EFF_ACC_L[15:0];
+				EFF_R <= !SND_EN[1] ? 16'h0000 : EFF_ACC_R[17] && EFF_ACC_R[16:15] != 2'b11 ? 16'h8000 : !EFF_ACC_R[17] && EFF_ACC_R[16:15] != 2'b00 ? 16'h7FFF : EFF_ACC_R[15:0];
 			end
 		end
 	end
-	assign SOUND_L = MVolCalc(DIR_L + EFF_L,CR0.MVOL);
-	assign SOUND_R = MVolCalc(DIR_R + EFF_R,CR0.MVOL);
+	
+	bit [16:0] SUM_L,SUM_R;
+	assign SUM_L = {DIR_L[15],DIR_L} + {EFF_L[15],EFF_L};
+	assign SUM_R = {DIR_R[15],DIR_R} + {EFF_R[15],EFF_R};
+	assign SOUND_L = MVolCalc(SUM_L[15:0],CR0.MVOL);
+	assign SOUND_R = MVolCalc(SUM_R[15:0],CR0.MVOL);
+`ifdef DEBUG
+	assign SUM_L_OF = (SUM_L[16] && !SUM_L[15]) || (!SUM_L[16] && SUM_L[15]);
+	assign SUM_R_OF = (SUM_R[16] && !SUM_R[15]) || (!SUM_R[16] && SUM_R[15]);
+`endif
+	
 	
 	
 	//Timers
@@ -779,6 +986,9 @@ module SCSP (
 		bit [6:0] CNT;
 	
 		if (!RST_N) begin
+			CNT <= '0;
+			TMR_CE <= '0;
+		end else if (!RES_N) begin
 			CNT <= '0;
 			TMR_CE <= '0;
 		end else begin
@@ -811,6 +1021,8 @@ module SCSP (
 			DMA_WR <= 0;
 			DMA_EXEC <= 0;
 			DEXE_OLD <= 0;
+		end else if (!RES_N) begin
+			DMA_EXEC <= 0;
 		end else begin
 			DEXE_OLD <= CR7.DEXE;
 			if (CR7.DEXE && !DEXE_OLD) begin
@@ -825,7 +1037,7 @@ module SCSP (
 				if (!DMA_WR && MEM_ST == MS_DMA_WAIT && RAM_RDY) begin
 					DMA_MA <= DMA_MA + 19'd1;
 					DMA_WR <= 1;
-				end else if (DMA_WR && REG_ST == MS_DMA_WAIT && REG_RDY) begin
+				end else if (DMA_WR && REG_ST == MS_DMA_WAIT && CYCLE1_CE) begin
 					DMA_RA <= DMA_RA + 11'd1;
 					DMA_LEN <= DMA_LEN - 11'd1;
 					if (!DMA_LEN) DMA_EXEC <= 0;
@@ -839,7 +1051,7 @@ module SCSP (
 	bit [20:1] A;
 	bit        WE_N;
 	bit  [1:0] DQM;
-	bit        BURST;
+//	bit        BURST;
 	
 	wire SCU_REQ = ~AD_N & ~CS_N & ~REQ_N;	//25A00000-25BFFFFF
 	bit [20:1] SCU_RA;
@@ -855,7 +1067,8 @@ module SCSP (
 	bit  [1:0] SAVE_WE;
 	bit        SCPU_PEND;
 	always @(posedge CLK or negedge RST_N) begin
-		bit CYCLE_START;
+		bit MEM_START;
+		bit REG_START;
 		
 		if (!RST_N) begin
 			MEM_ST <= MS_IDLE;
@@ -871,20 +1084,21 @@ module SCSP (
 			A <= '0;
 			WE_N <= 1;
 			DQM <= '1;
-			BURST <= 0;
+//			BURST <= 0;
 			SCPU_PEND <= 0;
 			SCDTACK_N <= 1;
 			SCU_RPEND <= 0;
 			SCU_RRDY <= 1;
 			SCU_WPEND <= 0;
 			SCU_WRDY <= 1;
-		end
-		else begin
+		end else if (!RES_N) begin
+			
+		end else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
 				if (!DI[15]) begin
 					A[20:9] <= DI[11:0];
 					WE_N <= DI[14];
-					BURST <= DI[13];
+//					BURST <= DI[13];
 				end else begin
 					A[8:1] <= DI[7:0];
 					DQM <= DI[13:12];
@@ -920,26 +1134,33 @@ module SCSP (
 				SCU_WRDY <= 1;
 			end
 			
-			if ((MEM_ST == MS_SCU_WAIT && MEM_RD && RAM_RDY) || (REG_ST == MS_SCU_WAIT && REG_RD && REG_RDY)) begin
+			if ((MEM_ST == MS_SCU_WAIT && MEM_RD && RAM_RDY) || (REG_ST == MS_SCU_WAIT && REG_RD && CYCLE1_CE)) begin
 				SCU_RRDY <= 1;
 				SCU_RPEND <= 0;
 			end
 			
 			if (!SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N && SCFC != 3'b111 && !SCPU_PEND) SCPU_PEND <= 1;
-			if ((MEM_ST == MS_SCPU_WAIT && RAM_RDY) || (REG_ST == MS_SCPU_WAIT && REG_RDY)) SCPU_PEND <= 0;
+			if ((MEM_ST == MS_SCPU_WAIT && RAM_RDY) || (REG_ST == MS_SCPU_WAIT && CYCLE1_CE)) SCPU_PEND <= 0;
 			
-			CYCLE_START <= CYCLE_CE;
+			MEM_START <= CYCLE1_CE;
 			
 			MEM_RFS <= 0;
 			case (MEM_ST)
-				MS_IDLE: if (CYCLE_START) begin
-					if (WD_READ && SLOT_EN) begin
+				MS_IDLE: if (MEM_START) begin
+					if (WD_READ && PCM_EN) begin
 						MEM_A <= ADP[18:1];
 						MEM_D <= '0;
 						MEM_WE <= '0;
 						MEM_RD <= 1;
 						MEM_CS <= 1;
 						MEM_ST <= MS_WD_WAIT;
+					end else if ((DSP_READ || DSP_WRITE) && DSP_EN) begin
+						MEM_A <= DSP_MEMA_REG[18:1];
+						MEM_D <= DSP_OUT_REG;
+						MEM_WE <= {2{DSP_WRITE}};
+						MEM_RD <= DSP_READ;
+						MEM_CS <= 1;
+						MEM_ST <= MS_DSP_WAIT;
 					end else if (DMA_EXEC && !DMA_WR) begin
 						MEM_A <= DMA_MA[18:1];
 						MEM_D <= '0;
@@ -993,6 +1214,17 @@ module SCSP (
 						MEM_ST <= MS_IDLE;
 					end
 				end
+
+				
+				MS_DSP_WAIT: begin
+					if (RAM_RDY) begin
+						DSP_INP_REG <= RAM_Q;
+						MEM_WE <= '0;
+						MEM_RD <= 0;
+						MEM_CS <= 0;
+						MEM_ST <= MS_IDLE;
+					end
+				end
 				
 				MS_DMA_WAIT: begin
 					if (RAM_RDY) begin
@@ -1025,28 +1257,23 @@ module SCSP (
 					end
 				end
 				
-				MS_END: begin
-					/*if (CYCLE_CE || !SLOT_EN)*/ MEM_ST <= MS_IDLE;
-				end
-				
 				default:;
 			endcase
 			
+			REG_START <= CYCLE0_CE;
 			case (REG_ST)
-				MS_IDLE: if (CYCLE_START && !SLOT_EN) begin
+				MS_IDLE: if (REG_START) begin
 					if (DMA_EXEC && DMA_WR) begin
 						REG_A <= DMA_RA;
 						REG_D <= DMA_DAT;
 						REG_WE <= '1;
 						REG_RD <= 0;
-						REG_CS <= 1;
 						REG_ST <= MS_DMA_WAIT;
 					end else if (SCA[20] && SCPU_PEND) begin
 						REG_A <= SCA[11:1];
 						REG_D <= SCDI;
 						REG_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
 						REG_RD <= SCRW_N;
-						REG_CS <= 1;
 						REG_ST <= MS_SCPU_WAIT;
 					end else if (SCU_WA[20] && SCU_WPEND) begin
 						SCU_WPEND <= 0;
@@ -1054,52 +1281,40 @@ module SCSP (
 						REG_D <= SCU_D;
 						REG_WE <= SCU_WE;
 						REG_RD <= 0;
-						REG_CS <= 1;
 						REG_ST <= MS_SCU_WAIT;
 					end else if (SCU_RA[20] && SCU_RPEND) begin
 						REG_A <= SCU_RA[11:1];
 						REG_WE <= 2'b00;
 						REG_RD <= 1;
-						REG_CS <= 1;
 						REG_ST <= MS_SCU_WAIT;
 					end
 				end
 				
-				MS_WD_WAIT:;
-				
 				MS_DMA_WAIT: begin
-					if (REG_RDY) begin
+					if (CYCLE1_CE) begin
 						REG_WE <= '0;
 						REG_RD <= 0;
-						REG_CS <= 0;
 						REG_ST <= MS_IDLE;
 					end
 				end
 				
 				MS_SCU_WAIT: begin
-					if (REG_RDY) begin
+					if (CYCLE1_CE) begin
 						DO <= REG_Q;
 						REG_WE <= '0;
 						REG_RD <= 0;
-						REG_CS <= 0;
-//						SCU_PEND <= 0;
 						REG_ST <= MS_IDLE;
 					end
 				end
 				
 				MS_SCPU_WAIT: begin
-					if (REG_RDY) begin
+					if (CYCLE1_CE) begin
 						SCDTACK_N <= 0;
 						SCDO <= REG_Q;
 						REG_WE <= '0;
 						REG_RD <= 0;
-						REG_CS <= 0;
 						REG_ST <= MS_IDLE;
 					end
-				end
-								
-				MS_END: begin
-					/*if (CYCLE_CE || !SLOT_EN)*/ REG_ST <= MS_IDLE;
 				end
 				
 				default:;
@@ -1121,9 +1336,9 @@ module SCSP (
 	//Registers
 	always @(posedge CLK or negedge RST_N) begin
 		bit DMA_EXEC_OLD;
+		bit REG_RD_DELAY;
 		
 		if (!RST_N) begin
-			SCR <= '{32{'0}};
 			CR0 <= '0;
 			CR1 <= '0;
 			CR2 <= '0;
@@ -1144,11 +1359,11 @@ module SCSP (
 			CR17 <= '0;
 			CR18 <= '0;
 			CR19 <= '0;
+			DSP_EXEC <= 0;
+			DSP_MPRO_SET <= '{128{0}};
 			REG_Q <= '0;
-			REG_RDY <= 0;
 		end else begin
 			if (!RES_N) begin
-				SCR <= '{32{'0}};
 				CR0 <= '0;
 				CR1 <= '0;
 				CR2 <= '0;
@@ -1169,6 +1384,8 @@ module SCSP (
 				CR17 <= '0;
 				CR18 <= '0;
 				CR19 <= '0;
+				DSP_EXEC <= 0;
+				DSP_MPRO_SET <= '{128{0}};
 			end else begin
 				DMA_EXEC_OLD <= DMA_EXEC;
 				if (!DMA_EXEC && DMA_EXEC_OLD) begin
@@ -1190,21 +1407,9 @@ module SCSP (
 					{CR12.SCIPD[10],CR18.MCIPD[10]} <= '1;
 				end
 
-				REG_RDY <= 0;
-				if (REG_WE && REG_CS) begin
-					if (REG_A[11:10] == 2'b00) begin
-						for (int i=0; i<32; i++) begin
-							if (REG_A[9:5] == i) begin
-								case ({REG_A[4:1],1'b0})
-									5'h00: begin
-										if (REG_WE[0]) SCR[i].SCR0[ 7:0] <= REG_D[ 7:0] & SCR0_MASK[ 7:0];
-										if (REG_WE[1]) SCR[i].SCR0[15:8] <= REG_D[15:8] & SCR0_MASK[15:8];
-									end
-									default:;
-								endcase
-							end
-						end
-					end else if (REG_A[11:9] == 3'b010) begin
+				REG_RD_DELAY <= REG_RD;
+				if (REG_WE && CYCLE1_CE) begin
+					if (REG_A[11:9] == 3'b010) begin
 						case ({REG_A[5:1],1'b0})
 							6'h00: begin
 								if (REG_WE[0]) CR0[ 7:0] <= REG_D[ 7:0] & CR0_MASK[ 7:0];
@@ -1228,16 +1433,16 @@ module SCSP (
 								if (REG_WE[1]) CR4[15:11] <= REG_D[15:11];
 							end
 							6'h12: begin
-								if (REG_WE[0]) CR5[ 7:0] <= REG_D[ 7:0] & CR5_MASK[ 7:0];
-								if (REG_WE[1]) CR5[15:8] <= REG_D[15:8] & CR5_MASK[15:8];
+								if (REG_WE[0] && !DMA_EXEC) CR5[ 7:0] <= REG_D[ 7:0] & CR5_MASK[ 7:0];
+								if (REG_WE[1] && !DMA_EXEC) CR5[15:8] <= REG_D[15:8] & CR5_MASK[15:8];
 							end
 							6'h14: begin
-								if (REG_WE[0]) CR6[ 7:0] <= REG_D[ 7:0] & CR6_MASK[ 7:0];
-								if (REG_WE[1]) CR6[15:8] <= REG_D[15:8] & CR6_MASK[15:8];
+								if (REG_WE[0] && !DMA_EXEC) CR6[ 7:0] <= REG_D[ 7:0] & CR6_MASK[ 7:0];
+								if (REG_WE[1] && !DMA_EXEC) CR6[15:8] <= REG_D[15:8] & CR6_MASK[15:8];
 							end
 							6'h16: begin
-								if (REG_WE[0]) CR7[ 7:0] <= REG_D[ 7:0] & CR7_MASK[ 7:0];
-								if (REG_WE[1]) CR7[15:8] <= REG_D[15:8] & CR7_MASK[15:8];
+								if (REG_WE[0] && !DMA_EXEC) CR7[ 7:0] <= REG_D[ 7:0] & CR7_MASK[ 7:0];
+								if (REG_WE[1] && !DMA_EXEC) CR7[15:8] <= REG_D[15:8] & CR7_MASK[15:8];
 							end
 							6'h18: begin
 								if (REG_WE[0]) CR8[ 7:0] <= REG_D[ 7:0] & CR8_MASK[ 7:0];
@@ -1294,9 +1499,11 @@ module SCSP (
 	//				end else if (REG_A[11:9] == 3'b011) begin
 	//					if (MEM_WE[0]) STACK[REG_A[7:1]][ 7:0] <= MEM_D[ 7:0];
 	//					if (MEM_WE[1]) STACK[REG_A[7:1]][15:8] <= MEM_D[15:8];
+					end else if (MPRO_SEL) begin
+						if (REG_A[9:3] == 10'h3F8>>3) DSP_EXEC <= 1;
+						if (REG_A[2:1] == 2'b11) DSP_MPRO_SET[REG_A[9:3]] <= 1;
 					end
-					REG_RDY <= 1;
-				end else if (REG_RD && REG_CS) begin
+				end else if (REG_RD_DELAY) begin
 					if (REG_A[11:10] == 2'b00) begin
 						for (int i=0; i<32; i++) begin
 							if (REG_A[9:5] == i) begin
@@ -1364,16 +1571,22 @@ module SCSP (
 							1'b0: REG_Q <= MEMS_RAM_Q[15: 0] & MEMS_MASK[15: 0];
 							1'b1: REG_Q <= MEMS_RAM_Q[31:16] & MEMS_MASK[31:16];
 						endcase
+					end else if (MIXS_SEL) begin
+						case (REG_A[1])
+							1'b0: REG_Q <= MIXS_RAM_Q[15: 0] & MIXS_MASK[15: 0];
+							1'b1: REG_Q <= MIXS_RAM_Q[31:16] & MIXS_MASK[31:16];
+						endcase
 					end else if (EFREG_SEL) begin
 						REG_Q <= EFREG_RAM_Q & EFREG_MASK;
+					end else if (EXTS_SEL) begin
+						REG_Q <= DSP_EXTS[REG_A[1]];
 					end else begin
 						REG_Q <= '0;
 					end
-					REG_RDY <= 1;
 				end
 				
-				if (OP3_PIPE.SLOT == CR4.MSLC && SLOT_CE) begin
-					CR4.CA <= OP3_SAOI[15:12];
+				if (OP3.SLOT == CR4.MSLC && SLOT1_CE) begin
+					CR4.CA <= SAO[15:12];
 //					case (EGST[CR4.MSLC])
 //						EGS_ATTACK: CR4.SGC <= 2'b00;
 //						EGS_DECAY1: CR4.SGC <= 2'b01;
@@ -1387,113 +1600,109 @@ module SCSP (
 	end
 	
 	
-	wire       SCR_SEL = REG_A[11:10] == 2'b00;
-	wire       REG_RDEN = REG_CS;//~(SLOT_EN | DSP_EN);
-	wire       REG_WREN = REG_CS;//~(SLOT_EN | DSP_EN);
-	
-	wire       SCR_SCR0_SEL  = SCR_SEL & (REG_A[4:1] == 5'h00>>1) & REG_CS;
+	wire       SCR_SEL = REG_A[11:10] == 2'b00;	
+	wire       SCR_SCR0_SEL  = SCR_SEL & (REG_A[4:1] == 5'h00>>1);
 	bit [15:0] SCR_SCR0_Q;
-	SCSP_SPRAM SCR_SCR0(CLK, REG_A[9:5], REG_D & SCR0_MASK , (REG_WE & {2{SCR_SCR0_SEL}}), (REG_RDEN ? REG_A[9:5] : OP3_PIPE.SLOT), SCR_SCR0_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR0(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR0_SEL}}), (REG_RD ? REG_A[9:5] : OP2.SLOT), SCR_SCR0_Q);
 	
-	wire       SCR_SA_SEL   = SCR_SEL & (REG_A[4:1] == 5'h02>>1) & REG_CS;
+	wire       SCR_SA_SEL   = SCR_SEL & (REG_A[4:1] == 5'h02>>1);
 	bit [15:0] SCR_SA_Q;
-	SCSP_SPRAM SCR_SA  (CLK, REG_A[9:5], REG_D & SA_MASK  , (REG_WE & {2{SCR_SA_SEL}})  , (REG_RDEN ? REG_A[9:5] : OP3_PIPE.SLOT), SCR_SA_Q);
+	SCSP_RAM_8X2 #(5) SCR_SA  (CLK, REG_A[9:5], REG_D  , (REG_WE & {2{SCR_SA_SEL}})  , (REG_RD ? REG_A[9:5] : OP2.SLOT), SCR_SA_Q);
 	
-	wire       SCR_LSA_SEL  = SCR_SEL & (REG_A[4:1] == 5'h04>>1) & REG_CS;
+	wire       SCR_LSA_SEL  = SCR_SEL & (REG_A[4:1] == 5'h04>>1);
 	bit [15:0] SCR_LSA_Q;
-	SCSP_SPRAM SCR_LSA (CLK, REG_A[9:5], REG_D & LSA_MASK , (REG_WE & {2{SCR_LSA_SEL}}) , (REG_RDEN ? REG_A[9:5] : OP2_PIPE.SLOT), SCR_LSA_Q);
+	SCSP_RAM_8X2 #(5) SCR_LSA (CLK, REG_A[9:5], REG_D , (REG_WE & {2{SCR_LSA_SEL}}) , (REG_RD ? REG_A[9:5] : OP2.SLOT), SCR_LSA_Q);
 	
-	wire       SCR_LEA_SEL  = SCR_SEL & (REG_A[4:1] == 5'h06>>1) & REG_CS;
+	wire       SCR_LEA_SEL  = SCR_SEL & (REG_A[4:1] == 5'h06>>1);
 	bit [15:0] SCR_LEA_Q;
-	SCSP_SPRAM SCR_LEA (CLK, REG_A[9:5], REG_D & LEA_MASK , (REG_WE & {2{SCR_LEA_SEL}}) , (REG_RDEN ? REG_A[9:5] : OP2_PIPE.SLOT), SCR_LEA_Q);
+	SCSP_RAM_8X2 #(5) SCR_LEA (CLK, REG_A[9:5], REG_D , (REG_WE & {2{SCR_LEA_SEL}}) , (REG_RD ? REG_A[9:5] : OP2.SLOT), SCR_LEA_Q);
 	
-	wire       SCR_SCR1_SEL = SCR_SEL & (REG_A[4:1] == 5'h08>>1) & REG_CS;
+	wire       SCR_SCR1_SEL = SCR_SEL & (REG_A[4:1] == 5'h08>>1);
 	bit [15:0] SCR_SCR1_Q;
-	SCSP_SPRAM SCR_SCR1(CLK, REG_A[9:5], REG_D & SCR1_MASK, (REG_WE & {2{SCR_SCR1_SEL}}), (REG_RDEN ? REG_A[9:5] : OP4_PIPE.SLOT), SCR_SCR1_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR1(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR1_SEL}}), (REG_RD ? REG_A[9:5] : OP4.SLOT), SCR_SCR1_Q);
 	
-	wire       SCR_SCR2_SEL = SCR_SEL & (REG_A[4:1] == 5'h0A>>1) & REG_CS;
+	wire       SCR_SCR2_SEL = SCR_SEL & (REG_A[4:1] == 5'h0A>>1);
 	bit [15:0] SCR_SCR2_Q;
-	SCSP_SPRAM SCR_SCR2(CLK, REG_A[9:5], REG_D & SCR2_MASK, (REG_WE & {2{SCR_SCR2_SEL}}), (REG_RDEN ? REG_A[9:5] : OP4_PIPE.SLOT), SCR_SCR2_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR2(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR2_SEL}}), (REG_RD ? REG_A[9:5] : OP4.SLOT), SCR_SCR2_Q);
 	
-	wire       SCR_SCR3_SEL = SCR_SEL & (REG_A[4:1] == 5'h0C>>1) & REG_CS;
+	wire       SCR_SCR3_SEL = SCR_SEL & (REG_A[4:1] == 5'h0C>>1);
 	bit [15:0] SCR_SCR3_Q;
-	SCSP_SPRAM SCR_SCR3(CLK, REG_A[9:5], REG_D & SCR3_MASK, (REG_WE & {2{SCR_SCR3_SEL}}), (REG_RDEN ? REG_A[9:5] : OP5_PIPE.SLOT), SCR_SCR3_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR3(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR3_SEL}}), (REG_RD ? REG_A[9:5] : OP6.SLOT), SCR_SCR3_Q);
 	
-	wire       SCR_SCR4_SEL = SCR_SEL & (REG_A[4:1] == 5'h0E>>1) & REG_CS;
+	wire       SCR_SCR4_SEL = SCR_SEL & (REG_A[4:1] == 5'h0E>>1);
 	bit [15:0] SCR_SCR4_Q;
-	SCSP_SPRAM SCR_SCR4(CLK, REG_A[9:5], REG_D & SCR4_MASK, (REG_WE & {2{SCR_SCR4_SEL}}), (REG_RDEN ? REG_A[9:5] : OP2_PIPE.SLOT), SCR_SCR4_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR4(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR4_SEL}}), (REG_RD ? REG_A[9:5] : OP2.SLOT), SCR_SCR4_Q);
 	
-	wire       SCR_SCR5_SEL = SCR_SEL & (REG_A[4:1] == 5'h10>>1) & REG_CS;
+	wire       SCR_SCR5_SEL = SCR_SEL & (REG_A[4:1] == 5'h10>>1);
 	bit [15:0] SCR_SCR5_Q;
-	SCSP_SPRAM SCR_SCR5(CLK, REG_A[9:5], REG_D & SCR5_MASK, (REG_WE & {2{SCR_SCR5_SEL}}), (REG_RDEN ? REG_A[9:5] :          SLOT), SCR_SCR5_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR5(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR5_SEL}}), (REG_RD ? REG_A[9:5] :     SLOT), SCR_SCR5_Q);
 	
-	wire       SCR_SCR6_SEL = SCR_SEL & (REG_A[4:1] == 5'h12>>1) & REG_CS;
+	wire       SCR_SCR6_SEL = SCR_SEL & (REG_A[4:1] == 5'h12>>1);
 	bit [15:0] SCR_SCR6_Q;
-	SCSP_SPRAM SCR_SCR6(CLK, REG_A[9:5], REG_D & SCR6_MASK, (REG_WE & {2{SCR_SCR6_SEL}}), (REG_RDEN ? REG_A[9:5] :          SLOT), SCR_SCR6_Q);
-	
-	wire       SCR_SCR7_SEL = SCR_SEL & (REG_A[4:1] == 5'h14>>1) & REG_CS;
+	SCSP_RAM_8X2 #(5) SCR_SCR6(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR6_SEL}}), (REG_RD ? REG_A[9:5] :     SLOT), SCR_SCR6_Q);
+
+	wire       SCR_SCR7_SEL = SCR_SEL & (REG_A[4:1] == 5'h14>>1);
 	bit [15:0] SCR_SCR7_Q;
-	SCSP_SPRAM SCR_SCR7(CLK, REG_A[9:5], REG_D & SCR7_MASK, (REG_WE & {2{SCR_SCR7_SEL}}), (REG_RDEN ? REG_A[9:5] :          SLOT), SCR_SCR7_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR7(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR7_SEL}}), (REG_RD ? REG_A[9:5] :     SLOT), SCR_SCR7_Q);
 	
-	wire       SCR_SCR8_SEL = SCR_SEL & (REG_A[4:1] == 5'h16>>1) & REG_CS;
+	wire       SCR_SCR8_SEL = SCR_SEL & (REG_A[4:1] == 5'h16>>1);
 	bit [15:0] SCR_SCR8_Q;
-	SCSP_SPRAM SCR_SCR8(CLK, REG_A[9:5], REG_D & SCR8_MASK, (REG_WE & {2{SCR_SCR8_SEL}}), (REG_RDEN ? REG_A[9:5] : OP7_PIPE.SLOT), SCR_SCR8_Q);
+	SCSP_RAM_8X2 #(5) SCR_SCR8(CLK, REG_A[9:5], REG_D, (REG_WE & {2{SCR_SCR8_SEL}}), (REG_RD ? REG_A[9:5] : OP7.SLOT), SCR_SCR8_Q);
 	
 	//STACK,100600-10067F
-	wire       SOUS_SEL = REG_A[11:7] == 5'b01100 & REG_CS;
+	wire       SOUS_SEL = REG_A[11:7] == 5'b01100;
 	bit [15:0] STACK0X_Q,STACK0Y_Q,STACK1_Q;
-	SCSP_SPRAM STACK1 (CLK, OP7_PIPE.SLOT, OP7_SD,   {2{SLOT_CE}}, OP7_PIPE.SLOT             , STACK1_Q);
-	SCSP_SPRAM STACK0X(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, OP2_PIPE.SLOT + SCR4.MDXSL, STACK0X_Q);
-	SCSP_SPRAM STACK0Y(CLK, OP7_PIPE.SLOT, STACK1_Q, {2{SLOT_CE}}, OP2_PIPE.SLOT + SCR4.MDYSL, STACK0Y_Q);
+	SCSP_STACK_RAM STACK1 (CLK, OP7.SLOT, OP7.SD,   {2{~OP7.STWINH&SLOT1_CE}}, OP7.SLOT             , STACK1_Q);
+	SCSP_STACK_RAM STACK0X(CLK, OP7.SLOT, STACK1_Q, {2{            SLOT1_CE}}, OP2.SLOT + SCR4.MDXSL, STACK0X_Q);
+	SCSP_STACK_RAM STACK0Y(CLK, OP7.SLOT, STACK1_Q, {2{            SLOT1_CE}}, OP2.SLOT + SCR4.MDYSL, STACK0Y_Q);
 	
 	//COEF,100700-10077F
-	wire       COEF_SEL = REG_A[11:7] == 5'b01110 & REG_CS;
+	wire       COEF_SEL = REG_A[11:7] == 5'b01110;
 	bit [15:0] COEF_RAM_Q;
-//	SCSP_RAM_8X2 #(6) COEF_RAM (CLK, REG_A[6:1], REG_D & COEF_MASK, (REG_WE & {2{COEF_SEL}}), (REG_RDEN ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
-	SCSP_COEF_RAM COEF_RAM (CLK, REG_A[6:1], REG_D & COEF_MASK, (REG_WE & {2{COEF_SEL}}), (REG_RDEN ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
+	SCSP_RAM_8X2 #(6) COEF_RAM (CLK, REG_A[6:1], REG_D, REG_WE & {2{COEF_SEL}} & {2{CYCLE1_CE}}, (REG_RD ? REG_A[6:1] : DSP_COEF_RA), COEF_RAM_Q);
 	
 	//MADRS,100780-1007BF
-	wire       MADRS_SEL = REG_A[11:6] == 6'b011110 & REG_CS;
+	wire       MADRS_SEL = REG_A[11:6] == 6'b011110;
 	bit [15:0] MADRS_RAM_Q;
-//	SCSP_RAM_8X2 #(5) MADRS_RAM (CLK, REG_A[5:1], REG_D & MADRS_MASK, (REG_WE & {2{MADRS_SEL}}), (REG_RDEN ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
-	SCSP_ADRS_RAM MADRS_RAM (CLK, REG_A[5:1], REG_D & MADRS_MASK, (REG_WE & {2{MADRS_SEL}}), (REG_RDEN ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
+	SCSP_RAM_8X2 #(5) MADRS_RAM (CLK, REG_A[5:1], REG_D, REG_WE & {2{MADRS_SEL}} & {2{CYCLE1_CE}}, (REG_RD ? REG_A[5:1] : DSP_MADRS_RA), MADRS_RAM_Q);
 	
 	//MPRO,100800-100BFF
 	wire       MPRO_SEL = REG_A[11:10] == 2'b10;
-	wire       MPRO0_SEL = MPRO_SEL & (REG_A[2:1] == 3'h0>>1) & REG_CS;
-	wire       MPRO1_SEL = MPRO_SEL & (REG_A[2:1] == 3'h2>>1) & REG_CS;
-	wire       MPRO2_SEL = MPRO_SEL & (REG_A[2:1] == 3'h4>>1) & REG_CS;
-	wire       MPRO3_SEL = MPRO_SEL & (REG_A[2:1] == 3'h6>>1) & REG_CS;
+	wire       MPRO0_SEL = MPRO_SEL & (REG_A[2:1] == 3'h0>>1);
+	wire       MPRO1_SEL = MPRO_SEL & (REG_A[2:1] == 3'h2>>1);
+	wire       MPRO2_SEL = MPRO_SEL & (REG_A[2:1] == 3'h4>>1);
+	wire       MPRO3_SEL = MPRO_SEL & (REG_A[2:1] == 3'h6>>1);
 	bit [63:0] MPRO_RAM_Q;
-//	SCSP_BRAM_8X2 #(7) MPRO0_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[63:48], (REG_WE & {2{MPRO0_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[63:48]);
-//	SCSP_BRAM_8X2 #(7) MPRO1_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[47:32], (REG_WE & {2{MPRO1_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[47:32]);
-//	SCSP_BRAM_8X2 #(7) MPRO2_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[31:16], (REG_WE & {2{MPRO2_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[31:16]);
-//	SCSP_BRAM_8X2 #(7) MPRO3_RAM (CLK, REG_A[9:3], REG_D & MPRO_MASK[15: 0], (REG_WE & {2{MPRO3_SEL}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q[15: 0]);
-	SCSP_MPRO_RAM MPRO_RAM (CLK, REG_A[9:3], {4{REG_D}} & MPRO_MASK, ({4{REG_WE}} & {{2{MPRO0_SEL}},{2{MPRO1_SEL}},{2{MPRO2_SEL}},{2{MPRO3_SEL}}}), (REG_RDEN ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q);
+	SCSP_MPRO_RAM MPRO_RAM (CLK, REG_A[9:3], {4{REG_D}}, ({4{REG_WE}} & {{2{MPRO0_SEL}},{2{MPRO1_SEL}},{2{MPRO2_SEL}},{2{MPRO3_SEL}}}), (REG_RD ? REG_A[9:3] : DSP_MPRO_STEP), MPRO_RAM_Q);
 	
 	//TEMP,100C00-100DFF
 	wire       TEMP_SEL = REG_A[11:9] == 3'b110;
-	wire       TEMP0_SEL = TEMP_SEL & (REG_A[1:1] == 2'h0>>1) & REG_CS;
-	wire       TEMP1_SEL = TEMP_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
+	wire       TEMP0_SEL = TEMP_SEL & (REG_A[1:1] == 2'h0>>1);
+	wire       TEMP1_SEL = TEMP_SEL & (REG_A[1:1] == 2'h2>>1);
 	bit [31:0] TEMP_RAM_Q;
-//	SCSP_RAM_8X2 #(7) TEMP1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[31:16] : DSP_TEMP_D), (REG_WE & {2{TEMP0_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[31:16]);
-//	SCSP_RAM_8X2 #(7) TEMP0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? REG_D & TEMP_MASK[15: 0] : DSP_TEMP_D), (REG_WE & {2{TEMP1_SEL}}) | {2{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q[15: 0]);
-	SCSP_TEMP_RAM TEMP_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_TEMP_WA), (REG_WREN ? {2{REG_D}} & TEMP_MASK : {8'h00,DSP_TEMP_D}), ({2{REG_WE}} & {{2{TEMP0_SEL}},{2{TEMP1_SEL}}}) | {4{DSP_TEMP_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_TEMP_RA), TEMP_RAM_Q);
+	SCSP_RAM_8X4 #(7) TEMP_RAM (CLK, (DSP_TEMP_WE ? DSP_TEMP_WA : REG_A[8:2]), (DSP_TEMP_WE ? {DSP_TEMP_D[23:8],8'h00,DSP_TEMP_D[7:0]} : {2{REG_D}}), (({2{REG_WE}} & {{2{TEMP0_SEL}},{2{TEMP1_SEL}}}) | {4{DSP_TEMP_WE}}) & {4{CYCLE1_CE}}, (REG_RD ? REG_A[8:2] : DSP_TEMP_RA), TEMP_RAM_Q);
 	
 	//MEMS,100E00-100E7F
 	wire       MEMS_SEL = REG_A[11:7] == 5'b11100;
-	wire       MEMS0_SEL = MEMS_SEL & (REG_A[1:1] == 2'h0>>1) & REG_CS;
-	wire       MEMS1_SEL = MEMS_SEL & (REG_A[1:1] == 2'h2>>1) & REG_CS;
+	wire       MEMS0_SEL = MEMS_SEL & (REG_A[1:1] == 2'h0>>1);
+	wire       MEMS1_SEL = MEMS_SEL & (REG_A[1:1] == 2'h2>>1);
 	bit [31:0] MEMS_RAM_Q;
-//	SCSP_RAM_8X2 #(5) MEMS1_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[31:16] : DSP_MEMS_D), (REG_WE & {2{MEMS0_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[31:16]);
-//	SCSP_RAM_8X2 #(5) MEMS0_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? REG_D & MEMS_MASK[15: 0] : DSP_MEMS_D), (REG_WE & {2{MEMS1_SEL}}) | {2{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q[15: 0]);
-	SCSP_MEMS_RAM MEMS_RAM (CLK, (REG_WREN ? REG_A[6:2] : DSP_MEMS_WA), (REG_WREN ? {2{REG_D}} & MEMS_MASK : {8'h00,DSP_MEMS_D}), (REG_WE & {{2{MEMS0_SEL}},{2{MEMS1_SEL}}}) | {4{DSP_MEMS_WE&DSP_CE}}, (REG_RDEN ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q);
+	SCSP_RAM_8X4 #(5) MEMS_RAM (CLK, (DSP_MEMS_WE ? DSP_MEMS_WA : REG_A[6:2]), (DSP_MEMS_WE ? {DSP_MEMS_D[23:8],8'h00,DSP_MEMS_D[7:0]} : {2{REG_D}}), ((REG_WE & {{2{MEMS0_SEL}},{2{MEMS1_SEL}}}) | {4{DSP_MEMS_WE}}) & {4{CYCLE1_CE}}, (REG_RD ? REG_A[6:2] : DSP_MEMS_RA), MEMS_RAM_Q);
+	
+	//MIXS,100E80-100EBF
+	wire       MIXS_SEL = REG_A[11:6] == 12'hE80>>6;
+	wire       MIXS0_SEL = MIXS_SEL & (REG_A[1:1] == 2'h0>>1);
+	wire       MIXS1_SEL = MIXS_SEL & (REG_A[1:1] == 2'h2>>1);
+	bit [31:0] MIXS_RAM_Q;
+	SCSP_RAM_8X4 #(4) MIXS_RAM (CLK, (PCM_MIXS_WE ? PCM_MIXS_WA : REG_A[5:2]), (PCM_MIXS_WE ? {PCM_MIXS_D[19:4],12'h000,PCM_MIXS_D[3:0]} : {2{REG_D}}), ((REG_WE & {{2{MIXS0_SEL}},{2{MIXS1_SEL}}}) | {4{PCM_MIXS_WE}}) & {4{CYCLE1_CE}}, (PCM_MIXS_RD ? PCM_MIXS_RA : REG_RD ? REG_A[5:2] : DSP_MIXS_RA), MIXS_RAM_Q);
 	
 	//EFREG,100EC0-100EDF
-	wire       EFREG_SEL = REG_A[11:5] == 7'b1110110 & REG_CS;
+	wire       EFREG_SEL = REG_A[11:5] == 7'b1110110;
 	bit [15:0] EFREG_RAM_Q;
-	SCSP_RAM_8X2 #(4) EFREG_RAM (CLK, (REG_WREN ? REG_A[4:1] : DSP_EFREG_WA), (REG_WREN ? REG_D & EFREG_MASK : DSP_EFREG_D), (REG_WE & {2{EFREG_SEL}}) | {2{DSP_EFREG_WE&DSP_CE}}, (REG_RDEN ? REG_A[4:1] : DSP_EFREG_RA), EFREG_RAM_Q);
+	SCSP_RAM_8X2 #(4) EFREG_RAM (CLK, (DSP_EFREG_WE ? DSP_EFREG_WA : REG_A[4:1]), (DSP_EFREG_WE ? DSP_EFREG_D : REG_D), ((REG_WE & {2{EFREG_SEL}}) | {2{DSP_EFREG_WE}}) & {2{CYCLE1_CE}}, (REG_RD ? REG_A[4:1] : DSP_EFREG_RA), EFREG_RAM_Q);
 	
+	//EXTS,100EE0-100EE3
+	wire       EXTS_SEL = REG_A[11:2] == 12'hEE0>>2;
 	
 	
 	
@@ -1508,18 +1717,15 @@ module SCSP (
 		else                                      ILV = 3'b000;
 	end
 	
-//	assign DO = MEM_Q;
 	assign RDY_N = ~(SCU_RRDY & SCU_WRDY);
 	assign INT_N = ~|(CR18.MCIPD & CR17.MCIEB);
 	
 	assign SCIPL_N = ~ILV;
-//	assign SCDO = MEM_Q;
 	assign SCAVEC_N = ~&SCFC;
 	
 `ifdef DEBUG
-	assign SLOT_EN_DBG = SLOT_EN;
+	assign PCM_EN_DBG = PCM_EN;
 	assign SCA_DBG = {SCA,1'b0};
-	assign SCR0_DBG_ = SCR0_;
 	assign SCR0_DBG = SCR0;
 	assign SA_DBG   = SA;
 	assign LSA_DBG  = LSA;
@@ -1532,20 +1738,27 @@ module SCSP (
 	assign SCR6_DBG = SCR6;
 	assign SCR7_DBG = SCR7;
 	assign SCR8_DBG = SCR8;
+	assign EST_DBG = EST;
+	assign OP4_EFF_RATE_DBG = EFF_RATE;
+	assign ENV_SAMPLE_CNT_DBG = ENV_SAMPLE_CNT;
+	assign ENV_STEP_CNT_DBG = ENV_STEP_CNT;
+	assign DSP_MPRO_DBG = MPRO_Q;
 	assign ADP_DBG = ADP;
 `endif
 	
 endmodule
 
-module SCSP_SAO_RAM (
+module SCSP_PHASE_RAM (
 	input	         CLK,
 	input	 [ 4: 0] WRADDR,
-	input	 [26: 0] DATA,
+	input	 [17: 0] DATA,
 	input	         WREN,
 	input	 [ 4: 0] RDADDR,
-	output [26: 0] Q);
+	output [17: 0] Q);
 
-	wire [26:0] sub_wire0;
+`ifdef DEBUG
+
+	wire [17:0] sub_wire0;
 
 	altdpram	altdpram_component (
 				.data (DATA),
@@ -1575,7 +1788,7 @@ module SCSP_SAO_RAM (
 		altdpram_component.rdcontrol_aclr = "OFF",
 		altdpram_component.rdcontrol_reg = "UNREGISTERED",
 		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component.width = 27,
+		altdpram_component.width = 18,
 		altdpram_component.widthad = 5,
 		altdpram_component.width_byteena = 1,
 		altdpram_component.wraddress_aclr = "OFF",
@@ -1584,19 +1797,287 @@ module SCSP_SAO_RAM (
 		altdpram_component.wrcontrol_reg = "INCLOCK";
 		
 	assign Q = sub_wire0;
+	
+`else
+
+	wire [17:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({18{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 18,
+		altsyncram_component.width_b = 18,
+		altsyncram_component.width_byteena_a = 1;
+	
+	assign Q = sub_wire0;
+	
+`endif
+
+endmodule
+
+module SCSP_SO_RAM (
+	input	         CLK,
+	input	 [ 4: 0] WRADDR,
+	input	 [16: 0] DATA,
+	input	         WREN,
+	input	 [ 4: 0] RDADDR,
+	output [16: 0] Q);
+
+`ifdef DEBUG
+
+	wire [16:0] sub_wire0;
+
+	altdpram	altdpram_component (
+				.data (DATA),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN),
+				.q (sub_wire0),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+				//.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component.indata_aclr = "OFF",
+		altdpram_component.indata_reg = "INCLOCK",
+		altdpram_component.intended_device_family = "Cyclone V",
+		altdpram_component.lpm_type = "altdpram",
+		altdpram_component.outdata_aclr = "OFF",
+		altdpram_component.outdata_reg = "UNREGISTERED",
+		altdpram_component.power_up_uninitialized = "TRUE",
+		altdpram_component.ram_block_type = "MLAB",
+		altdpram_component.rdaddress_aclr = "OFF",
+		altdpram_component.rdaddress_reg = "UNREGISTERED",
+		altdpram_component.rdcontrol_aclr = "OFF",
+		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component.width = 17,
+		altdpram_component.widthad = 5,
+		altdpram_component.width_byteena = 1,
+		altdpram_component.wraddress_aclr = "OFF",
+		altdpram_component.wraddress_reg = "INCLOCK",
+		altdpram_component.wrcontrol_aclr = "OFF",
+		altdpram_component.wrcontrol_reg = "INCLOCK";
+		
+	assign Q = sub_wire0;
+	
+`else
+
+	wire [16:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({17{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 17,
+		altsyncram_component.width_b = 17,
+		altsyncram_component.width_byteena_a = 1;
+	
+	assign Q = sub_wire0;
+	
+`endif
+
+endmodule
+
+module SCSP_ENV_CNT_RAM (
+	input	         CLK,
+	input	 [ 4: 0] WRADDR,
+	input	 [15: 0] DATA,
+	input	         WREN,
+	input	 [ 4: 0] RDADDR,
+	output [15: 0] Q);
+
+`ifdef DEBUG
+	
+	wire [15:0] sub_wire0;
+	
+	altdpram	altdpram_component (
+				.data (DATA),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN),
+				.q (sub_wire0),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+				//.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component.indata_aclr = "OFF",
+		altdpram_component.indata_reg = "INCLOCK",
+		altdpram_component.intended_device_family = "Cyclone V",
+		altdpram_component.lpm_type = "altdpram",
+		altdpram_component.outdata_aclr = "OFF",
+		altdpram_component.outdata_reg = "UNREGISTERED",
+		altdpram_component.power_up_uninitialized = "TRUE",
+		altdpram_component.ram_block_type = "MLAB",
+		altdpram_component.rdaddress_aclr = "OFF",
+		altdpram_component.rdaddress_reg = "UNREGISTERED",
+		altdpram_component.rdcontrol_aclr = "OFF",
+		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component.width = 16,
+		altdpram_component.widthad = 5,
+		altdpram_component.width_byteena = 1,
+		altdpram_component.wraddress_aclr = "OFF",
+		altdpram_component.wraddress_reg = "INCLOCK",
+		altdpram_component.wrcontrol_aclr = "OFF",
+		altdpram_component.wrcontrol_reg = "INCLOCK";
+		
+	assign Q = sub_wire0;
+	
+`else
+
+	wire [15:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({16{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 16,
+		altsyncram_component.width_b = 16,
+		altsyncram_component.width_byteena_a = 1;
+	
+	assign Q = sub_wire0;
+	
+`endif
 
 endmodule
 
 module SCSP_EVOL_RAM (
 	input	         CLK,
 	input	 [ 4: 0] WRADDR,
-	input	 [ 9: 0] DATA,
+	input	 [11: 0] DATA,
 	input	         WREN,
 	input	 [ 4: 0] RDADDR,
-	output [ 9: 0] Q);
+	output [11: 0] Q);
 
-	wire [9:0] sub_wire0;
-
+`ifdef DEBUG
+	
+	wire [11:0] sub_wire0;
+	
 	altdpram	altdpram_component (
 				.data (DATA),
 				.inclock (CLK),
@@ -1625,7 +2106,7 @@ module SCSP_EVOL_RAM (
 		altdpram_component.rdcontrol_aclr = "OFF",
 		altdpram_component.rdcontrol_reg = "UNREGISTERED",
 		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component.width = 10,
+		altdpram_component.width = 12,
 		altdpram_component.widthad = 5,
 		altdpram_component.width_byteena = 1,
 		altdpram_component.wraddress_aclr = "OFF",
@@ -1634,17 +2115,71 @@ module SCSP_EVOL_RAM (
 		altdpram_component.wrcontrol_reg = "INCLOCK";
 		
 	assign Q = sub_wire0;
+	
+`else
+
+	wire [11:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({12{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 32,
+		altsyncram_component.numwords_b = 32,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 5,
+		altsyncram_component.widthad_b = 5,
+		altsyncram_component.width_a = 12,
+		altsyncram_component.width_b = 12,
+		altsyncram_component.width_byteena_a = 1;
+	
+	assign Q = sub_wire0;
+	
+`endif
 
 endmodule
 
-module SCSP_SPRAM
+module SCSP_STACK_RAM
 (
 	input         CLK,
 	
-	input   [4:0] WADDR,
+	input   [4:0] WRADDR,
 	input  [15:0] DATA,
 	input   [1:0] WREN,
-	input   [4:0] RADDR,
+	input   [4:0] RDADDR,
 	output [15:0] Q
 );
 
@@ -1653,22 +2188,25 @@ module SCSP_SPRAM
 	reg [15:0] MEM [32];
 	
 	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WADDR] <= DATA;
+		if (WREN[0]) begin
+			MEM[WADDR][7:0] <= DATA[7:0];
+		end
+		if (WREN[1]) begin
+			MEM[WADDR][15:8] <= DATA[15:8];
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
 	
 `else
 
 	wire [15:0] sub_wire0;
 	
-	altdpram	altdpram_component_l (
+	altdpram	altdpram_component_0 (
 				.data (DATA[7:0]),
 				.inclock (CLK),
-				.rdaddress (RADDR),
-				.wraddress (WADDR),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
 				.wren (WREN[0]),
 				.q (sub_wire0[7:0]),
 				.aclr (1'b0),
@@ -1679,31 +2217,31 @@ module SCSP_SPRAM
 //				.sclr (1'b0),
 				.wraddressstall (1'b0));
 	defparam
-		altdpram_component_l.indata_aclr = "OFF",
-		altdpram_component_l.indata_reg = "INCLOCK",
-		altdpram_component_l.intended_device_family = "Cyclone V",
-		altdpram_component_l.lpm_type = "altdpram",
-		altdpram_component_l.outdata_aclr = "OFF",
-		altdpram_component_l.outdata_reg = "UNREGISTERED",
-		altdpram_component_l.ram_block_type = "MLAB",
-		altdpram_component_l.rdaddress_aclr = "OFF",
-		altdpram_component_l.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_l.rdcontrol_aclr = "OFF",
-		altdpram_component_l.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_l.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_l.width = 8,
-		altdpram_component_l.widthad = 5,
-		altdpram_component_l.width_byteena = 1,
-		altdpram_component_l.wraddress_aclr = "OFF",
-		altdpram_component_l.wraddress_reg = "INCLOCK",
-		altdpram_component_l.wrcontrol_aclr = "OFF",
-		altdpram_component_l.wrcontrol_reg = "INCLOCK";
+		altdpram_component_0.indata_aclr = "OFF",
+		altdpram_component_0.indata_reg = "INCLOCK",
+		altdpram_component_0.intended_device_family = "Cyclone V",
+		altdpram_component_0.lpm_type = "altdpram",
+		altdpram_component_0.outdata_aclr = "OFF",
+		altdpram_component_0.outdata_reg = "UNREGISTERED",
+		altdpram_component_0.ram_block_type = "MLAB",
+		altdpram_component_0.rdaddress_aclr = "OFF",
+		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_0.rdcontrol_aclr = "OFF",
+		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_0.width = 8,
+		altdpram_component_0.widthad = 5,
+		altdpram_component_0.width_byteena = 1,
+		altdpram_component_0.wraddress_aclr = "OFF",
+		altdpram_component_0.wraddress_reg = "INCLOCK",
+		altdpram_component_0.wrcontrol_aclr = "OFF",
+		altdpram_component_0.wrcontrol_reg = "INCLOCK";
 		
-	altdpram	altdpram_component_h (
+	altdpram	altdpram_component_1 (
 				.data (DATA[15:8]),
 				.inclock (CLK),
-				.rdaddress (RADDR),
-				.wraddress (WADDR),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
 				.wren (WREN[1]),
 				.q (sub_wire0[15:8]),
 				.aclr (1'b0),
@@ -1714,25 +2252,25 @@ module SCSP_SPRAM
 //				.sclr (1'b0),
 				.wraddressstall (1'b0));
 	defparam
-		altdpram_component_h.indata_aclr = "OFF",
-		altdpram_component_h.indata_reg = "INCLOCK",
-		altdpram_component_h.intended_device_family = "Cyclone V",
-		altdpram_component_h.lpm_type = "altdpram",
-		altdpram_component_h.outdata_aclr = "OFF",
-		altdpram_component_h.outdata_reg = "UNREGISTERED",
-		altdpram_component_h.ram_block_type = "MLAB",
-		altdpram_component_h.rdaddress_aclr = "OFF",
-		altdpram_component_h.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_h.rdcontrol_aclr = "OFF",
-		altdpram_component_h.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_h.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_h.width = 8,
-		altdpram_component_h.widthad = 5,
-		altdpram_component_h.width_byteena = 1,
-		altdpram_component_h.wraddress_aclr = "OFF",
-		altdpram_component_h.wraddress_reg = "INCLOCK",
-		altdpram_component_h.wrcontrol_aclr = "OFF",
-		altdpram_component_h.wrcontrol_reg = "INCLOCK";
+		altdpram_component_1.indata_aclr = "OFF",
+		altdpram_component_1.indata_reg = "INCLOCK",
+		altdpram_component_1.intended_device_family = "Cyclone V",
+		altdpram_component_1.lpm_type = "altdpram",
+		altdpram_component_1.outdata_aclr = "OFF",
+		altdpram_component_1.outdata_reg = "UNREGISTERED",
+		altdpram_component_1.ram_block_type = "MLAB",
+		altdpram_component_1.rdaddress_aclr = "OFF",
+		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_1.rdcontrol_aclr = "OFF",
+		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_1.width = 8,
+		altdpram_component_1.widthad = 5,
+		altdpram_component_1.width_byteena = 1,
+		altdpram_component_1.wraddress_aclr = "OFF",
+		altdpram_component_1.wraddress_reg = "INCLOCK",
+		altdpram_component_1.wrcontrol_aclr = "OFF",
+		altdpram_component_1.wrcontrol_reg = "INCLOCK";
 	
 	assign Q = sub_wire0;
 	
@@ -1747,10 +2285,10 @@ module SCSP_RAM_8X2
 (
 	input         CLK,
 	
-	input  [addr_width-1:0] WADDR,
+	input  [addr_width-1:0] WRADDR,
 	input            [15:0] DATA,
 	input             [1:0] WREN,
-	input  [addr_width-1:0] RADDR,
+	input  [addr_width-1:0] RDADDR,
 	output           [15:0] Q
 );
 
@@ -1759,22 +2297,419 @@ module SCSP_RAM_8X2
 	reg [15:0] MEM [1**addr_width];
 	
 	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WADDR] <= DATA;
+		if (WREN[0]) begin
+			MEM[WRADDR][7:0] <= DATA[7:0];
+		end
+		if (WREN[1]) begin
+			MEM[WRADDR][15:8] <= DATA[15:8];
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
+
+	wire [15:0] sub_wire0;
+	
+	altdpram	altdpram_component_0 (
+				.data (DATA[7:0]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[0]),
+				.q (sub_wire0[7:0]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_0.indata_aclr = "OFF",
+		altdpram_component_0.indata_reg = "INCLOCK",
+		altdpram_component_0.intended_device_family = "Cyclone V",
+		altdpram_component_0.lpm_type = "altdpram",
+		altdpram_component_0.outdata_aclr = "OFF",
+		altdpram_component_0.outdata_reg = "UNREGISTERED",
+		altdpram_component_0.ram_block_type = "MLAB",
+		altdpram_component_0.rdaddress_aclr = "OFF",
+		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_0.rdcontrol_aclr = "OFF",
+		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_0.width = 8,
+		altdpram_component_0.widthad = addr_width,
+		altdpram_component_0.width_byteena = 1,
+		altdpram_component_0.wraddress_aclr = "OFF",
+		altdpram_component_0.wraddress_reg = "INCLOCK",
+		altdpram_component_0.wrcontrol_aclr = "OFF",
+		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_1 (
+				.data (DATA[15:8]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[1]),
+				.q (sub_wire0[15:8]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_1.indata_aclr = "OFF",
+		altdpram_component_1.indata_reg = "INCLOCK",
+		altdpram_component_1.intended_device_family = "Cyclone V",
+		altdpram_component_1.lpm_type = "altdpram",
+		altdpram_component_1.outdata_aclr = "OFF",
+		altdpram_component_1.outdata_reg = "UNREGISTERED",
+		altdpram_component_1.ram_block_type = "MLAB",
+		altdpram_component_1.rdaddress_aclr = "OFF",
+		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_1.rdcontrol_aclr = "OFF",
+		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_1.width = 8,
+		altdpram_component_1.widthad = addr_width,
+		altdpram_component_1.width_byteena = 1,
+		altdpram_component_1.wraddress_aclr = "OFF",
+		altdpram_component_1.wraddress_reg = "INCLOCK",
+		altdpram_component_1.wrcontrol_aclr = "OFF",
+		altdpram_component_1.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
 	
 `else
+
+	wire [15:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({16{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 2**addr_width,
+		altsyncram_component.numwords_b = 2**addr_width,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = addr_width,
+		altsyncram_component.widthad_b = addr_width,
+		altsyncram_component.width_a = 16,
+		altsyncram_component.width_b = 16,
+		altsyncram_component.width_byteena_a = 2;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_RAM_8X4
+#(
+	parameter addr_width = 5
+)
+(
+	input         CLK,
+	
+	input  [addr_width-1:0] WRADDR,
+	input            [31:0] DATA,
+	input             [3:0] WREN,
+	input  [addr_width-1:0] RDADDR,
+	output           [31:0] Q
+);
+
+`ifdef SIM
+	
+	reg [31:0] MEM [1**addr_width];
+	
+	always @(posedge CLK) begin
+		if (WREN[0]) begin
+			MEM[WRADDR][7:0] <= DATA[7:0];
+		end
+		if (WREN[1]) begin
+			MEM[WRADDR][15:8] <= DATA[15:8];
+		end
+		if (WREN[2]) begin
+			MEM[WRADDR][23:16] <= DATA[23:16];
+		end
+		if (WREN[3]) begin
+			MEM[WRADDR][31:24] <= DATA[31:24];
+		end
+	end
+		
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
+
+	wire [31:0] sub_wire0;
+	
+	altdpram	altdpram_component_0 (
+				.data (DATA[7:0]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[0]),
+				.q (sub_wire0[7:0]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_0.indata_aclr = "OFF",
+		altdpram_component_0.indata_reg = "INCLOCK",
+		altdpram_component_0.intended_device_family = "Cyclone V",
+		altdpram_component_0.lpm_type = "altdpram",
+		altdpram_component_0.outdata_aclr = "OFF",
+		altdpram_component_0.outdata_reg = "UNREGISTERED",
+		altdpram_component_0.ram_block_type = "MLAB",
+		altdpram_component_0.rdaddress_aclr = "OFF",
+		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_0.rdcontrol_aclr = "OFF",
+		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_0.width = 8,
+		altdpram_component_0.widthad = addr_width,
+		altdpram_component_0.width_byteena = 1,
+		altdpram_component_0.wraddress_aclr = "OFF",
+		altdpram_component_0.wraddress_reg = "INCLOCK",
+		altdpram_component_0.wrcontrol_aclr = "OFF",
+		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_1 (
+				.data (DATA[15:8]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[1]),
+				.q (sub_wire0[15:8]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_1.indata_aclr = "OFF",
+		altdpram_component_1.indata_reg = "INCLOCK",
+		altdpram_component_1.intended_device_family = "Cyclone V",
+		altdpram_component_1.lpm_type = "altdpram",
+		altdpram_component_1.outdata_aclr = "OFF",
+		altdpram_component_1.outdata_reg = "UNREGISTERED",
+		altdpram_component_1.ram_block_type = "MLAB",
+		altdpram_component_1.rdaddress_aclr = "OFF",
+		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_1.rdcontrol_aclr = "OFF",
+		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_1.width = 8,
+		altdpram_component_1.widthad = addr_width,
+		altdpram_component_1.width_byteena = 1,
+		altdpram_component_1.wraddress_aclr = "OFF",
+		altdpram_component_1.wraddress_reg = "INCLOCK",
+		altdpram_component_1.wrcontrol_aclr = "OFF",
+		altdpram_component_1.wrcontrol_reg = "INCLOCK";
+	
+	altdpram	altdpram_component_2 (
+				.data (DATA[23:16]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[2]),
+				.q (sub_wire0[23:16]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_2.indata_aclr = "OFF",
+		altdpram_component_2.indata_reg = "INCLOCK",
+		altdpram_component_2.intended_device_family = "Cyclone V",
+		altdpram_component_2.lpm_type = "altdpram",
+		altdpram_component_2.outdata_aclr = "OFF",
+		altdpram_component_2.outdata_reg = "UNREGISTERED",
+		altdpram_component_2.ram_block_type = "MLAB",
+		altdpram_component_2.rdaddress_aclr = "OFF",
+		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_2.rdcontrol_aclr = "OFF",
+		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_2.width = 8,
+		altdpram_component_2.widthad = addr_width,
+		altdpram_component_2.width_byteena = 1,
+		altdpram_component_2.wraddress_aclr = "OFF",
+		altdpram_component_2.wraddress_reg = "INCLOCK",
+		altdpram_component_2.wrcontrol_aclr = "OFF",
+		altdpram_component_2.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_3 (
+				.data (DATA[31:24]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[3]),
+				.q (sub_wire0[31:24]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_3.indata_aclr = "OFF",
+		altdpram_component_3.indata_reg = "INCLOCK",
+		altdpram_component_3.intended_device_family = "Cyclone V",
+		altdpram_component_3.lpm_type = "altdpram",
+		altdpram_component_3.outdata_aclr = "OFF",
+		altdpram_component_3.outdata_reg = "UNREGISTERED",
+		altdpram_component_3.ram_block_type = "MLAB",
+		altdpram_component_3.rdaddress_aclr = "OFF",
+		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_3.rdcontrol_aclr = "OFF",
+		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_3.width = 8,
+		altdpram_component_3.widthad = addr_width,
+		altdpram_component_3.width_byteena = 1,
+		altdpram_component_3.wraddress_aclr = "OFF",
+		altdpram_component_3.wraddress_reg = "INCLOCK",
+		altdpram_component_3.wrcontrol_aclr = "OFF",
+		altdpram_component_3.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
+	
+`else
+
+	wire [31:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({32{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 2**addr_width,
+		altsyncram_component.numwords_b = 2**addr_width,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = addr_width,
+		altsyncram_component.widthad_b = addr_width,
+		altsyncram_component.width_a = 32,
+		altsyncram_component.width_b = 32,
+		altsyncram_component.width_byteena_a = 4;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
+module SCSP_COEF_RAM
+(
+	input          CLK,
+	
+	input  [ 5: 0] WRADDR,
+	input  [15: 0] DATA,
+	input  [ 1: 0] WREN,
+	input  [ 5: 0] RDADDR,
+	output [15: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [15:0] MEM [64];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WRADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
 
 	wire [15:0] sub_wire0;
 	
 	altdpram	altdpram_component_l (
 				.data (DATA[7:0]),
 				.inclock (CLK),
-				.rdaddress (RADDR),
-				.wraddress (WADDR),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
 				.wren (WREN[0]),
 				.q (sub_wire0[7:0]),
 				.aclr (1'b0),
@@ -1798,7 +2733,7 @@ module SCSP_RAM_8X2
 		altdpram_component_l.rdcontrol_reg = "UNREGISTERED",
 		altdpram_component_l.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
 		altdpram_component_l.width = 8,
-		altdpram_component_l.widthad = addr_width,
+		altdpram_component_l.widthad = 6,
 		altdpram_component_l.width_byteena = 1,
 		altdpram_component_l.wraddress_aclr = "OFF",
 		altdpram_component_l.wraddress_reg = "INCLOCK",
@@ -1808,8 +2743,8 @@ module SCSP_RAM_8X2
 	altdpram	altdpram_component_h (
 				.data (DATA[15:8]),
 				.inclock (CLK),
-				.rdaddress (RADDR),
-				.wraddress (WADDR),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
 				.wren (WREN[1]),
 				.q (sub_wire0[15:8]),
 				.aclr (1'b0),
@@ -1833,7 +2768,7 @@ module SCSP_RAM_8X2
 		altdpram_component_h.rdcontrol_reg = "UNREGISTERED",
 		altdpram_component_h.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
 		altdpram_component_h.width = 8,
-		altdpram_component_h.widthad = addr_width,
+		altdpram_component_h.widthad = 6,
 		altdpram_component_h.width_byteena = 1,
 		altdpram_component_h.wraddress_aclr = "OFF",
 		altdpram_component_h.wraddress_reg = "INCLOCK",
@@ -1842,44 +2777,17 @@ module SCSP_RAM_8X2
 	
 	assign Q = sub_wire0;
 	
-`endif
-	
-endmodule
-
-module SCSP_COEF_RAM
-(
-	input          CLK,
-	
-	input  [ 5: 0] WADDR,
-	input  [15: 0] DATA,
-	input  [ 1: 0] WREN,
-	input  [ 5: 0] RADDR,
-	output [15: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [15:0] MEM [64];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RADDR];
-	
 `else
 
 	wire [15:0] sub_wire0;
 	
 	altsyncram	altsyncram_component (
-				.address_a (WADDR),
+				.address_a (WRADDR),
 				.byteena_a (WREN),
 				.clock0 (CLK),
 				.data_a (DATA),
 				.wren_a (|WREN),
-				.address_b (RADDR),
+				.address_b (RDADDR),
 				.q_b (sub_wire0),
 				.aclr0 (1'b0),
 				.aclr1 (1'b0),
@@ -1926,14 +2834,14 @@ module SCSP_COEF_RAM
 	
 endmodule
 
-module SCSP_ADRS_RAM
+module SCSP_MADRS_RAM
 (
 	input          CLK,
 	
-	input  [ 4: 0] WADDR,
+	input  [ 4: 0] WRADDR,
 	input  [15: 0] DATA,
 	input  [ 1: 0] WREN,
-	input  [ 4: 0] RADDR,
+	input  [ 4: 0] RDADDR,
 	output [15: 0] Q
 );
 
@@ -1943,23 +2851,99 @@ module SCSP_ADRS_RAM
 	
 	always @(posedge CLK) begin
 		if (WREN) begin
-			MEM[WADDR] <= DATA;
+			MEM[WRADDR] <= DATA;
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
+
+	wire [15:0] sub_wire0;
+	
+	altdpram	altdpram_component_l (
+				.data (DATA[7:0]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[0]),
+				.q (sub_wire0[7:0]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_l.indata_aclr = "OFF",
+		altdpram_component_l.indata_reg = "INCLOCK",
+		altdpram_component_l.intended_device_family = "Cyclone V",
+		altdpram_component_l.lpm_type = "altdpram",
+		altdpram_component_l.outdata_aclr = "OFF",
+		altdpram_component_l.outdata_reg = "UNREGISTERED",
+		altdpram_component_l.ram_block_type = "MLAB",
+		altdpram_component_l.rdaddress_aclr = "OFF",
+		altdpram_component_l.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_l.rdcontrol_aclr = "OFF",
+		altdpram_component_l.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_l.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_l.width = 8,
+		altdpram_component_l.widthad = 5,
+		altdpram_component_l.width_byteena = 1,
+		altdpram_component_l.wraddress_aclr = "OFF",
+		altdpram_component_l.wraddress_reg = "INCLOCK",
+		altdpram_component_l.wrcontrol_aclr = "OFF",
+		altdpram_component_l.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_h (
+				.data (DATA[15:8]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[1]),
+				.q (sub_wire0[15:8]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_h.indata_aclr = "OFF",
+		altdpram_component_h.indata_reg = "INCLOCK",
+		altdpram_component_h.intended_device_family = "Cyclone V",
+		altdpram_component_h.lpm_type = "altdpram",
+		altdpram_component_h.outdata_aclr = "OFF",
+		altdpram_component_h.outdata_reg = "UNREGISTERED",
+		altdpram_component_h.ram_block_type = "MLAB",
+		altdpram_component_h.rdaddress_aclr = "OFF",
+		altdpram_component_h.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_h.rdcontrol_aclr = "OFF",
+		altdpram_component_h.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_h.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_h.width = 8,
+		altdpram_component_h.widthad = 5,
+		altdpram_component_h.width_byteena = 1,
+		altdpram_component_h.wraddress_aclr = "OFF",
+		altdpram_component_h.wraddress_reg = "INCLOCK",
+		altdpram_component_h.wrcontrol_aclr = "OFF",
+		altdpram_component_h.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
 	
 `else
 
 	wire [15:0] sub_wire0;
 	
 	altsyncram	altsyncram_component (
-				.address_a (WADDR),
+				.address_a (WRADDR),
 				.byteena_a (WREN),
 				.clock0 (CLK),
 				.data_a (DATA),
 				.wren_a (|WREN),
-				.address_b (RADDR),
+				.address_b (RDADDR),
 				.q_b (sub_wire0),
 				.aclr0 (1'b0),
 				.aclr1 (1'b0),
@@ -2010,10 +2994,10 @@ module SCSP_TEMP_RAM
 (
 	input          CLK,
 	
-	input  [ 6: 0] WADDR,
+	input  [ 6: 0] WRADDR,
 	input  [31: 0] DATA,
 	input  [ 3: 0] WREN,
-	input  [ 6: 0] RADDR,
+	input  [ 6: 0] RDADDR,
 	output [31: 0] Q
 );
 
@@ -2023,23 +3007,23 @@ module SCSP_TEMP_RAM
 	
 	always @(posedge CLK) begin
 		if (WREN) begin
-			MEM[WADDR] <= DATA;
+			MEM[WRADDR] <= DATA;
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
 	
 `else
 
 	wire [31:0] sub_wire0;
 	
 	altsyncram	altsyncram_component (
-				.address_a (WADDR),
+				.address_a (WRADDR),
 				.byteena_a (WREN),
 				.clock0 (CLK),
 				.data_a (DATA),
 				.wren_a (|WREN),
-				.address_b (RADDR),
+				.address_b (RDADDR),
 				.q_b (sub_wire0),
 				.aclr0 (1'b0),
 				.aclr1 (1'b0),
@@ -2090,10 +3074,10 @@ module SCSP_MEMS_RAM
 (
 	input          CLK,
 	
-	input  [ 4: 0] WADDR,
+	input  [ 4: 0] WRADDR,
 	input  [31: 0] DATA,
 	input  [ 3: 0] WREN,
-	input  [ 4: 0] RADDR,
+	input  [ 4: 0] RDADDR,
 	output [31: 0] Q
 );
 
@@ -2103,23 +3087,169 @@ module SCSP_MEMS_RAM
 	
 	always @(posedge CLK) begin
 		if (WREN) begin
-			MEM[WADDR] <= DATA;
+			MEM[WRADDR] <= DATA;
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
+
+	wire [31:0] sub_wire0;
+	
+	altdpram	altdpram_component_0 (
+				.data (DATA[7:0]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[0]),
+				.q (sub_wire0[7:0]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_0.indata_aclr = "OFF",
+		altdpram_component_0.indata_reg = "INCLOCK",
+		altdpram_component_0.intended_device_family = "Cyclone V",
+		altdpram_component_0.lpm_type = "altdpram",
+		altdpram_component_0.outdata_aclr = "OFF",
+		altdpram_component_0.outdata_reg = "UNREGISTERED",
+		altdpram_component_0.ram_block_type = "MLAB",
+		altdpram_component_0.rdaddress_aclr = "OFF",
+		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_0.rdcontrol_aclr = "OFF",
+		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_0.width = 8,
+		altdpram_component_0.widthad = 5,
+		altdpram_component_0.width_byteena = 1,
+		altdpram_component_0.wraddress_aclr = "OFF",
+		altdpram_component_0.wraddress_reg = "INCLOCK",
+		altdpram_component_0.wrcontrol_aclr = "OFF",
+		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_1 (
+				.data (DATA[15:8]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[1]),
+				.q (sub_wire0[15:8]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_1.indata_aclr = "OFF",
+		altdpram_component_1.indata_reg = "INCLOCK",
+		altdpram_component_1.intended_device_family = "Cyclone V",
+		altdpram_component_1.lpm_type = "altdpram",
+		altdpram_component_1.outdata_aclr = "OFF",
+		altdpram_component_1.outdata_reg = "UNREGISTERED",
+		altdpram_component_1.ram_block_type = "MLAB",
+		altdpram_component_1.rdaddress_aclr = "OFF",
+		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_1.rdcontrol_aclr = "OFF",
+		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_1.width = 8,
+		altdpram_component_1.widthad = 5,
+		altdpram_component_1.width_byteena = 1,
+		altdpram_component_1.wraddress_aclr = "OFF",
+		altdpram_component_1.wraddress_reg = "INCLOCK",
+		altdpram_component_1.wrcontrol_aclr = "OFF",
+		altdpram_component_1.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_2 (
+				.data (DATA[23:16]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[2]),
+				.q (sub_wire0[23:16]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_2.indata_aclr = "OFF",
+		altdpram_component_2.indata_reg = "INCLOCK",
+		altdpram_component_2.intended_device_family = "Cyclone V",
+		altdpram_component_2.lpm_type = "altdpram",
+		altdpram_component_2.outdata_aclr = "OFF",
+		altdpram_component_2.outdata_reg = "UNREGISTERED",
+		altdpram_component_2.ram_block_type = "MLAB",
+		altdpram_component_2.rdaddress_aclr = "OFF",
+		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_2.rdcontrol_aclr = "OFF",
+		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_2.width = 8,
+		altdpram_component_2.widthad = 5,
+		altdpram_component_2.width_byteena = 1,
+		altdpram_component_2.wraddress_aclr = "OFF",
+		altdpram_component_2.wraddress_reg = "INCLOCK",
+		altdpram_component_2.wrcontrol_aclr = "OFF",
+		altdpram_component_2.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_3 (
+				.data (DATA[31:24]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[3]),
+				.q (sub_wire0[31:24]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_3.indata_aclr = "OFF",
+		altdpram_component_3.indata_reg = "INCLOCK",
+		altdpram_component_3.intended_device_family = "Cyclone V",
+		altdpram_component_3.lpm_type = "altdpram",
+		altdpram_component_3.outdata_aclr = "OFF",
+		altdpram_component_3.outdata_reg = "UNREGISTERED",
+		altdpram_component_3.ram_block_type = "MLAB",
+		altdpram_component_3.rdaddress_aclr = "OFF",
+		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_3.rdcontrol_aclr = "OFF",
+		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_3.width = 8,
+		altdpram_component_3.widthad = 5,
+		altdpram_component_3.width_byteena = 1,
+		altdpram_component_3.wraddress_aclr = "OFF",
+		altdpram_component_3.wraddress_reg = "INCLOCK",
+		altdpram_component_3.wrcontrol_aclr = "OFF",
+		altdpram_component_3.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
 	
 `else
 
 	wire [31:0] sub_wire0;
 	
 	altsyncram	altsyncram_component (
-				.address_a (WADDR),
+				.address_a (WRADDR),
 				.byteena_a (WREN),
 				.clock0 (CLK),
 				.data_a (DATA),
 				.wren_a (|WREN),
-				.address_b (RADDR),
+				.address_b (RDADDR),
 				.q_b (sub_wire0),
 				.aclr0 (1'b0),
 				.aclr1 (1'b0),
@@ -2166,16 +3296,242 @@ module SCSP_MEMS_RAM
 	
 endmodule
 
+module SCSP_MIXS_RAM
+(
+	input          CLK,
+	
+	input  [ 3: 0] WRADDR,
+	input  [31: 0] DATA,
+	input  [ 3: 0] WREN,
+	input  [ 3: 0] RDADDR,
+	output [31: 0] Q
+);
+
+`ifdef SIM
+	
+	reg [31:0] MEM [16];
+	
+	always @(posedge CLK) begin
+		if (WREN) begin
+			MEM[WRADDR] <= DATA;
+		end
+	end
+		
+	assign Q = MEM[RDADDR];
+	
+`elsif DEBUG
+
+	wire [31:0] sub_wire0;
+	
+	altdpram	altdpram_component_0 (
+				.data (DATA[7:0]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[0]),
+				.q (sub_wire0[7:0]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_0.indata_aclr = "OFF",
+		altdpram_component_0.indata_reg = "INCLOCK",
+		altdpram_component_0.intended_device_family = "Cyclone V",
+		altdpram_component_0.lpm_type = "altdpram",
+		altdpram_component_0.outdata_aclr = "OFF",
+		altdpram_component_0.outdata_reg = "UNREGISTERED",
+		altdpram_component_0.ram_block_type = "MLAB",
+		altdpram_component_0.rdaddress_aclr = "OFF",
+		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_0.rdcontrol_aclr = "OFF",
+		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_0.width = 8,
+		altdpram_component_0.widthad = 4,
+		altdpram_component_0.width_byteena = 1,
+		altdpram_component_0.wraddress_aclr = "OFF",
+		altdpram_component_0.wraddress_reg = "INCLOCK",
+		altdpram_component_0.wrcontrol_aclr = "OFF",
+		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_1 (
+				.data (DATA[15:8]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[1]),
+				.q (sub_wire0[15:8]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_1.indata_aclr = "OFF",
+		altdpram_component_1.indata_reg = "INCLOCK",
+		altdpram_component_1.intended_device_family = "Cyclone V",
+		altdpram_component_1.lpm_type = "altdpram",
+		altdpram_component_1.outdata_aclr = "OFF",
+		altdpram_component_1.outdata_reg = "UNREGISTERED",
+		altdpram_component_1.ram_block_type = "MLAB",
+		altdpram_component_1.rdaddress_aclr = "OFF",
+		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_1.rdcontrol_aclr = "OFF",
+		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_1.width = 8,
+		altdpram_component_1.widthad = 4,
+		altdpram_component_1.width_byteena = 1,
+		altdpram_component_1.wraddress_aclr = "OFF",
+		altdpram_component_1.wraddress_reg = "INCLOCK",
+		altdpram_component_1.wrcontrol_aclr = "OFF",
+		altdpram_component_1.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_2 (
+				.data (DATA[23:16]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[2]),
+				.q (sub_wire0[23:16]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_2.indata_aclr = "OFF",
+		altdpram_component_2.indata_reg = "INCLOCK",
+		altdpram_component_2.intended_device_family = "Cyclone V",
+		altdpram_component_2.lpm_type = "altdpram",
+		altdpram_component_2.outdata_aclr = "OFF",
+		altdpram_component_2.outdata_reg = "UNREGISTERED",
+		altdpram_component_2.ram_block_type = "MLAB",
+		altdpram_component_2.rdaddress_aclr = "OFF",
+		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_2.rdcontrol_aclr = "OFF",
+		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_2.width = 8,
+		altdpram_component_2.widthad = 4,
+		altdpram_component_2.width_byteena = 1,
+		altdpram_component_2.wraddress_aclr = "OFF",
+		altdpram_component_2.wraddress_reg = "INCLOCK",
+		altdpram_component_2.wrcontrol_aclr = "OFF",
+		altdpram_component_2.wrcontrol_reg = "INCLOCK";
+		
+	altdpram	altdpram_component_3 (
+				.data (DATA[31:24]),
+				.inclock (CLK),
+				.rdaddress (RDADDR),
+				.wraddress (WRADDR),
+				.wren (WREN[3]),
+				.q (sub_wire0[31:24]),
+				.aclr (1'b0),
+				.byteena (1'b1),
+				.inclocken (1'b1),
+				.rdaddressstall (1'b0),
+				.rden (1'b1),
+//				.sclr (1'b0),
+				.wraddressstall (1'b0));
+	defparam
+		altdpram_component_3.indata_aclr = "OFF",
+		altdpram_component_3.indata_reg = "INCLOCK",
+		altdpram_component_3.intended_device_family = "Cyclone V",
+		altdpram_component_3.lpm_type = "altdpram",
+		altdpram_component_3.outdata_aclr = "OFF",
+		altdpram_component_3.outdata_reg = "UNREGISTERED",
+		altdpram_component_3.ram_block_type = "MLAB",
+		altdpram_component_3.rdaddress_aclr = "OFF",
+		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
+		altdpram_component_3.rdcontrol_aclr = "OFF",
+		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component_3.width = 8,
+		altdpram_component_3.widthad = 4,
+		altdpram_component_3.width_byteena = 1,
+		altdpram_component_3.wraddress_aclr = "OFF",
+		altdpram_component_3.wraddress_reg = "INCLOCK",
+		altdpram_component_3.wrcontrol_aclr = "OFF",
+		altdpram_component_3.wrcontrol_reg = "INCLOCK";
+	
+	assign Q = sub_wire0;
+
+`else
+
+	wire [31:0] sub_wire0;
+	
+	altsyncram	altsyncram_component (
+				.address_a (WRADDR),
+				.byteena_a (WREN),
+				.clock0 (CLK),
+				.data_a (DATA),
+				.wren_a (|WREN),
+				.address_b (RDADDR),
+				.q_b (sub_wire0),
+				.aclr0 (1'b0),
+				.aclr1 (1'b0),
+				.addressstall_a (1'b0),
+				.addressstall_b (1'b0),
+				.byteena_b (1'b1),
+				.clock1 (1'b1),
+				.clocken0 (1'b1),
+				.clocken1 (1'b1),
+				.clocken2 (1'b1),
+				.clocken3 (1'b1),
+				.data_b ({16{1'b1}}),
+				.eccstatus (),
+				.q_a (),
+				.rden_a (1'b1),
+				.rden_b (1'b1),
+				.wren_b (1'b0));
+	defparam
+		altsyncram_component.address_aclr_b = "NONE",
+		altsyncram_component.address_reg_b = "CLOCK0",
+		altsyncram_component.byte_size = 8,
+		altsyncram_component.clock_enable_input_a = "BYPASS",
+		altsyncram_component.clock_enable_input_b = "BYPASS",
+		altsyncram_component.clock_enable_output_b = "BYPASS",
+		altsyncram_component.intended_device_family = "Cyclone V",
+		altsyncram_component.lpm_type = "altsyncram",
+		altsyncram_component.numwords_a = 16,
+		altsyncram_component.numwords_b = 16,
+		altsyncram_component.operation_mode = "DUAL_PORT",
+		altsyncram_component.outdata_aclr_b = "NONE",
+		altsyncram_component.outdata_reg_b = "UNREGISTERED",
+		altsyncram_component.power_up_uninitialized = "FALSE",
+		altsyncram_component.ram_block_type = "M10K",
+		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
+		altsyncram_component.widthad_a = 4,
+		altsyncram_component.widthad_b = 4,
+		altsyncram_component.width_a = 32,
+		altsyncram_component.width_b = 32,
+		altsyncram_component.width_byteena_a = 4;
+	
+	assign Q = sub_wire0;
+	
+`endif
+	
+endmodule
+
 
 module SCSP_MPRO_RAM
 (
-	input         CLK,
+	input          CLK,
 	
-	input  [6:0] WADDR,
-	input            [63:0] DATA,
-	input             [7:0] WREN,
-	input  [6:0] RADDR,
-	output           [63:0] Q
+	input  [ 6: 0] WRADDR,
+	input  [63: 0] DATA,
+	input  [ 7: 0] WREN,
+	input  [ 6: 0] RDADDR,
+	output [63: 0] Q
 );
 
 `ifdef SIM
@@ -2184,23 +3540,23 @@ module SCSP_MPRO_RAM
 	
 	always @(posedge CLK) begin
 		if (WREN) begin
-			MEM[WADDR] <= DATA;
+			MEM[WRADDR] <= DATA;
 		end
 	end
 		
-	assign Q = MEM[RADDR];
+	assign Q = MEM[RDADDR];
 	
 `else
 
 	wire [63:0] sub_wire0;
 	
 	altsyncram	altsyncram_component (
-				.address_a (WADDR),
+				.address_a (WRADDR),
 				.byteena_a (WREN),
 				.clock0 (CLK),
 				.data_a (DATA),
 				.wren_a (|WREN),
-				.address_b (RADDR),
+				.address_b (RDADDR),
 				.q_b (sub_wire0),
 				.aclr0 (1'b0),
 				.aclr1 (1'b0),

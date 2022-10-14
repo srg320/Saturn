@@ -108,7 +108,7 @@ module Saturn (
 	input      [15:0] JOY2,
 	
 	input       [6:0] SCRN_EN,
-	input       [1:0] SND_EN,
+	input       [2:0] SND_EN,
 	input             DBG_PAUSE,
 	input             DBG_BREAK,
 	input             DBG_RUN,

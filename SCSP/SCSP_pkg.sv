@@ -25,22 +25,22 @@ package SCSP_PKG;
 	
 	typedef struct packed		//RW,08
 	{
+		bit [ 4: 0] D2R;
+		bit [ 4: 0] D1R;
+		bit         EGHOLD;
+		bit [ 4: 0] AR;
+	} SCR1_t;
+	parameter bit [15:0] SCR1_MASK = 16'hFFFF;
+	
+	typedef struct packed		//RW,0A
+	{
 		bit         UNUSED;
 		bit         LPSLNK;
 		bit [ 3: 0] KRS;
 		bit [ 4: 0] DL;
 		bit [ 4: 0] RR;
-	} SCR1_t;
-	parameter bit [15:0] SCR1_MASK = 16'h7FFF;
-	
-	typedef struct packed		//RW,0A
-	{
-		bit [ 4: 0] D2R;
-		bit [ 4: 0] D1R;
-		bit         EGHOLD;
-		bit [ 4: 0] AR;
 	} SCR2_t;
-	parameter bit [15:0] SCR2_MASK = 16'hFFFF;
+	parameter bit [15:0] SCR2_MASK = 16'h7FFF;
 	
 	typedef struct packed		//RW,0C
 	{
@@ -277,17 +277,13 @@ package SCSP_PKG;
 	
 //	typedef SOUS_t STACK_t[32];
 	
-	typedef struct packed		//RW,100700-10077F
-	{
-		bit [12: 0] COEF;
-		bit [ 2: 0] UNUSED;
-	} COEF_t;
-	parameter bit [15:0] COEF_MASK = 16'hFFF8;
+	typedef bit [12:0]  COEF_t;		//RW,100700-10077F
+	parameter bit [12:0] COEF_MASK = 13'h1FFF;
 	
 	typedef bit [16:1] MADRS_t;		//RW,100780-1007BF
 	parameter bit [16:1] MADRS_MASK = 16'hFFFF;
 	
-	typedef struct packed		//RW,100800-100BFF
+	typedef struct packed				//RW,100800-100BFF
 	{
 		bit         UNUSED;
 		bit [ 6: 0] TRA;
@@ -333,73 +329,108 @@ package SCSP_PKG;
 	parameter bit [15:0] EFREG_MASK = 16'hFFFF;
 	
 	typedef MIXS_t MIXSS_t[16];
-	typedef EFREG_t EFREGS_t[16];
 	
 	
-	typedef enum bit [1:0] {
-		EGS_ATTACK  = 2'b00, 
-		EGS_DECAY1  = 2'b01,
-		EGS_DECAY2  = 2'b10,
-		EGS_RELEASE = 2'b11
-	} EGState_t;
+	typedef bit [1:0] EGState_t;
+	parameter EGState_t EST_ATTACK  = 2'b00;
+	parameter EGState_t EST_DECAY1  = 2'b01;
+	parameter EGState_t EST_DECAY2  = 2'b10;
+	parameter EGState_t EST_RELEASE = 2'b11;
 	
-	typedef struct packed
-	{
-		bit [14: 0] PHASE;
-	} OP1State_t;
-	
-	typedef struct packed
-	{
-		bit [15: 0] MD;	//Modulation data
-		bit [18: 1] ADP;	//Address pointer
-	} OP2State_t;
-	
-	typedef struct packed
-	{
-		bit [ 9: 0] EVOL;	//Envelope volume
-		EGState_t   ST;	//Envelope generator state
-	} OP4State_t;
+//	typedef struct packed
+//	{
+//		bit [14: 0] PHASE;
+//	} OP1State_t;
 	
 	typedef struct packed
 	{
 		bit [ 4: 0] SLOT;	//
 		bit         KON;	//
 		bit         KOFF;	//
-	} OPPipe_t;
-	parameter OPPipe_t OP_PIPE_RESET = '{'0,0,0};
+		bit  [ 7:0] PHASE_INT;//Phase integer
+		bit  [17:0] PHASE_FRAC;//Phase fractional
+		bit  [ 5:0] BASE_RATE;
+		bit [ 7: 0] PLFO;	//Pitch LFO data
+	} OP2_t;
+	parameter OP2_t OP2_RESET = '{5'h00,1'b0,1'b0,8'h00,18'h00000,6'h00,8'h00};
 	
-	function bit signed [15:0] SignedShiftRight(bit signed [15:0] V, bit [3:0] A);
-		return $signed(V)>>>A;;
-	endfunction
+	typedef struct packed
+	{
+		bit [ 4: 0] SLOT;	//
+		bit         KON;	//
+		bit         KOFF;	//
+		bit [ 5: 0] BASE_RATE;
+		bit         LOOP_END;//Loop processing end
+		bit         PCM8B;//
+		bit [ 1: 0] SBCTL;
+		bit [ 1: 0] SSCTL;
+		bit [ 1: 0] EST;//Envelope state
+		bit [ 9: 0] EVOL;//Envelope volume
+	} OP3_t;
+	parameter OP3_t OP3_RESET = '{5'h00,1'b0,1'b0,6'h00,1'b0,1'b0,2'h0,2'h0,2'h0,10'h000};
 	
-	function bit [15:0] SoundSel(input bit signed [15:0] WAVE, input bit signed [15:0] NOISE, SCR0_t SCR0);
-		bit signed [15:0] SD;
-		bit signed [15:0] temp;
+	typedef struct packed
+	{
+		bit [ 4: 0] SLOT;	//
+		bit         KON;	//
+		bit         KOFF;	//
+		bit [ 5: 0] BASE_RATE;
+		bit         LOOP_END;//Loop processing end
+		bit [ 1: 0] EST;//Envelope state
+		bit [ 9: 0] EVOL;//Envelope volume
+		bit [15: 0] WD;//Wave form data
+	} OP4_t;
+	parameter OP4_t OP4_RESET = '{5'h00,1'b0,1'b0,6'h00,1'b0,2'h0,10'h000,16'h0000};
+	
+	typedef struct packed
+	{
+		bit [ 4: 0] SLOT;	//
+		bit         KON;	//
+		bit         KOFF;	//
+		bit [15: 0] WD;//Wave form data
+		bit [ 1: 0] EST;//Envelope state
+		bit [ 9: 0] EVOL;//Envelope volume
+	} OP5_t;
+	parameter OP5_t OP5_RESET = '{5'h00,1'b0,1'b0,16'h0000,2'h0,10'h000};
+	
+	typedef struct packed
+	{
+		bit [ 4: 0] SLOT;	//
+		bit         KON;	//
+		bit         KOFF;	//
+		bit [15: 0] SD;	//Slot out data
+		bit [ 9: 0] EVOL;
+		bit         SDIR;
+	} OP6_t;
+	parameter OP6_t OP6_RESET = '{5'h00,1'b0,1'b0,16'h0000,10'h000,1'b0};
+	
+	typedef struct packed
+	{
+		bit [ 4: 0] SLOT;	//
+		bit         KON;	//
+		bit         KOFF;	//
+		bit [15: 0] SD;	//Slot out data
+		bit         STWINH;
+	} OP7_t;
+	parameter OP7_t OP7_RESET = '{5'h00,1'b0,1'b0,16'h0000,1'b0};
+	
+	
+	
+	function bit [15:0] SoundSel(input bit [15:0] WAVE, input bit [15:0] NOISE, bit [1:0] SBCTL, bit [1:0] SSCTL);
+		bit [15:0] SD;
+		bit [15:0] temp;
 		
-		case (SCR0.SSCTL)
+		case (SSCTL)
 			2'b00: temp = WAVE;
 			2'b01: temp = NOISE;
-			default: temp = 16'sh0000;
+			default: temp = 16'h0000;
 		endcase
-		SD = {temp[15] ^ SCR0.SBCTL[1], temp[14:0] ^ {15{SCR0.SBCTL[0]}}}; 
+		SD = {temp[15] ^ SBCTL[1], temp[14:0] ^ {15{SBCTL[0]}}}; 
 	
 		return SD;
 	endfunction
 
-//	function bit signed [15:0] MDCalc(input STACK_t STACK, SCR4_t SCR4);
-//		bit signed [15:0] MD;
-//		bit signed [15:0] X,Y;
-//		bit signed [15:0] TEMP;
-//		
-//		X = $signed(STACK[SCR4.MDXSL]);
-//		Y = $signed(STACK[SCR4.MDYSL]);
-//		TEMP = $signed({X[15],X[15:1]})+ $signed({Y[15],Y[15:1]}); 
-//		MD = $signed($signed(TEMP)>>>(26-SCR4.MDL));
-//		
-//		return SCR4.MDL ? MD : '0;
-//	endfunction
-
-	function bit signed [15:0] MDCalc2(bit signed [15:0] X, bit signed [15:0] Y, bit [3:0] MDL);
+	function bit signed [15:0] MDCalc(bit signed [15:0] X, bit signed [15:0] Y, bit [3:0] MDL);
 		bit signed [15:0] MD;
 		bit signed [15:0] TEMP;
 		
@@ -411,63 +442,211 @@ package SCSP_PKG;
 	
 	function bit [25:0] PhaseCalc(SCR5_t SCR5);
 		bit [25:0] P;
-		bit [4:0] S;
+		bit [3:0] S;
+		bit [10:0] F;
 		
-		S = {SCR5.OCT[3],4'b0111} - {1'b0,SCR5.OCT};
-		P = {9'b000000001,SCR5.FNS,7'b0000000}>>S[3:0];
+		S = SCR5.OCT^4'h8;
+		F = 11'h400 + {1'b0,SCR5.FNS};
+		P = {15'b000000000000000,F}<<S;
 		
 		return P;
 	endfunction
 	
-	function bit [5:0] RateCalc(bit [4:0] R, bit [3:0] KRS, SCR5_t SCR5);
-		bit [5:0] RATE;
+	
+	typedef struct packed
+	{
+		bit [12: 0] CNT;	//
+		bit         LAST;	//
+	} EnvTable_t;
+	parameter EnvTable_t ENV_TBL [64][7] = '{
+	'{{13'h1FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//00
+	'{{13'h1FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b1}},//01
+	'{{13'h0FFF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//02
+	'{{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h0FFF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//03
+	
+	'{{13'h0FFF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//04
+	'{{13'h0FFF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b1}},//05
+	'{{13'h07FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//06
+	'{{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h07FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//07
+	
+	'{{13'h07FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//08
+	'{{13'h07FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b1}},//09
+	'{{13'h03FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//0A
+	'{{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h03FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//0B
+	
+	'{{13'h03FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//0C
+	'{{13'h03FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b1}},//0D
+	'{{13'h01FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//0E
+	'{{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h01FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//0F
+	
+	'{{13'h01FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//10
+	'{{13'h01FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b1}},//11
+	'{{13'h00FF,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//12
+	'{{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h00FF,1'b0},{13'h007F,1'b0},{13'h007F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//13
+	
+	'{{13'h00FF,1'b0},{13'h007F,1'b0},{13'h007F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//14
+	'{{13'h00FF,1'b0},{13'h007F,1'b0},{13'h007F,1'b0},{13'h007F,1'b0},{13'h007F,1'b0},{13'h007F,1'b0},{13'h007F,1'b1}},//15
+	'{{13'h007F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//16
+	'{{13'h007F,1'b0},{13'h007F,1'b0},{13'h007F,1'b0},{13'h003F,1'b0},{13'h003F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//17
+	
+	'{{13'h007F,1'b0},{13'h003F,1'b0},{13'h003F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//18
+	'{{13'h007F,1'b0},{13'h003F,1'b0},{13'h003F,1'b0},{13'h003F,1'b0},{13'h003F,1'b0},{13'h003F,1'b0},{13'h003F,1'b1}},//19
+	'{{13'h003F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//1A
+	'{{13'h003F,1'b0},{13'h003F,1'b0},{13'h003F,1'b0},{13'h001F,1'b0},{13'h001F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//1B
+	
+	'{{13'h003F,1'b0},{13'h001F,1'b0},{13'h001F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//1C
+	'{{13'h003F,1'b0},{13'h001F,1'b0},{13'h001F,1'b0},{13'h001F,1'b0},{13'h001F,1'b0},{13'h001F,1'b0},{13'h001F,1'b1}},//1D
+	'{{13'h001F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//1E
+	'{{13'h001F,1'b0},{13'h001F,1'b0},{13'h001F,1'b0},{13'h000F,1'b0},{13'h000F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//1F
+	
+	'{{13'h001F,1'b0},{13'h000F,1'b0},{13'h000F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//20
+	'{{13'h001F,1'b0},{13'h000F,1'b0},{13'h000F,1'b0},{13'h000F,1'b0},{13'h000F,1'b0},{13'h000F,1'b0},{13'h000F,1'b1}},//21
+	'{{13'h000F,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//22
+	'{{13'h000F,1'b0},{13'h000F,1'b0},{13'h000F,1'b0},{13'h0007,1'b0},{13'h0007,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//23
+	
+	'{{13'h000F,1'b0},{13'h0007,1'b0},{13'h0007,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//24
+	'{{13'h000F,1'b0},{13'h0007,1'b0},{13'h0007,1'b0},{13'h0007,1'b0},{13'h0007,1'b0},{13'h0007,1'b0},{13'h0007,1'b1}},//25
+	'{{13'h0007,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//26
+	'{{13'h0007,1'b0},{13'h0007,1'b0},{13'h0007,1'b0},{13'h0003,1'b0},{13'h0003,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//27
+	
+	'{{13'h0007,1'b0},{13'h0003,1'b0},{13'h0003,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//28
+	'{{13'h0007,1'b0},{13'h0003,1'b0},{13'h0003,1'b0},{13'h0003,1'b0},{13'h0003,1'b0},{13'h0003,1'b0},{13'h0003,1'b1}},//29
+	'{{13'h0003,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//2A
+	'{{13'h0003,1'b0},{13'h0003,1'b0},{13'h0003,1'b0},{13'h0001,1'b0},{13'h0001,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//2B
+	
+	'{{13'h0003,1'b0},{13'h0001,1'b0},{13'h0001,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//2C
+	'{{13'h0003,1'b0},{13'h0001,1'b0},{13'h0001,1'b0},{13'h0001,1'b0},{13'h0001,1'b0},{13'h0001,1'b0},{13'h0001,1'b1}},//2D
+	'{{13'h0001,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//2E
+	'{{13'h0001,1'b0},{13'h0001,1'b0},{13'h0001,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//2F
+	
+	'{{13'h0001,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//30
+	'{{13'h0001,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1}},//31
+	'{{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//32
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//33
+	
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//34
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1}},//35
+	'{{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//36
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//37
+	
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//38
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1}},//39
+	'{{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//3A
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}},//3B
+	
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//3C
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1}},//3D
+	'{{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0}},//3E
+	'{{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b0},{13'h0000,1'b1},{13'h0000,1'b0},{13'h0000,1'b0}} //3F
+	};
+	
+	function bit [5:0] BaseRateCalc(SCR5_t SCR5);
+		bit [5:0] TEMP;
+		
+		TEMP = {5'b00000,SCR5.FNS[9]} + {{2{SCR5.OCT[3]}},SCR5.OCT};
+			
+		return TEMP;
+	endfunction
+	
+	parameter bit [ 3: 0] ARATE_TBL [16][4] = '{
+	'{4'h4,4'h4,4'h4,4'h4},//30
+	'{4'h3,4'h4,4'h4,4'h4},//31
+	'{4'h3,4'h4,4'h3,4'h4},//32
+	'{4'h3,4'h3,4'h3,4'h4},//33
+	
+	'{4'h3,4'h3,4'h3,4'h3},//34
+	'{4'h2,4'h3,4'h3,4'h3},//35
+	'{4'h2,4'h3,4'h2,4'h3},//36
+	'{4'h2,4'h2,4'h2,4'h3},//37
+	
+	'{4'h2,4'h2,4'h2,4'h2},//38
+	'{4'h1,4'h2,4'h2,4'h2},//39
+	'{4'h1,4'h2,4'h1,4'h2},//3A
+	'{4'h1,4'h1,4'h1,4'h2},//3B
+	
+	'{4'h1,4'h1,4'h1,4'h1},//3C
+	'{4'h1,4'h1,4'h1,4'h1},//3D
+	'{4'h1,4'h1,4'h1,4'h1},//3E
+	'{4'h1,4'h1,4'h1,4'h1} //3F
+	};
+	
+	parameter bit [ 3: 0] DRATE_TBL [16][4] = '{
+	'{4'h1,4'h1,4'h1,4'h1},//30
+	'{4'h2,4'h1,4'h1,4'h1},//31
+	'{4'h2,4'h1,4'h2,4'h1},//32
+	'{4'h2,4'h2,4'h2,4'h1},//33
+	
+	'{4'h2,4'h2,4'h2,4'h2},//34
+	'{4'h4,4'h2,4'h2,4'h2},//35
+	'{4'h2,4'h2,4'h4,4'h2},//36
+	'{4'h4,4'h4,4'h4,4'h2},//37
+	
+	'{4'h4,4'h4,4'h4,4'h4},//38
+	'{4'h8,4'h4,4'h4,4'h4},//39
+	'{4'h8,4'h4,4'h8,4'h4},//3A
+	'{4'h8,4'h8,4'h8,4'h4},//3B
+	
+	'{4'h8,4'h8,4'h8,4'h8},//3C
+	'{4'h8,4'h8,4'h8,4'h8},//3D
+	'{4'h8,4'h8,4'h8,4'h8},//3E
+	'{4'h8,4'h8,4'h8,4'h8} //3F
+	};
+	
+	function bit [9:0] AttackEnvCalc(bit [5:0] RATE, bit [9:0] EVOL);
+		bit [3:0] R;
+		
+		if (RATE[5:4] != 2'h3)
+			R = ARATE_TBL[0][0];
+		else
+			R = ARATE_TBL[RATE[3:0]][0];
+		return (EVOL>>R) + 10'd1;
+	endfunction
+	
+	function bit [9:0] DecayEnvCalc(bit [5:0] RATE);
+		bit [3:0] R;
+		
+		if (RATE[5:4] != 2'h3)
+			R = DRATE_TBL[0][0];
+		else
+			R = DRATE_TBL[RATE[3:0]][0];
+		return {6'b000000,R};
+	endfunction
+	
+	function bit [5:0] EffRateCalc(bit [5:0] BASE, bit [4:0] RATE, bit [3:0] KRS);
+		bit [5:0] RES;
 		bit [7:0] TEMP;
 		
 		if (KRS == 4'hF) 
-			TEMP = {1'b0,R,1'b0};
+			TEMP = {2'b00,RATE,1'b0};
 		else
-			TEMP = {3'b000,KRS,SCR5.FNS[9]} + {2'b00,R,1'b0} + {3'b000,SCR5.OCT^4'h8} - 8'h08;
+			TEMP = {{2{BASE[5]}},BASE} + {2'b00,RATE,1'b0} + {3'b000,KRS,1'b0};
 		
 		if (TEMP[7])
-			RATE = 5'h00;
-		else if (TEMP >= 8'h3C)
-			RATE = 8'h3C;
+			RES = 6'h00;
+		else if (TEMP[6])
+			RES = 6'h3F;
 		else
-			RATE = TEMP[5:0];
+			RES = TEMP[5:0];
 			
-		return RATE;
-	endfunction
-	
-	function bit [9:0] EnvVolCalc(bit [9:0] ENV, bit [7:0] TL);
-		bit [9:0] RES;
-		bit [9:0] D2,D4,D8,D16,D32,D64,D128,D256;
-		D2 = ENV>>1;	//ENV / 2 
-		D4 = ENV>>2;	//ENV / 4 
-		D8 = ENV>>3;	//ENV / 8 
-		D16 = ENV>>4;	//ENV / 16 
-		D32 = ENV>>5;	//ENV / 32 
-		D64 = ENV>>6;	//ENV / 64
-		D128 = ENV>>7;	//ENV / 128 
-		D256 = ENV>>8;	//ENV / 256 
-		
-		RES = ENV - ((TL[7] ?                           D256 : 10'd0) + 
-		             (TL[6] ?          D16                   : 10'd0) + 
-						 (TL[5] ?    D4                          : 10'd0) + 
-						 (TL[4] ? D2                             : 10'd0) + 
-		             (TL[3] ? D2+   D8+D16+    D64           : 10'd0) + 
-						 (TL[2] ? D2+D4+   D16+    D64+D128+D256 : 10'd0) + 
-						 (TL[1] ? D2+D4+D8+    D32+    D128+D256 : 10'd0) + 
-						 (TL[0] ? D2+D4+D8+D16+    D64+     D256 : 10'd0));
-		
 		return RES;
 	endfunction
 	
-	function bit signed [15:0] VolCalc(bit signed [15:0] ENV, bit [7:0] TL);
-		return $signed($signed(ENV)>>>TL[7:4]);
+	function bit [15:0] VolCalc(bit [15:0] WAVE, bit [9:0] ENV, bit [7:0] TL);
+		bit [10:0] ATT;
+		bit [22:0] MULT;
+		bit [15:0] RES;
+		
+		ATT = {1'b0,ENV} + {1'b0,TL,2'b00};
+		
+		MULT = $signed(WAVE) * ({1'b1,~ATT[5:0]} + 7'd1);
+		
+		RES = $signed($signed(MULT[22:7])>>>ATT[9:6]);
+		
+		return !ATT[10] ? RES : 16'sh0000;
 	endfunction
 	
 	function bit signed [15:0] LevelCalc(bit signed [15:0] WAVE, bit [2:0] SDL);
-		return SDL ? $signed(WAVE>>>(~SDL)) : 16'sh0000;
+		return SDL ? $signed($signed(WAVE)>>>(~SDL)) : 16'sh0000;
 	endfunction
 	
 	function bit signed [15:0] PanLCalc(bit signed [15:0] WAVE, bit [4:0] PAN);
@@ -494,10 +673,10 @@ package SCSP_PKG;
 		return WAVE;
 	endfunction
 	
-	function bit [25:0] DSPMulti(bit [23:0] X, bit [12:0] Y);
+	function bit [25:0] DSPMult(bit [23:0] X, bit [12:0] Y);
 		bit [37:0] M;
 		
-		M = {X,1'b0} * {Y,1'b0};
+		M = $signed(X) * $signed(Y);
 		return M[37:12];
 	endfunction
 	
