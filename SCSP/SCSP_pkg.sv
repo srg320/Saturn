@@ -63,10 +63,9 @@ package SCSP_PKG;
 	{
 		bit         UNUSED;
 		bit [ 3: 0] OCT;
-		bit         UNUSED2;
-		bit [ 9: 0] FNS;
+		bit [10: 0] FNS;
 	} SCR5_t;
-	parameter bit [15:0] SCR5_MASK = 16'h7BFF;
+	parameter bit [15:0] SCR5_MASK = 16'h7FFF;
 	
 	typedef struct packed		//RW,12
 	{
@@ -446,7 +445,7 @@ package SCSP_PKG;
 		bit [10:0] F;
 		
 		S = SCR5.OCT^4'h8;
-		F = 11'h400 + {1'b0,SCR5.FNS};
+		F = 11'h400 + SCR5.FNS;
 		P = {15'b000000000000000,F}<<S;
 		
 		return P;

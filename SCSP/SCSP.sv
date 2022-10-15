@@ -347,18 +347,18 @@ module SCSP (
 					end
 					2'b01: begin
 						if (CALC_SO >= LEA) begin
-							SAO <= {LSA};
+							SAO <= LSA;
 						end
 					end
 					2'b10: begin
 						if (!CUR_SADIR) begin
 							if (CALC_SO >= LEA) begin
-								SAO <= {LEA};
+								SAO <= LEA;
 								SADIR <= 1;
 							end
 						end else begin
 							if (CALC_SO <= LSA) begin
-								SAO <= {LSA};
+								SAO <= LSA;
 							end
 						end
 					end
