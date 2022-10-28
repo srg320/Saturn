@@ -238,7 +238,8 @@ module VDP1 (
 	always @(posedge CLK or negedge RST_N) begin
 //	   bit        FRAME_START_PEND;
 		bit [18:1] NEXT_ADDR;
-		bit [18:1] CMD_JRET;
+		bit [18:1] CMD_RET_ADDR;
+		bit        CMD_SUB_RUN;
 		CMDCOLR_t  CMDCOLR_LAST;
 //		bit [10:0] CMDXA_CLIP;
 //		bit [10:0] CMDXB_CLIP;
@@ -272,6 +273,7 @@ module VDP1 (
 			SYS_CLIP <= CLIP_NULL;
 			USR_CLIP <= CLIP_NULL;
 			LOC_COORD <= COORD_NULL;
+			CMD_SUB_RUN <= 0;
 			
 			LOPR <= '0;
 			COPR <= '0;
@@ -281,6 +283,7 @@ module VDP1 (
 			CMD_READ <= 1;
 			SPR_READ <= 0;
 			CLT_READ <= 0;
+			CMD_SUB_RUN <= 0;
 			CMD_ST <= CMDS_READ;
 		end else if (DRAW_TERMINATE) begin
 			CMD_READ <= 0;
@@ -861,12 +864,12 @@ module VDP1 (
 				end
 				
 				CMDS_END: begin
-					NEXT_ADDR = CMD_ADDR + 18'd16;
+					NEXT_ADDR = CMD_ADDR + 18'h10;
 					case (CMD.CMDCTRL.JP[1:0])
 						2'b00: begin CMD_ADDR <= NEXT_ADDR; end
 						2'b01: begin CMD_ADDR <= {CMD.CMDLINK,2'b00}; end
-						2'b10: begin CMD_ADDR <= {CMD.CMDLINK,2'b00}; CMD_JRET <= NEXT_ADDR; end
-						2'b11: begin CMD_ADDR <= CMD_JRET; end
+						2'b10: begin CMD_ADDR <= {CMD.CMDLINK,2'b00}; CMD_RET_ADDR <= NEXT_ADDR; CMD_SUB_RUN <= 1; end
+						2'b11: begin CMD_ADDR <= CMD_SUB_RUN ? CMD_RET_ADDR : NEXT_ADDR; CMD_SUB_RUN <= 0; end
 					endcase
 					
 					if (CMD.CMDCTRL.END || CMD.CMDCTRL.COMM >= 4'hC) begin
@@ -1440,7 +1443,6 @@ module VDP1 (
 		bit        START_DRAW_PEND;
 		bit        VBE_CHECK;
 		
-		
 		if (!RST_N) begin
 			TVMR <= '0;
 			FBCR <= '0;
@@ -1451,19 +1453,28 @@ module VDP1 (
 			EDSR <= '0;
 			IRQ_N <= 1;
 			
-			REG_DO <= '0;
-//			A <= '0;
-//			WE_N <= 1;
-//			DQM <= '1;
-//			BURST <= 0;
-			
 			FRAME_ERASECHANGE_PEND <= 0;
 			FRAME_ERASE <= 0;
 			VBLANK_ERASE <= 0;
 			DRAW_TERMINATE <= 0;
 			VBE_CHECK <= 0;
+			
+			REG_DO <= '0;
 		end else if (!RES_N) begin
+			TVMR <= '0;
+			FBCR <= '0;
+			PTMR <= '0;
+			EWDR <= '0;
+			EWLR <= 16'h0000;
+			EWRR <= 16'h4EFF;
+			EDSR <= '0;
+			IRQ_N <= 1;
 				
+			FRAME_ERASECHANGE_PEND <= 0;
+			FRAME_ERASE <= 0;
+			VBLANK_ERASE <= 0;
+			DRAW_TERMINATE <= 0;
+			VBE_CHECK <= 0;
 		end else begin
 			START_DRAW_PEND <= 0;
 			DRAW_TERMINATE <= 0;
