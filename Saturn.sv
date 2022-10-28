@@ -106,6 +106,7 @@ module Saturn (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
+	input             JOY2_EN,
 	
 	input       [6:0] SCRN_EN,
 	input       [2:0] SND_EN,
@@ -452,7 +453,8 @@ module Saturn (
 	
 	
 	
-	assign ADI      = !ACS2_N ? CD_DO  : 16'h0000;
+	assign ADI      = !ACS0_N ? CART_DO  : 
+	                  !ACS2_N ? CD_DO  : 16'hFFFF;
 //	assign AWAIT_N  = 1;
 	assign AIRQ_N   = ARQT_N;
 	
@@ -658,7 +660,8 @@ module Saturn (
 		.MIRQ_N(MIRQ_N),
 		
 		.JOY1(JOY1),
-		.JOY2(JOY2)
+		.JOY2(JOY2),
+		.JOY2_EN(JOY2_EN)
 	);
 	
 	VDP1 VDP1
@@ -772,11 +775,7 @@ module Saturn (
 		.HRES(HRES),
 		.VRES(VRES),
 		
-		.SCRN_EN(SCRN_EN),
-		.H320_END_INC(H320_END_INC),
-		.H320_END_DEC(H320_END_DEC),
-		.H352_END_INC(H352_END_INC),
-		.H352_END_DEC(H352_END_DEC)
+		.SCRN_EN(SCRN_EN)
 	);
 	
 	
@@ -954,6 +953,7 @@ module Saturn (
 	
 	assign SDI = !SCS1_N ? CD_RAM_Q : YGR019_SDO;
 	
+	bit YGR019_AWAIT_N;
 	YGR019 ygr 
 	(
 		.CLK(CLK),
@@ -973,7 +973,7 @@ module Saturn (
 		.AWRU_N(AWRU_N),
 		.ATIM0_N(ATIM0_N),
 		.ATIM2_N(ATIM2_N),
-		.AWAIT_N(AWAIT_N),
+		.AWAIT_N(YGR019_AWAIT_N),
 		.ARQT_N(ARQT_N),
 		
 		.SHCE_R(SHCE_R),
@@ -1011,6 +1011,43 @@ module Saturn (
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
+	
+	
+	bit  [15: 0] CART_DO;
+	bit          CART_AWAIT_N;
+	CART cart 
+	(
+		.CLK(CLK),
+		.RST_N(RST_N),
+		
+		.RES_N(SYSRES_N),
+		
+		.CE_R(CE_R),
+		.CE_F(CE_F),
+		.AA(AA),
+		.ADI(ADO),
+		.ADO(CART_DO),
+		.AFC(AFC),
+		.ACS0_N(ACS0_N),
+		.ACS1_N(ACS1_N),
+		.ACS2_N(ACS2_N),
+		.ARD_N(ARD_N),
+		.AWRL_N(AWRL_N),
+		.AWRU_N(AWRU_N),
+		.ATIM0_N(ATIM0_N),
+		.ATIM2_N(ATIM2_N),
+		.AWAIT_N(CART_AWAIT_N),
+		.ARQT_N(),
+		
+		.MEMA(),
+		.MEMDO(),
+		.MEMDI(16'hFFFF),
+		.MEMWRL_N(),
+		.MEMWRH_N(),
+		.MEMRD_N()
+	);
+	
+	assign AWAIT_N = YGR019_AWAIT_N & CART_AWAIT_N;
 	
 	
 endmodule
