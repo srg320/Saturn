@@ -30,7 +30,8 @@ module SMPC (
 	output reg        MIRQ_N,
 	
 	input      [15:0] JOY1,
-	input      [15:0] JOY2
+	input      [15:0] JOY2,
+	input             JOY2_EN
 );
 
 	//Registers
@@ -167,7 +168,6 @@ module SMPC (
 		bit        CS_N_OLD;
 		bit        IRQV_N_OLD;
 		bit [15:0] WAIT_CNT;
-//		bit [19:0] INTERNAL_WAIT_CNT;
 		bit [15:0] INTBACK_WAIT_CNT;
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
@@ -242,17 +242,14 @@ module SMPC (
 				end
 				
 				SR[4:0] <= {~SRES_N,IREG[1][7:4]};
-
-//				if (INTERNAL_WAIT_CNT) INTERNAL_WAIT_CNT <= INTERNAL_WAIT_CNT - 20'd1;
-//				if (!IRQV_N && IRQV_N_OLD) INTERNAL_WAIT_CNT <= 20'd1200;
 				
 				case (COMM_ST)
 					CS_IDLE: begin
-						if (INTBACK_PERI && !INTBACK_WAIT_CNT && !SRES_EXEC && IRQV_N && IRQV_N_OLD) begin
+						if (INTBACK_PERI && !INTBACK_WAIT_CNT && !SRES_EXEC && IRQV_N) begin
 							INTBACK_PERI <= 0;
 							OREG_CNT <= '0;
 							COMM_ST <= CS_INTBACK_PERI;
-						end else if (COMREG_SET && !SRES_EXEC /*&& !INTERNAL_WAIT_CNT*/) begin
+						end else if (COMREG_SET && !SRES_EXEC) begin
 							COMREG_SET <= 0;
 							OREG_CNT <= '0;
 							COMM_ST <= CS_START;
@@ -525,7 +522,7 @@ module SMPC (
 							5'd1: OREG_RAM_D <= 8'h02;
 							5'd2: OREG_RAM_D <= JOY1[15:8];
 							5'd3: OREG_RAM_D <= JOY1[7:0];
-							5'd4: OREG_RAM_D <= 8'hF1;
+							5'd4: OREG_RAM_D <= JOY2_EN ? 8'hF1 : 8'hF0;
 							5'd5: OREG_RAM_D <= 8'h02;
 							5'd6: OREG_RAM_D <= JOY2[15:8];
 							5'd7: OREG_RAM_D <= JOY2[7:0];
@@ -628,7 +625,12 @@ module SMPC (
 				endcase
 			end
 			
-			if (!IRQV_N && IRQV_N_OLD) INTBACK_EXEC <= 0;
+			if (!IRQV_N && IRQV_N_OLD) begin
+				INTBACK_EXEC <= 0;
+				INTBACK_PERI <= 0;
+				SF <= 0;
+				SR[7:5] <= 3'b000;
+			end
 			
 			RW_N_OLD <= RW_N;
 			if (!RW_N && RW_N_OLD && !CS_N) begin
