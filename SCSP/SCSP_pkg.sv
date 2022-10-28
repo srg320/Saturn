@@ -135,12 +135,13 @@ package SCSP_PKG;
 	
 	typedef struct packed		//RW,100408
 	{
-		bit [ 4: 0] MSLC;		//RW
+		bit [ 4: 0] MSLC;		//W
 		bit [ 3: 0] CA;		//R
 		bit [ 1: 0] SGC;		//R
 		bit [ 4: 0] EG;		//R
 	} CR4_t;
-	parameter bit [15:0] CR4_MASK = 16'hFFFF;
+	parameter bit [15:0] CR4_RMASK = 16'h07FF;
+	parameter bit [15:0] CR4_WMASK = 16'hF800;
 	
 	typedef struct packed		//RW,100412
 	{

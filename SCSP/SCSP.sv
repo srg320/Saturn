@@ -307,17 +307,28 @@ module SCSP (
 	//Operation 2: MD read, ADP
 	bit  [ 9: 0] EVOL;//Current envelope volume
 	EGState_t    EST;//Current envelope state
-	
 	assign {EST,EVOL} = EVOL_RAM_Q;
+	
+	bit  [ 5: 0] STACK_RA;
+	always_comb begin
+		case (CYCLE_NUM[2:1])
+			2'b00: STACK_RA = {1'b0,OP7.SLOT};
+			2'b01: STACK_RA = {1'b0,OP7.SLOT};
+			2'b10: STACK_RA = {1'b0,OP2.SLOT} + SCR4.MDXSL;
+			2'b11: STACK_RA = {1'b0,OP2.SLOT} + SCR4.MDYSL;
+		endcase
+	end
 	
 	bit [15: 0] SAO;	//Sample offset integer
 	bit         SADIR;//Sample address direction
 	always @(posedge CLK or negedge RST_N) begin
-		bit [15:0] CUR_SO;
-		bit        CUR_SADIR;
-		bit [15:0] CALC_SO;
-		bit [15:0] MOD_SO;
-		bit [15:0] DELTA;
+		bit  [15: 0] SOUSX;
+		bit  [15: 0] SOUSY;
+		bit  [15: 0] CUR_SO;
+		bit          CUR_SADIR;
+		bit  [15: 0] CALC_SO;
+		bit  [15: 0] MOD_SO;
+		bit  [15: 0] DELTA;
 		
 		if (!RST_N) begin
 			// synopsys translate_off
@@ -328,6 +339,15 @@ module SCSP (
 			OP3 <= OP3_RESET;
 			WD_READ <= 0;
 		end else begin
+			if (CYCLE0_CE) begin
+				case (CYCLE_NUM[2:1])
+					2'b00: ;
+					2'b01: ;
+					2'b10: SOUSX <= STACK_RA[5] ? STACK1_Q : STACK0_Q;
+					2'b11: SOUSY <= STACK_RA[5] ? STACK1_Q : STACK0_Q;
+				endcase
+			end
+		
 			{CUR_SADIR,CUR_SO} = SO_RAM_Q;
 			
 			DELTA = {8'h00,OP2.PHASE_INT};
@@ -372,7 +392,7 @@ module SCSP (
 					{SADIR,SAO} <= '0;
 				end
 				
-				MOD_SO = CUR_SO + MDCalc(STACK0X_Q, STACK0Y_Q, SCR4.MDL);
+				MOD_SO = CUR_SO + MDCalc(SOUSX, SOUSY, SCR4.MDL);
 				ADP <= {SCR0.SAH,SA} + (!SCR0.PCM8B ? {3'b000,MOD_SO,1'b0} : {4'b0000,MOD_SO});
 				
 				OP3.SLOT <= OP2.SLOT;
@@ -1428,8 +1448,8 @@ module SCSP (
 								if (REG_WE[1]) CR3[15:8] <= REG_D[15:8] & CR3_MASK[15:8];
 							end
 							6'h08: begin
-								//if (MEM_WE[0]) CR4[ 7:0] <= MEM_D[ 7:0] & CR4_MASK[ 7:0];
-								//if (MEM_WE[1]) CR4[15:8] <= MEM_D[15:8] & CR4_MASK[15:8];
+								//if (MEM_WE[0]) CR4[ 7:0] <= MEM_D[ 7:0] & CR4_WMASK[ 7:0];
+								//if (MEM_WE[1]) CR4[15:8] <= MEM_D[15:8] & CR4_WMASK[15:8];
 								if (REG_WE[1]) CR4[15:11] <= REG_D[15:11];
 							end
 							6'h12: begin
@@ -1505,32 +1525,28 @@ module SCSP (
 					end
 				end else if (REG_RD_DELAY) begin
 					if (REG_A[11:10] == 2'b00) begin
-						for (int i=0; i<32; i++) begin
-							if (REG_A[9:5] == i) begin
-								case ({REG_A[4:1],1'b0})
-									5'h00: REG_Q <= SCR_SCR0_Q & SCR0_MASK;
-									5'h02: REG_Q <= SCR_SA_Q & SA_MASK;
-									5'h04: REG_Q <= SCR_LSA_Q & LSA_MASK;
-									5'h06: REG_Q <= SCR_LEA_Q & LEA_MASK;
-									5'h08: REG_Q <= SCR_SCR1_Q & SCR1_MASK;
-									5'h0A: REG_Q <= SCR_SCR2_Q & SCR2_MASK;
-									5'h0C: REG_Q <= SCR_SCR3_Q & SCR3_MASK;
-									5'h0E: REG_Q <= SCR_SCR4_Q & SCR4_MASK;
-									5'h10: REG_Q <= SCR_SCR5_Q & SCR5_MASK;
-									5'h12: REG_Q <= SCR_SCR6_Q & SCR6_MASK;
-									5'h14: REG_Q <= SCR_SCR7_Q & SCR7_MASK;
-									5'h16: REG_Q <= SCR_SCR8_Q & SCR8_MASK;
-									default:REG_Q <= '0;
-								endcase
-							end
-						end
+						case ({REG_A[4:1],1'b0})
+							5'h00: REG_Q <= SCR_SCR0_Q & SCR0_MASK;
+							5'h02: REG_Q <= SCR_SA_Q & SA_MASK;
+							5'h04: REG_Q <= SCR_LSA_Q & LSA_MASK;
+							5'h06: REG_Q <= SCR_LEA_Q & LEA_MASK;
+							5'h08: REG_Q <= SCR_SCR1_Q & SCR1_MASK;
+							5'h0A: REG_Q <= SCR_SCR2_Q & SCR2_MASK;
+							5'h0C: REG_Q <= SCR_SCR3_Q & SCR3_MASK;
+							5'h0E: REG_Q <= SCR_SCR4_Q & SCR4_MASK;
+							5'h10: REG_Q <= SCR_SCR5_Q & SCR5_MASK;
+							5'h12: REG_Q <= SCR_SCR6_Q & SCR6_MASK;
+							5'h14: REG_Q <= SCR_SCR7_Q & SCR7_MASK;
+							5'h16: REG_Q <= SCR_SCR8_Q & SCR8_MASK;
+							default:REG_Q <= '0;
+						endcase
 					end else if (REG_A[11:9] == 3'b010) begin
 						case ({REG_A[5:1],1'b0})
 							6'h00: REG_Q <= CR0 & CR0_MASK;
 							6'h02: REG_Q <= CR1 & CR1_MASK;
 							6'h04: REG_Q <= CR2 & CR2_MASK;
 							6'h06: REG_Q <= CR3 & CR3_MASK;
-							6'h08: REG_Q <= CR4 & CR4_MASK;
+							6'h08: REG_Q <= CR4 & CR4_RMASK;
 							6'h12: REG_Q <= CR5 & CR5_MASK;
 							6'h14: REG_Q <= CR6 & CR6_MASK;
 							6'h16: REG_Q <= CR7 & CR7_MASK;
@@ -1548,8 +1564,8 @@ module SCSP (
 							6'h2E: REG_Q <= CR19 & CR19_MASK;
 							default: REG_Q <= '0;
 						endcase
-					end else if (SOUS_SEL) begin
-						REG_Q <= STACK1_Q;
+//					end else if (SOUS_SEL) begin
+//						REG_Q <= STACK1_Q;
 					end else if (COEF_SEL) begin
 						REG_Q <= COEF_RAM_Q & COEF_MASK;
 					end else if (MADRS_SEL) begin
@@ -1651,10 +1667,9 @@ module SCSP (
 	
 	//STACK,100600-10067F
 	wire       SOUS_SEL = REG_A[11:7] == 5'b01100;
-	bit [15:0] STACK0X_Q,STACK0Y_Q,STACK1_Q;
-	SCSP_STACK_RAM STACK1 (CLK, OP7.SLOT, OP7.SD,   {2{~OP7.STWINH&SLOT1_CE}}, OP7.SLOT             , STACK1_Q);
-	SCSP_STACK_RAM STACK0X(CLK, OP7.SLOT, STACK1_Q, {2{            SLOT1_CE}}, OP2.SLOT + SCR4.MDXSL, STACK0X_Q);
-	SCSP_STACK_RAM STACK0Y(CLK, OP7.SLOT, STACK1_Q, {2{            SLOT1_CE}}, OP2.SLOT + SCR4.MDYSL, STACK0Y_Q);
+	bit [15:0] STACK0_Q,STACK1_Q;
+	SCSP_STACK_RAM STACK1 (CLK, OP7.SLOT, OP7.SD,   {2{~OP7.STWINH&CYCLE1_CE}}, STACK_RA[4:0], STACK1_Q);
+	SCSP_STACK_RAM STACK0 (CLK, OP7.SLOT, STACK1_Q, {2{            CYCLE1_CE}}, STACK_RA[4:0], STACK0_Q);
 	
 	//COEF,100700-10077F
 	wire       COEF_SEL = REG_A[11:7] == 5'b01110;
@@ -2202,76 +2217,42 @@ module SCSP_STACK_RAM
 
 	wire [15:0] sub_wire0;
 	
-	altdpram	altdpram_component_0 (
-				.data (DATA[7:0]),
+	altdpram	altdpram_component (
+				.data (DATA),
 				.inclock (CLK),
 				.rdaddress (RDADDR),
 				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
+				.wren (|WREN),
+				.byteena (WREN),
+				.q (sub_wire0),
 				.aclr (1'b0),
-				.byteena (1'b1),
 				.inclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 //				.sclr (1'b0),
 				.wraddressstall (1'b0));
 	defparam
-		altdpram_component_0.indata_aclr = "OFF",
-		altdpram_component_0.indata_reg = "INCLOCK",
-		altdpram_component_0.intended_device_family = "Cyclone V",
-		altdpram_component_0.lpm_type = "altdpram",
-		altdpram_component_0.outdata_aclr = "OFF",
-		altdpram_component_0.outdata_reg = "UNREGISTERED",
-		altdpram_component_0.ram_block_type = "MLAB",
-		altdpram_component_0.rdaddress_aclr = "OFF",
-		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_0.rdcontrol_aclr = "OFF",
-		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_0.width = 8,
-		altdpram_component_0.widthad = 5,
-		altdpram_component_0.width_byteena = 1,
-		altdpram_component_0.wraddress_aclr = "OFF",
-		altdpram_component_0.wraddress_reg = "INCLOCK",
-		altdpram_component_0.wrcontrol_aclr = "OFF",
-		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		altdpram_component.byte_size = 8,
+		altdpram_component.indata_aclr = "OFF",
+		altdpram_component.indata_reg = "INCLOCK",
+		altdpram_component.intended_device_family = "Cyclone V",
+		altdpram_component.lpm_type = "altdpram",
+		altdpram_component.outdata_aclr = "OFF",
+		altdpram_component.outdata_reg = "UNREGISTERED",
+		altdpram_component.ram_block_type = "MLAB",
+		altdpram_component.rdaddress_aclr = "OFF",
+		altdpram_component.rdaddress_reg = "UNREGISTERED",
+		altdpram_component.rdcontrol_aclr = "OFF",
+		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component.width = 16,
+		altdpram_component.widthad = 5,
+		altdpram_component.width_byteena = 2,
+		altdpram_component.wraddress_aclr = "OFF",
+		altdpram_component.wraddress_reg = "INCLOCK",
+		altdpram_component.wrcontrol_aclr = "OFF",
+		altdpram_component.wrcontrol_reg = "INCLOCK";
 		
-	altdpram	altdpram_component_1 (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_1.indata_aclr = "OFF",
-		altdpram_component_1.indata_reg = "INCLOCK",
-		altdpram_component_1.intended_device_family = "Cyclone V",
-		altdpram_component_1.lpm_type = "altdpram",
-		altdpram_component_1.outdata_aclr = "OFF",
-		altdpram_component_1.outdata_reg = "UNREGISTERED",
-		altdpram_component_1.ram_block_type = "MLAB",
-		altdpram_component_1.rdaddress_aclr = "OFF",
-		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_1.rdcontrol_aclr = "OFF",
-		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_1.width = 8,
-		altdpram_component_1.widthad = 5,
-		altdpram_component_1.width_byteena = 1,
-		altdpram_component_1.wraddress_aclr = "OFF",
-		altdpram_component_1.wraddress_reg = "INCLOCK",
-		altdpram_component_1.wrcontrol_aclr = "OFF",
-		altdpram_component_1.wrcontrol_reg = "INCLOCK";
-	
 	assign Q = sub_wire0;
 	
 `endif
@@ -2311,76 +2292,42 @@ module SCSP_RAM_8X2
 
 	wire [15:0] sub_wire0;
 	
-	altdpram	altdpram_component_0 (
-				.data (DATA[7:0]),
+	altdpram	altdpram_component (
+				.data (DATA),
 				.inclock (CLK),
 				.rdaddress (RDADDR),
 				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
+				.wren (|WREN),
+				.byteena (WREN),
+				.q (sub_wire0),
 				.aclr (1'b0),
-				.byteena (1'b1),
 				.inclocken (1'b1),
 				.rdaddressstall (1'b0),
 				.rden (1'b1),
 //				.sclr (1'b0),
 				.wraddressstall (1'b0));
 	defparam
-		altdpram_component_0.indata_aclr = "OFF",
-		altdpram_component_0.indata_reg = "INCLOCK",
-		altdpram_component_0.intended_device_family = "Cyclone V",
-		altdpram_component_0.lpm_type = "altdpram",
-		altdpram_component_0.outdata_aclr = "OFF",
-		altdpram_component_0.outdata_reg = "UNREGISTERED",
-		altdpram_component_0.ram_block_type = "MLAB",
-		altdpram_component_0.rdaddress_aclr = "OFF",
-		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_0.rdcontrol_aclr = "OFF",
-		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_0.width = 8,
-		altdpram_component_0.widthad = addr_width,
-		altdpram_component_0.width_byteena = 1,
-		altdpram_component_0.wraddress_aclr = "OFF",
-		altdpram_component_0.wraddress_reg = "INCLOCK",
-		altdpram_component_0.wrcontrol_aclr = "OFF",
-		altdpram_component_0.wrcontrol_reg = "INCLOCK";
+		altdpram_component.byte_size = 8,
+		altdpram_component.indata_aclr = "OFF",
+		altdpram_component.indata_reg = "INCLOCK",
+		altdpram_component.intended_device_family = "Cyclone V",
+		altdpram_component.lpm_type = "altdpram",
+		altdpram_component.outdata_aclr = "OFF",
+		altdpram_component.outdata_reg = "UNREGISTERED",
+		altdpram_component.ram_block_type = "MLAB",
+		altdpram_component.rdaddress_aclr = "OFF",
+		altdpram_component.rdaddress_reg = "UNREGISTERED",
+		altdpram_component.rdcontrol_aclr = "OFF",
+		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+		altdpram_component.width = 16,
+		altdpram_component.widthad = addr_width,
+		altdpram_component.width_byteena = 2,
+		altdpram_component.wraddress_aclr = "OFF",
+		altdpram_component.wraddress_reg = "INCLOCK",
+		altdpram_component.wrcontrol_aclr = "OFF",
+		altdpram_component.wrcontrol_reg = "INCLOCK";
 		
-	altdpram	altdpram_component_1 (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_1.indata_aclr = "OFF",
-		altdpram_component_1.indata_reg = "INCLOCK",
-		altdpram_component_1.intended_device_family = "Cyclone V",
-		altdpram_component_1.lpm_type = "altdpram",
-		altdpram_component_1.outdata_aclr = "OFF",
-		altdpram_component_1.outdata_reg = "UNREGISTERED",
-		altdpram_component_1.ram_block_type = "MLAB",
-		altdpram_component_1.rdaddress_aclr = "OFF",
-		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_1.rdcontrol_aclr = "OFF",
-		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_1.width = 8,
-		altdpram_component_1.widthad = addr_width,
-		altdpram_component_1.width_byteena = 1,
-		altdpram_component_1.wraddress_aclr = "OFF",
-		altdpram_component_1.wraddress_reg = "INCLOCK",
-		altdpram_component_1.wrcontrol_aclr = "OFF",
-		altdpram_component_1.wrcontrol_reg = "INCLOCK";
-	
 	assign Q = sub_wire0;
 	
 `else
@@ -2475,151 +2422,47 @@ module SCSP_RAM_8X4
 		
 	assign Q = MEM[RDADDR];
 	
-`elsif DEBUG
-
-	wire [31:0] sub_wire0;
-	
-	altdpram	altdpram_component_0 (
-				.data (DATA[7:0]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_0.indata_aclr = "OFF",
-		altdpram_component_0.indata_reg = "INCLOCK",
-		altdpram_component_0.intended_device_family = "Cyclone V",
-		altdpram_component_0.lpm_type = "altdpram",
-		altdpram_component_0.outdata_aclr = "OFF",
-		altdpram_component_0.outdata_reg = "UNREGISTERED",
-		altdpram_component_0.ram_block_type = "MLAB",
-		altdpram_component_0.rdaddress_aclr = "OFF",
-		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_0.rdcontrol_aclr = "OFF",
-		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_0.width = 8,
-		altdpram_component_0.widthad = addr_width,
-		altdpram_component_0.width_byteena = 1,
-		altdpram_component_0.wraddress_aclr = "OFF",
-		altdpram_component_0.wraddress_reg = "INCLOCK",
-		altdpram_component_0.wrcontrol_aclr = "OFF",
-		altdpram_component_0.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_1 (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_1.indata_aclr = "OFF",
-		altdpram_component_1.indata_reg = "INCLOCK",
-		altdpram_component_1.intended_device_family = "Cyclone V",
-		altdpram_component_1.lpm_type = "altdpram",
-		altdpram_component_1.outdata_aclr = "OFF",
-		altdpram_component_1.outdata_reg = "UNREGISTERED",
-		altdpram_component_1.ram_block_type = "MLAB",
-		altdpram_component_1.rdaddress_aclr = "OFF",
-		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_1.rdcontrol_aclr = "OFF",
-		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_1.width = 8,
-		altdpram_component_1.widthad = addr_width,
-		altdpram_component_1.width_byteena = 1,
-		altdpram_component_1.wraddress_aclr = "OFF",
-		altdpram_component_1.wraddress_reg = "INCLOCK",
-		altdpram_component_1.wrcontrol_aclr = "OFF",
-		altdpram_component_1.wrcontrol_reg = "INCLOCK";
-	
-	altdpram	altdpram_component_2 (
-				.data (DATA[23:16]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[2]),
-				.q (sub_wire0[23:16]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_2.indata_aclr = "OFF",
-		altdpram_component_2.indata_reg = "INCLOCK",
-		altdpram_component_2.intended_device_family = "Cyclone V",
-		altdpram_component_2.lpm_type = "altdpram",
-		altdpram_component_2.outdata_aclr = "OFF",
-		altdpram_component_2.outdata_reg = "UNREGISTERED",
-		altdpram_component_2.ram_block_type = "MLAB",
-		altdpram_component_2.rdaddress_aclr = "OFF",
-		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_2.rdcontrol_aclr = "OFF",
-		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_2.width = 8,
-		altdpram_component_2.widthad = addr_width,
-		altdpram_component_2.width_byteena = 1,
-		altdpram_component_2.wraddress_aclr = "OFF",
-		altdpram_component_2.wraddress_reg = "INCLOCK",
-		altdpram_component_2.wrcontrol_aclr = "OFF",
-		altdpram_component_2.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_3 (
-				.data (DATA[31:24]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[3]),
-				.q (sub_wire0[31:24]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_3.indata_aclr = "OFF",
-		altdpram_component_3.indata_reg = "INCLOCK",
-		altdpram_component_3.intended_device_family = "Cyclone V",
-		altdpram_component_3.lpm_type = "altdpram",
-		altdpram_component_3.outdata_aclr = "OFF",
-		altdpram_component_3.outdata_reg = "UNREGISTERED",
-		altdpram_component_3.ram_block_type = "MLAB",
-		altdpram_component_3.rdaddress_aclr = "OFF",
-		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_3.rdcontrol_aclr = "OFF",
-		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_3.width = 8,
-		altdpram_component_3.widthad = addr_width,
-		altdpram_component_3.width_byteena = 1,
-		altdpram_component_3.wraddress_aclr = "OFF",
-		altdpram_component_3.wraddress_reg = "INCLOCK",
-		altdpram_component_3.wrcontrol_aclr = "OFF",
-		altdpram_component_3.wrcontrol_reg = "INCLOCK";
-	
-	assign Q = sub_wire0;
+//`elsif DEBUG
+//
+//	wire [31:0] sub_wire0;
+//	
+//	altdpram	altdpram_component (
+//				.data (DATA),
+//				.inclock (CLK),
+//				.rdaddress (RDADDR),
+//				.wraddress (WRADDR),
+//				.wren (|WREN),
+//				.byteena (WREN),
+//				.q (sub_wire0),
+//				.aclr (1'b0),
+//				.inclocken (1'b1),
+//				.rdaddressstall (1'b0),
+//				.rden (1'b1),
+////				.sclr (1'b0),
+//				.wraddressstall (1'b0));
+//	defparam
+//		altdpram_component.byte_size = 8,
+//		altdpram_component.indata_aclr = "OFF",
+//		altdpram_component.indata_reg = "INCLOCK",
+//		altdpram_component.intended_device_family = "Cyclone V",
+//		altdpram_component.lpm_type = "altdpram",
+//		altdpram_component.outdata_aclr = "OFF",
+//		altdpram_component.outdata_reg = "UNREGISTERED",
+//		altdpram_component.ram_block_type = "MLAB",
+//		altdpram_component.rdaddress_aclr = "OFF",
+//		altdpram_component.rdaddress_reg = "UNREGISTERED",
+//		altdpram_component.rdcontrol_aclr = "OFF",
+//		altdpram_component.rdcontrol_reg = "UNREGISTERED",
+//		altdpram_component.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
+//		altdpram_component.width = 32,
+//		altdpram_component.widthad = addr_width,
+//		altdpram_component.width_byteena = 4,
+//		altdpram_component.wraddress_aclr = "OFF",
+//		altdpram_component.wraddress_reg = "INCLOCK",
+//		altdpram_component.wrcontrol_aclr = "OFF",
+//		altdpram_component.wrcontrol_reg = "INCLOCK";
+//	
+//	assign Q = sub_wire0;
 	
 `else
 
@@ -2677,851 +2520,6 @@ module SCSP_RAM_8X4
 `endif
 	
 endmodule
-
-module SCSP_COEF_RAM
-(
-	input          CLK,
-	
-	input  [ 5: 0] WRADDR,
-	input  [15: 0] DATA,
-	input  [ 1: 0] WREN,
-	input  [ 5: 0] RDADDR,
-	output [15: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [15:0] MEM [64];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WRADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RDADDR];
-	
-`elsif DEBUG
-
-	wire [15:0] sub_wire0;
-	
-	altdpram	altdpram_component_l (
-				.data (DATA[7:0]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_l.indata_aclr = "OFF",
-		altdpram_component_l.indata_reg = "INCLOCK",
-		altdpram_component_l.intended_device_family = "Cyclone V",
-		altdpram_component_l.lpm_type = "altdpram",
-		altdpram_component_l.outdata_aclr = "OFF",
-		altdpram_component_l.outdata_reg = "UNREGISTERED",
-		altdpram_component_l.ram_block_type = "MLAB",
-		altdpram_component_l.rdaddress_aclr = "OFF",
-		altdpram_component_l.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_l.rdcontrol_aclr = "OFF",
-		altdpram_component_l.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_l.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_l.width = 8,
-		altdpram_component_l.widthad = 6,
-		altdpram_component_l.width_byteena = 1,
-		altdpram_component_l.wraddress_aclr = "OFF",
-		altdpram_component_l.wraddress_reg = "INCLOCK",
-		altdpram_component_l.wrcontrol_aclr = "OFF",
-		altdpram_component_l.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_h (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_h.indata_aclr = "OFF",
-		altdpram_component_h.indata_reg = "INCLOCK",
-		altdpram_component_h.intended_device_family = "Cyclone V",
-		altdpram_component_h.lpm_type = "altdpram",
-		altdpram_component_h.outdata_aclr = "OFF",
-		altdpram_component_h.outdata_reg = "UNREGISTERED",
-		altdpram_component_h.ram_block_type = "MLAB",
-		altdpram_component_h.rdaddress_aclr = "OFF",
-		altdpram_component_h.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_h.rdcontrol_aclr = "OFF",
-		altdpram_component_h.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_h.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_h.width = 8,
-		altdpram_component_h.widthad = 6,
-		altdpram_component_h.width_byteena = 1,
-		altdpram_component_h.wraddress_aclr = "OFF",
-		altdpram_component_h.wraddress_reg = "INCLOCK",
-		altdpram_component_h.wrcontrol_aclr = "OFF",
-		altdpram_component_h.wrcontrol_reg = "INCLOCK";
-	
-	assign Q = sub_wire0;
-	
-`else
-
-	wire [15:0] sub_wire0;
-	
-	altsyncram	altsyncram_component (
-				.address_a (WRADDR),
-				.byteena_a (WREN),
-				.clock0 (CLK),
-				.data_a (DATA),
-				.wren_a (|WREN),
-				.address_b (RDADDR),
-				.q_b (sub_wire0),
-				.aclr0 (1'b0),
-				.aclr1 (1'b0),
-				.addressstall_a (1'b0),
-				.addressstall_b (1'b0),
-				.byteena_b (1'b1),
-				.clock1 (1'b1),
-				.clocken0 (1'b1),
-				.clocken1 (1'b1),
-				.clocken2 (1'b1),
-				.clocken3 (1'b1),
-				.data_b ({16{1'b1}}),
-				.eccstatus (),
-				.q_a (),
-				.rden_a (1'b1),
-				.rden_b (1'b1),
-				.wren_b (1'b0));
-	defparam
-		altsyncram_component.address_aclr_b = "NONE",
-		altsyncram_component.address_reg_b = "CLOCK0",
-		altsyncram_component.byte_size = 8,
-		altsyncram_component.clock_enable_input_a = "BYPASS",
-		altsyncram_component.clock_enable_input_b = "BYPASS",
-		altsyncram_component.clock_enable_output_b = "BYPASS",
-		altsyncram_component.intended_device_family = "Cyclone V",
-		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 64,
-		altsyncram_component.numwords_b = 64,
-		altsyncram_component.operation_mode = "DUAL_PORT",
-		altsyncram_component.outdata_aclr_b = "NONE",
-		altsyncram_component.outdata_reg_b = "UNREGISTERED",
-		altsyncram_component.power_up_uninitialized = "FALSE",
-		altsyncram_component.ram_block_type = "M10K",
-		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.widthad_a = 6,
-		altsyncram_component.widthad_b = 6,
-		altsyncram_component.width_a = 16,
-		altsyncram_component.width_b = 16,
-		altsyncram_component.width_byteena_a = 2;
-	
-	assign Q = sub_wire0;
-	
-`endif
-	
-endmodule
-
-module SCSP_MADRS_RAM
-(
-	input          CLK,
-	
-	input  [ 4: 0] WRADDR,
-	input  [15: 0] DATA,
-	input  [ 1: 0] WREN,
-	input  [ 4: 0] RDADDR,
-	output [15: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [15:0] MEM [32];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WRADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RDADDR];
-	
-`elsif DEBUG
-
-	wire [15:0] sub_wire0;
-	
-	altdpram	altdpram_component_l (
-				.data (DATA[7:0]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_l.indata_aclr = "OFF",
-		altdpram_component_l.indata_reg = "INCLOCK",
-		altdpram_component_l.intended_device_family = "Cyclone V",
-		altdpram_component_l.lpm_type = "altdpram",
-		altdpram_component_l.outdata_aclr = "OFF",
-		altdpram_component_l.outdata_reg = "UNREGISTERED",
-		altdpram_component_l.ram_block_type = "MLAB",
-		altdpram_component_l.rdaddress_aclr = "OFF",
-		altdpram_component_l.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_l.rdcontrol_aclr = "OFF",
-		altdpram_component_l.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_l.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_l.width = 8,
-		altdpram_component_l.widthad = 5,
-		altdpram_component_l.width_byteena = 1,
-		altdpram_component_l.wraddress_aclr = "OFF",
-		altdpram_component_l.wraddress_reg = "INCLOCK",
-		altdpram_component_l.wrcontrol_aclr = "OFF",
-		altdpram_component_l.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_h (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_h.indata_aclr = "OFF",
-		altdpram_component_h.indata_reg = "INCLOCK",
-		altdpram_component_h.intended_device_family = "Cyclone V",
-		altdpram_component_h.lpm_type = "altdpram",
-		altdpram_component_h.outdata_aclr = "OFF",
-		altdpram_component_h.outdata_reg = "UNREGISTERED",
-		altdpram_component_h.ram_block_type = "MLAB",
-		altdpram_component_h.rdaddress_aclr = "OFF",
-		altdpram_component_h.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_h.rdcontrol_aclr = "OFF",
-		altdpram_component_h.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_h.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_h.width = 8,
-		altdpram_component_h.widthad = 5,
-		altdpram_component_h.width_byteena = 1,
-		altdpram_component_h.wraddress_aclr = "OFF",
-		altdpram_component_h.wraddress_reg = "INCLOCK",
-		altdpram_component_h.wrcontrol_aclr = "OFF",
-		altdpram_component_h.wrcontrol_reg = "INCLOCK";
-	
-	assign Q = sub_wire0;
-	
-`else
-
-	wire [15:0] sub_wire0;
-	
-	altsyncram	altsyncram_component (
-				.address_a (WRADDR),
-				.byteena_a (WREN),
-				.clock0 (CLK),
-				.data_a (DATA),
-				.wren_a (|WREN),
-				.address_b (RDADDR),
-				.q_b (sub_wire0),
-				.aclr0 (1'b0),
-				.aclr1 (1'b0),
-				.addressstall_a (1'b0),
-				.addressstall_b (1'b0),
-				.byteena_b (1'b1),
-				.clock1 (1'b1),
-				.clocken0 (1'b1),
-				.clocken1 (1'b1),
-				.clocken2 (1'b1),
-				.clocken3 (1'b1),
-				.data_b ({16{1'b1}}),
-				.eccstatus (),
-				.q_a (),
-				.rden_a (1'b1),
-				.rden_b (1'b1),
-				.wren_b (1'b0));
-	defparam
-		altsyncram_component.address_aclr_b = "NONE",
-		altsyncram_component.address_reg_b = "CLOCK0",
-		altsyncram_component.byte_size = 8,
-		altsyncram_component.clock_enable_input_a = "BYPASS",
-		altsyncram_component.clock_enable_input_b = "BYPASS",
-		altsyncram_component.clock_enable_output_b = "BYPASS",
-		altsyncram_component.intended_device_family = "Cyclone V",
-		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 32,
-		altsyncram_component.numwords_b = 32,
-		altsyncram_component.operation_mode = "DUAL_PORT",
-		altsyncram_component.outdata_aclr_b = "NONE",
-		altsyncram_component.outdata_reg_b = "UNREGISTERED",
-		altsyncram_component.power_up_uninitialized = "FALSE",
-		altsyncram_component.ram_block_type = "M10K",
-		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.widthad_a = 5,
-		altsyncram_component.widthad_b = 5,
-		altsyncram_component.width_a = 16,
-		altsyncram_component.width_b = 16,
-		altsyncram_component.width_byteena_a = 2;
-	
-	assign Q = sub_wire0;
-	
-`endif
-	
-endmodule
-
-module SCSP_TEMP_RAM
-(
-	input          CLK,
-	
-	input  [ 6: 0] WRADDR,
-	input  [31: 0] DATA,
-	input  [ 3: 0] WREN,
-	input  [ 6: 0] RDADDR,
-	output [31: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [31:0] MEM [128];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WRADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RDADDR];
-	
-`else
-
-	wire [31:0] sub_wire0;
-	
-	altsyncram	altsyncram_component (
-				.address_a (WRADDR),
-				.byteena_a (WREN),
-				.clock0 (CLK),
-				.data_a (DATA),
-				.wren_a (|WREN),
-				.address_b (RDADDR),
-				.q_b (sub_wire0),
-				.aclr0 (1'b0),
-				.aclr1 (1'b0),
-				.addressstall_a (1'b0),
-				.addressstall_b (1'b0),
-				.byteena_b (1'b1),
-				.clock1 (1'b1),
-				.clocken0 (1'b1),
-				.clocken1 (1'b1),
-				.clocken2 (1'b1),
-				.clocken3 (1'b1),
-				.data_b ({32{1'b1}}),
-				.eccstatus (),
-				.q_a (),
-				.rden_a (1'b1),
-				.rden_b (1'b1),
-				.wren_b (1'b0));
-	defparam
-		altsyncram_component.address_aclr_b = "NONE",
-		altsyncram_component.address_reg_b = "CLOCK0",
-		altsyncram_component.byte_size = 8,
-		altsyncram_component.clock_enable_input_a = "BYPASS",
-		altsyncram_component.clock_enable_input_b = "BYPASS",
-		altsyncram_component.clock_enable_output_b = "BYPASS",
-		altsyncram_component.intended_device_family = "Cyclone V",
-		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 128,
-		altsyncram_component.numwords_b = 128,
-		altsyncram_component.operation_mode = "DUAL_PORT",
-		altsyncram_component.outdata_aclr_b = "NONE",
-		altsyncram_component.outdata_reg_b = "UNREGISTERED",
-		altsyncram_component.power_up_uninitialized = "FALSE",
-		altsyncram_component.ram_block_type = "M10K",
-		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.widthad_a = 7,
-		altsyncram_component.widthad_b = 7,
-		altsyncram_component.width_a = 32,
-		altsyncram_component.width_b = 32,
-		altsyncram_component.width_byteena_a = 4;
-	
-	assign Q = sub_wire0;
-	
-`endif
-	
-endmodule
-
-module SCSP_MEMS_RAM
-(
-	input          CLK,
-	
-	input  [ 4: 0] WRADDR,
-	input  [31: 0] DATA,
-	input  [ 3: 0] WREN,
-	input  [ 4: 0] RDADDR,
-	output [31: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [31:0] MEM [32];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WRADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RDADDR];
-	
-`elsif DEBUG
-
-	wire [31:0] sub_wire0;
-	
-	altdpram	altdpram_component_0 (
-				.data (DATA[7:0]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_0.indata_aclr = "OFF",
-		altdpram_component_0.indata_reg = "INCLOCK",
-		altdpram_component_0.intended_device_family = "Cyclone V",
-		altdpram_component_0.lpm_type = "altdpram",
-		altdpram_component_0.outdata_aclr = "OFF",
-		altdpram_component_0.outdata_reg = "UNREGISTERED",
-		altdpram_component_0.ram_block_type = "MLAB",
-		altdpram_component_0.rdaddress_aclr = "OFF",
-		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_0.rdcontrol_aclr = "OFF",
-		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_0.width = 8,
-		altdpram_component_0.widthad = 5,
-		altdpram_component_0.width_byteena = 1,
-		altdpram_component_0.wraddress_aclr = "OFF",
-		altdpram_component_0.wraddress_reg = "INCLOCK",
-		altdpram_component_0.wrcontrol_aclr = "OFF",
-		altdpram_component_0.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_1 (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_1.indata_aclr = "OFF",
-		altdpram_component_1.indata_reg = "INCLOCK",
-		altdpram_component_1.intended_device_family = "Cyclone V",
-		altdpram_component_1.lpm_type = "altdpram",
-		altdpram_component_1.outdata_aclr = "OFF",
-		altdpram_component_1.outdata_reg = "UNREGISTERED",
-		altdpram_component_1.ram_block_type = "MLAB",
-		altdpram_component_1.rdaddress_aclr = "OFF",
-		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_1.rdcontrol_aclr = "OFF",
-		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_1.width = 8,
-		altdpram_component_1.widthad = 5,
-		altdpram_component_1.width_byteena = 1,
-		altdpram_component_1.wraddress_aclr = "OFF",
-		altdpram_component_1.wraddress_reg = "INCLOCK",
-		altdpram_component_1.wrcontrol_aclr = "OFF",
-		altdpram_component_1.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_2 (
-				.data (DATA[23:16]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[2]),
-				.q (sub_wire0[23:16]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_2.indata_aclr = "OFF",
-		altdpram_component_2.indata_reg = "INCLOCK",
-		altdpram_component_2.intended_device_family = "Cyclone V",
-		altdpram_component_2.lpm_type = "altdpram",
-		altdpram_component_2.outdata_aclr = "OFF",
-		altdpram_component_2.outdata_reg = "UNREGISTERED",
-		altdpram_component_2.ram_block_type = "MLAB",
-		altdpram_component_2.rdaddress_aclr = "OFF",
-		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_2.rdcontrol_aclr = "OFF",
-		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_2.width = 8,
-		altdpram_component_2.widthad = 5,
-		altdpram_component_2.width_byteena = 1,
-		altdpram_component_2.wraddress_aclr = "OFF",
-		altdpram_component_2.wraddress_reg = "INCLOCK",
-		altdpram_component_2.wrcontrol_aclr = "OFF",
-		altdpram_component_2.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_3 (
-				.data (DATA[31:24]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[3]),
-				.q (sub_wire0[31:24]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_3.indata_aclr = "OFF",
-		altdpram_component_3.indata_reg = "INCLOCK",
-		altdpram_component_3.intended_device_family = "Cyclone V",
-		altdpram_component_3.lpm_type = "altdpram",
-		altdpram_component_3.outdata_aclr = "OFF",
-		altdpram_component_3.outdata_reg = "UNREGISTERED",
-		altdpram_component_3.ram_block_type = "MLAB",
-		altdpram_component_3.rdaddress_aclr = "OFF",
-		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_3.rdcontrol_aclr = "OFF",
-		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_3.width = 8,
-		altdpram_component_3.widthad = 5,
-		altdpram_component_3.width_byteena = 1,
-		altdpram_component_3.wraddress_aclr = "OFF",
-		altdpram_component_3.wraddress_reg = "INCLOCK",
-		altdpram_component_3.wrcontrol_aclr = "OFF",
-		altdpram_component_3.wrcontrol_reg = "INCLOCK";
-	
-	assign Q = sub_wire0;
-	
-`else
-
-	wire [31:0] sub_wire0;
-	
-	altsyncram	altsyncram_component (
-				.address_a (WRADDR),
-				.byteena_a (WREN),
-				.clock0 (CLK),
-				.data_a (DATA),
-				.wren_a (|WREN),
-				.address_b (RDADDR),
-				.q_b (sub_wire0),
-				.aclr0 (1'b0),
-				.aclr1 (1'b0),
-				.addressstall_a (1'b0),
-				.addressstall_b (1'b0),
-				.byteena_b (1'b1),
-				.clock1 (1'b1),
-				.clocken0 (1'b1),
-				.clocken1 (1'b1),
-				.clocken2 (1'b1),
-				.clocken3 (1'b1),
-				.data_b ({32{1'b1}}),
-				.eccstatus (),
-				.q_a (),
-				.rden_a (1'b1),
-				.rden_b (1'b1),
-				.wren_b (1'b0));
-	defparam
-		altsyncram_component.address_aclr_b = "NONE",
-		altsyncram_component.address_reg_b = "CLOCK0",
-		altsyncram_component.byte_size = 8,
-		altsyncram_component.clock_enable_input_a = "BYPASS",
-		altsyncram_component.clock_enable_input_b = "BYPASS",
-		altsyncram_component.clock_enable_output_b = "BYPASS",
-		altsyncram_component.intended_device_family = "Cyclone V",
-		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 32,
-		altsyncram_component.numwords_b = 32,
-		altsyncram_component.operation_mode = "DUAL_PORT",
-		altsyncram_component.outdata_aclr_b = "NONE",
-		altsyncram_component.outdata_reg_b = "UNREGISTERED",
-		altsyncram_component.power_up_uninitialized = "FALSE",
-		altsyncram_component.ram_block_type = "M10K",
-		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.widthad_a = 5,
-		altsyncram_component.widthad_b = 5,
-		altsyncram_component.width_a = 32,
-		altsyncram_component.width_b = 32,
-		altsyncram_component.width_byteena_a = 4;
-	
-	assign Q = sub_wire0;
-	
-`endif
-	
-endmodule
-
-module SCSP_MIXS_RAM
-(
-	input          CLK,
-	
-	input  [ 3: 0] WRADDR,
-	input  [31: 0] DATA,
-	input  [ 3: 0] WREN,
-	input  [ 3: 0] RDADDR,
-	output [31: 0] Q
-);
-
-`ifdef SIM
-	
-	reg [31:0] MEM [16];
-	
-	always @(posedge CLK) begin
-		if (WREN) begin
-			MEM[WRADDR] <= DATA;
-		end
-	end
-		
-	assign Q = MEM[RDADDR];
-	
-`elsif DEBUG
-
-	wire [31:0] sub_wire0;
-	
-	altdpram	altdpram_component_0 (
-				.data (DATA[7:0]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[0]),
-				.q (sub_wire0[7:0]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_0.indata_aclr = "OFF",
-		altdpram_component_0.indata_reg = "INCLOCK",
-		altdpram_component_0.intended_device_family = "Cyclone V",
-		altdpram_component_0.lpm_type = "altdpram",
-		altdpram_component_0.outdata_aclr = "OFF",
-		altdpram_component_0.outdata_reg = "UNREGISTERED",
-		altdpram_component_0.ram_block_type = "MLAB",
-		altdpram_component_0.rdaddress_aclr = "OFF",
-		altdpram_component_0.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_0.rdcontrol_aclr = "OFF",
-		altdpram_component_0.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_0.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_0.width = 8,
-		altdpram_component_0.widthad = 4,
-		altdpram_component_0.width_byteena = 1,
-		altdpram_component_0.wraddress_aclr = "OFF",
-		altdpram_component_0.wraddress_reg = "INCLOCK",
-		altdpram_component_0.wrcontrol_aclr = "OFF",
-		altdpram_component_0.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_1 (
-				.data (DATA[15:8]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[1]),
-				.q (sub_wire0[15:8]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_1.indata_aclr = "OFF",
-		altdpram_component_1.indata_reg = "INCLOCK",
-		altdpram_component_1.intended_device_family = "Cyclone V",
-		altdpram_component_1.lpm_type = "altdpram",
-		altdpram_component_1.outdata_aclr = "OFF",
-		altdpram_component_1.outdata_reg = "UNREGISTERED",
-		altdpram_component_1.ram_block_type = "MLAB",
-		altdpram_component_1.rdaddress_aclr = "OFF",
-		altdpram_component_1.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_1.rdcontrol_aclr = "OFF",
-		altdpram_component_1.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_1.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_1.width = 8,
-		altdpram_component_1.widthad = 4,
-		altdpram_component_1.width_byteena = 1,
-		altdpram_component_1.wraddress_aclr = "OFF",
-		altdpram_component_1.wraddress_reg = "INCLOCK",
-		altdpram_component_1.wrcontrol_aclr = "OFF",
-		altdpram_component_1.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_2 (
-				.data (DATA[23:16]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[2]),
-				.q (sub_wire0[23:16]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_2.indata_aclr = "OFF",
-		altdpram_component_2.indata_reg = "INCLOCK",
-		altdpram_component_2.intended_device_family = "Cyclone V",
-		altdpram_component_2.lpm_type = "altdpram",
-		altdpram_component_2.outdata_aclr = "OFF",
-		altdpram_component_2.outdata_reg = "UNREGISTERED",
-		altdpram_component_2.ram_block_type = "MLAB",
-		altdpram_component_2.rdaddress_aclr = "OFF",
-		altdpram_component_2.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_2.rdcontrol_aclr = "OFF",
-		altdpram_component_2.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_2.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_2.width = 8,
-		altdpram_component_2.widthad = 4,
-		altdpram_component_2.width_byteena = 1,
-		altdpram_component_2.wraddress_aclr = "OFF",
-		altdpram_component_2.wraddress_reg = "INCLOCK",
-		altdpram_component_2.wrcontrol_aclr = "OFF",
-		altdpram_component_2.wrcontrol_reg = "INCLOCK";
-		
-	altdpram	altdpram_component_3 (
-				.data (DATA[31:24]),
-				.inclock (CLK),
-				.rdaddress (RDADDR),
-				.wraddress (WRADDR),
-				.wren (WREN[3]),
-				.q (sub_wire0[31:24]),
-				.aclr (1'b0),
-				.byteena (1'b1),
-				.inclocken (1'b1),
-				.rdaddressstall (1'b0),
-				.rden (1'b1),
-//				.sclr (1'b0),
-				.wraddressstall (1'b0));
-	defparam
-		altdpram_component_3.indata_aclr = "OFF",
-		altdpram_component_3.indata_reg = "INCLOCK",
-		altdpram_component_3.intended_device_family = "Cyclone V",
-		altdpram_component_3.lpm_type = "altdpram",
-		altdpram_component_3.outdata_aclr = "OFF",
-		altdpram_component_3.outdata_reg = "UNREGISTERED",
-		altdpram_component_3.ram_block_type = "MLAB",
-		altdpram_component_3.rdaddress_aclr = "OFF",
-		altdpram_component_3.rdaddress_reg = "UNREGISTERED",
-		altdpram_component_3.rdcontrol_aclr = "OFF",
-		altdpram_component_3.rdcontrol_reg = "UNREGISTERED",
-		altdpram_component_3.read_during_write_mode_mixed_ports = "CONSTRAINED_DONT_CARE",
-		altdpram_component_3.width = 8,
-		altdpram_component_3.widthad = 4,
-		altdpram_component_3.width_byteena = 1,
-		altdpram_component_3.wraddress_aclr = "OFF",
-		altdpram_component_3.wraddress_reg = "INCLOCK",
-		altdpram_component_3.wrcontrol_aclr = "OFF",
-		altdpram_component_3.wrcontrol_reg = "INCLOCK";
-	
-	assign Q = sub_wire0;
-
-`else
-
-	wire [31:0] sub_wire0;
-	
-	altsyncram	altsyncram_component (
-				.address_a (WRADDR),
-				.byteena_a (WREN),
-				.clock0 (CLK),
-				.data_a (DATA),
-				.wren_a (|WREN),
-				.address_b (RDADDR),
-				.q_b (sub_wire0),
-				.aclr0 (1'b0),
-				.aclr1 (1'b0),
-				.addressstall_a (1'b0),
-				.addressstall_b (1'b0),
-				.byteena_b (1'b1),
-				.clock1 (1'b1),
-				.clocken0 (1'b1),
-				.clocken1 (1'b1),
-				.clocken2 (1'b1),
-				.clocken3 (1'b1),
-				.data_b ({16{1'b1}}),
-				.eccstatus (),
-				.q_a (),
-				.rden_a (1'b1),
-				.rden_b (1'b1),
-				.wren_b (1'b0));
-	defparam
-		altsyncram_component.address_aclr_b = "NONE",
-		altsyncram_component.address_reg_b = "CLOCK0",
-		altsyncram_component.byte_size = 8,
-		altsyncram_component.clock_enable_input_a = "BYPASS",
-		altsyncram_component.clock_enable_input_b = "BYPASS",
-		altsyncram_component.clock_enable_output_b = "BYPASS",
-		altsyncram_component.intended_device_family = "Cyclone V",
-		altsyncram_component.lpm_type = "altsyncram",
-		altsyncram_component.numwords_a = 16,
-		altsyncram_component.numwords_b = 16,
-		altsyncram_component.operation_mode = "DUAL_PORT",
-		altsyncram_component.outdata_aclr_b = "NONE",
-		altsyncram_component.outdata_reg_b = "UNREGISTERED",
-		altsyncram_component.power_up_uninitialized = "FALSE",
-		altsyncram_component.ram_block_type = "M10K",
-		altsyncram_component.read_during_write_mode_mixed_ports = "DONT_CARE",
-		altsyncram_component.widthad_a = 4,
-		altsyncram_component.widthad_b = 4,
-		altsyncram_component.width_a = 32,
-		altsyncram_component.width_b = 32,
-		altsyncram_component.width_byteena_a = 4;
-	
-	assign Q = sub_wire0;
-	
-`endif
-	
-endmodule
-
 
 module SCSP_MPRO_RAM
 (
