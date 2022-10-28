@@ -80,7 +80,7 @@ module DCC (
 	
 	assign WAIT_N = WTIN_N;///////////////////////
 	
-	assign IREQ_N = {VINT_N,VINT_N&HINT_N};////////////////
+	assign IREQ_N = {VINT_N,VINT_N&HINT_N};
 	
 	assign ROMCE_N = ~(A[24:20] == 5'b00000) | CS0_N;
 	assign SMPCCE_N = ~(A[24:19] == 6'b000010) | CS0_N;
