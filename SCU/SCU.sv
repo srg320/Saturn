@@ -559,9 +559,6 @@ module SCU (
 `endif
 			end
 			
-			if (CE_F) begin
-				if (DSP_DMA_END) DSP_DMA_END <= 0;
-			end
 			if (CE_R) begin
 				DMAIL_PEND <= 0;
 				if (DSP_DMA_ACK) DSP_DMA_ACK <= 0;
@@ -1492,6 +1489,7 @@ module SCU (
 						DSTA.DACSD <= 0;
 						if (DMA_DSP) begin
 							DMA_DSP <= 0;
+							DSP_DMA_END <= 0;
 							DMA_ST <= DMA_IDLE;
 						end else if (!DMD[DMA_CH].MOD || DMA_EC) begin
 							DMA_RUN[DMA_CH] <= 0;
@@ -1645,6 +1643,8 @@ module SCU (
 		.CLK(CLK),
 		.RST_N(RST_N),
 		.CE(DSP_CE & CE_R),
+		
+		.RES_N(RES_N),
 		
 		.CE_R(CE_R),
 		.CE_F(CE_F),
