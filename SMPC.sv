@@ -71,7 +71,7 @@ module SMPC (
 				2'b00: PDR1I = {3'b001,JOY1[ 7: 4]};
 				2'b01: PDR1I = {3'b001,JOY1[15:12]};
 				2'b10: PDR1I = {3'b001,JOY1[11: 8]};
-				2'b11: PDR1I = {3'b001,JOY1[ 3: 0]&3'h4};
+				2'b11: PDR1I = {3'b001,JOY1[ 3: 3],3'b100};
 			endcase
 		end
 		
@@ -83,7 +83,7 @@ module SMPC (
 				2'b00: PDR2I = {3'b001,JOY2[ 7: 4]};
 				2'b01: PDR2I = {3'b001,JOY2[15:12]};
 				2'b10: PDR2I = {3'b001,JOY2[11: 8]};
-				2'b11: PDR2I = {3'b001,JOY2[ 3: 0]&3'h4};
+				2'b11: PDR2I = {3'b001,JOY2[ 3: 3],3'b100};
 			endcase
 		end
 	end
