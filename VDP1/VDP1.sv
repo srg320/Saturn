@@ -114,10 +114,6 @@ module VDP1 (
 	assign FB_DRAW_Q = FB_SEL ? FB0_Q : FB1_Q;
 	assign FB_DISP_Q = FB_SEL ? FB1_Q : FB0_Q;
 	
-	bit [20:1] A;
-	bit        WE_N;
-	bit  [1:0] DQM;
-	bit        BURST;
 	
 	typedef enum bit [10:0] {
 		VS_IDLE          = 11'b00000000001,  
@@ -133,11 +129,7 @@ module VDP1 (
 		VS_CLT_END       = 11'b10000000000
 	} VRAMState_t;
 	VRAMState_t VRAM_ST;
-	bit [18:1] IO_VRAM_RA;
-	bit [18:1] IO_VRAM_WA;
-	bit [15:0] IO_VRAM_D;
-	bit  [1:0] IO_VRAM_WE;
-	bit [15:0] IO_VRAM_DO;
+
 	bit        VRAM_DONE;
 	
 	typedef enum bit [2:0] {
@@ -150,7 +142,6 @@ module VDP1 (
 	bit [15:0] FB_D;
 	bit  [1:0] FB_WE;
 	bit        FB_RD;
-	bit [15:0] IO_FB_DO;
 	
 	typedef enum bit [4:0] {
 		CMDS_IDLE,  
@@ -1059,31 +1050,38 @@ module VDP1 (
 	//VRAM
 	wire CPU_VRAM_REQ = (A[20:19] == 2'b00) & ~AD_N & ~CS_N & ~REQ_N;	//000000-07FFFF
 	wire CPU_FB_REQ = (A[20:19] == 2'b01) & ~AD_N & ~CS_N & ~REQ_N;	//080000-0FFFFF
-	bit [18: 1] VRAM_LAST_A;
-	bit [18: 1] CPU_RA;
-	bit [18: 1] CPU_WA;
-	bit [15: 0] CPU_D;
-	bit [ 1: 0] CPU_WE;
-	bit [18: 1] SAVE_WA;
-	bit [15: 0] SAVE_D;
-	bit [ 1: 0] SAVE_WE;
-	bit         CPU_VRAM_RPEND;
+	
+	bit [20: 1] A;
+	bit         WE_N;
+	bit [ 1:0 ] DQM;
+	bit         BURST;
+	
 	bit         CPU_VRAM_RRDY;
-	bit         CPU_FB_RPEND;
 	bit         CPU_FB_RRDY;
-	bit         CPU_VRAM_WPEND;
 	bit         CPU_VRAM_WRDY;
-	bit         CPU_FB_WPEND;
 	bit         CPU_FB_WRDY;
+	
+	bit [15: 0] MEM_DO;
 	always @(posedge CLK or negedge RST_N) begin
-		bit        CMD_READ_PEND;
-		bit        SPR_READ_PEND;
-		bit        CLT_READ_PEND;
-		bit        LAST_DATA;
-		bit        CMD_DATA_PEND;
-		bit  [3:0] CMD_DATA_POS;
-		bit        VRAM_RDY_OLD;
-//		bit        CPU_VRAM_LOCK;
+		bit [18: 1] CPU_RA;
+		bit [18: 1] CPU_WA;
+		bit [15: 0] CPU_D;
+		bit [ 1: 0] CPU_WE;
+		bit [18: 1] SAVE_WA;
+		bit [15: 0] SAVE_D;
+		bit [ 1: 0] SAVE_WE;
+		bit         CPU_VRAM_RPEND;
+		bit         CPU_FB_RPEND;
+		bit         CPU_VRAM_WPEND;
+		bit         CPU_FB_WPEND;
+		bit         CMD_READ_PEND;
+		bit         SPR_READ_PEND;
+		bit         CLT_READ_PEND;
+		bit         LAST_DATA;
+		bit         CMD_DATA_PEND;
+		bit [ 3: 0] CMD_DATA_POS;
+		bit         VRAM_RDY_OLD;
+//		bit         CPU_VRAM_LOCK;
 		
 		if (!RST_N) begin
 			VRAM_ST <= VS_IDLE;
@@ -1258,7 +1256,7 @@ module VDP1 (
 				
 				VS_CPU_READ: begin
 					if (VRAM_RDY && CE_R) begin
-						IO_VRAM_DO <= VRAM_Q[31:16];
+						MEM_DO <= VRAM_Q[31:16];
 						VRAM_RD <= 0;
 						CPU_VRAM_RRDY <= 1;
 						VRAM_ST <= VS_IDLE;
@@ -1418,7 +1416,7 @@ module VDP1 (
 				FS_CPU_READ: begin
 //					VRAM_ST <= VS_CPU_READ_END;
 					if (FB_RDY && CE_R) begin
-						IO_FB_DO <= FB_DRAW_Q;
+						MEM_DO <= FB_DRAW_Q;
 						FB_RD <= 0;
 						CPU_FB_RRDY <= 1;
 						FB_ST <= FS_IDLE;
@@ -1586,9 +1584,7 @@ module VDP1 (
 		end
 	end
 	
-	assign DO = A[20]             ? REG_DO : 
-	            A[20:19] == 2'b00 ? IO_VRAM_DO : 
-					                    IO_FB_DO;
-	assign RDY_N = ~CPU_VRAM_RRDY | ~CPU_VRAM_WRDY | ~CPU_FB_RRDY | ~CPU_FB_WRDY;//~((CPU_VRAM_SEL & CPU_VRAM_RRDY & CPU_VRAM_WRDY) | CPU_FB_SEL | REG_SEL);
+	assign DO = A[20] ? REG_DO : MEM_DO;
+	assign RDY_N = ~CPU_VRAM_RRDY | ~CPU_VRAM_WRDY | ~CPU_FB_RRDY | ~CPU_FB_WRDY;
 	
 endmodule
