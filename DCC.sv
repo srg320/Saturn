@@ -44,8 +44,9 @@ module DCC (
 	output            MWR_N
 );
 
-	bit SSH_ACTIVE;
-	bit SCU_ACTIVE;
+	//SCU bus arbitration
+	bit          SSH_ACTIVE;
+	bit          SCU_ACTIVE;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
 			SSH_ACTIVE <= '0;
@@ -62,37 +63,44 @@ module DCC (
 	assign BACK_N = BGR_N | ~SSH_ACTIVE;
 	assign EXBACK_N = BGR_N | ~SCU_ACTIVE;
 	
-//	always @(posedge CLK or negedge RST_N) begin
-//		if (!RST_N) begin
-//			SSH_ACTIVE <= '0;
-//			SCU_ACTIVE <= 0;
-//		end else if (CE_R) begin
-//			if (!BREQ_N && EXBREQ_N && !SSH_ACTIVE && !SCU_ACTIVE) SSH_ACTIVE <= 1;
-//			else if (BREQ_N && SSH_ACTIVE) SSH_ACTIVE <= 0;
-//			
-//			if (!EXBREQ_N /*&& BREQ_N*/ && !SCU_ACTIVE /*&& !SSH_ACTIVE*/) SCU_ACTIVE <= 1;
-//			else if (EXBREQ_N && SCU_ACTIVE) SCU_ACTIVE <= 0;
-//		end
-//	end
-//	assign BRLS_N = (BREQ_N | ~SSH_ACTIVE) & (EXBREQ_N | ~SCU_ACTIVE);
-//	assign BACK_N = BGR_N | ~SSH_ACTIVE | SCU_ACTIVE;
-//	assign EXBACK_N = BGR_N | ~SCU_ACTIVE;
-	
-	assign WAIT_N = WTIN_N;///////////////////////
-	
-	assign IREQ_N = {VINT_N,VINT_N&HINT_N};
-	
+	//ROM (BIOS)
 	assign ROMCE_N = ~(A[24:20] == 5'b00000) | CS0_N;
+	//SMPC
 	assign SMPCCE_N = ~(A[24:19] == 6'b000010) | CS0_N;
+	//SRAM (backup)
 	assign SRAMCE_N = ~(A[24:19] == 6'b000011) | CS0_N;
+	
 	assign MOE_N = RD_N;
 	assign MWR_N = WE_N[0];
 	
-	
+	//DRAM (LWRAM)
 	assign DCE_N = ~(A[24:21] == 4'b0001) | CS0_N;
 	assign DOE_N = RD_N;
 	assign DWE_N = WE_N;
+	bit          DRAM_WAIT;
+	always @(posedge CLK or negedge RST_N) begin
+		bit          RD_N_OLD;
+		bit          WE_N_OLD;
+		bit  [ 2: 0] DRAM_WAIT_CNT;
+		
+		if (!RST_N) begin
+			DRAM_WAIT <= 0;
+			DRAM_WAIT_CNT <= '0;
+		end else begin
+			RD_N_OLD <= RD_N;
+			WE_N_OLD <= WE_N;
+			if ((!RD_N && RD_N_OLD && !DCE_N) || (!WE_N && WE_N_OLD && !DCE_N)) begin
+				DRAM_WAIT <= 1;
+				DRAM_WAIT_CNT <= 3'd5;
+			end else if (!DRAM_WAIT_CNT && CE_F) begin
+				DRAM_WAIT <= 0;
+			end
+			
+			if (DRAM_WAIT_CNT && CE_R) DRAM_WAIT_CNT <= DRAM_WAIT_CNT - 3'd1;
+		end
+	end
 	
+	//MINIT/SINIT
 	wire MINIT_SEL = (A[24:23] == 2'b10) & ~CS0_N;
 	wire SINIT_SEL = (A[24:23] == 2'b11) & ~CS0_N;
 	always @(posedge CLK or negedge RST_N) begin
@@ -115,5 +123,9 @@ module DCC (
 			end
 		end
 	end
+	
+	assign WAIT_N = WTIN_N & ~DRAM_WAIT;
+	
+	assign IREQ_N = {VINT_N,VINT_N&HINT_N};
 
 endmodule
