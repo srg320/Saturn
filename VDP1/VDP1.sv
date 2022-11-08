@@ -976,8 +976,10 @@ module VDP1 (
 
 	//FB out
 	bit         HBL_SKIP;
-	bit [ 8: 0] OUT_X, ERASE_X;
-	bit [ 8: 0] OUT_Y, ERASE_Y;
+	bit [ 8: 0] OUT_X;
+	bit [ 8: 0] OUT_Y;
+	bit [ 9: 0] ERASE_X;
+	bit [ 8: 0] ERASE_Y;
 	always @(posedge CLK or negedge RST_N) begin
 		bit       HTIM_N_OLD;
 		bit       VTIM_N_OLD;
@@ -1016,15 +1018,12 @@ module VDP1 (
 			
 			if (CE_R) begin
 				if (!VTIM_N && VBLANK_ERASE) begin
-					ERASE_X <= ERASE_X + 9'd1;
-					if (ERASE_X == {EWRR.X3,3'b111}) begin
+					ERASE_X <= ERASE_X + 10'd1;
+					if (ERASE_X + 10'd1 == {EWRR.X3,3'b000}) begin
 						ERASE_X <= {EWLR.X1,3'b000};
 						ERASE_Y <= ERASE_Y + 9'd1;
 					end
-					FB_ERASE_A <= {ERASE_Y[7:0],ERASE_X};
-//				end else begin
-//					ERASE_X <= {EWLR.X1,3'b000};
-//					ERASE_Y <= EWLR.Y1;
+					FB_ERASE_A <= {ERASE_Y[7:0],ERASE_X[8:0]};//TODO: 8bit/pixel mode
 				end
 			end
 			if (!VTIM_N && VTIM_N_OLD) begin
@@ -1034,8 +1033,8 @@ module VDP1 (
 		end
 	end
 	
-	assign FRAME_ERASE_HIT = (OUT_X >= {EWLR.X1,3'b000}) & (OUT_X <= {EWRR.X3,3'b111}) & (OUT_Y >= EWLR.Y1) & (OUT_Y <= EWRR.Y3) & FRAME_ERASE & VTIM_N;
-	assign VBLANK_ERASE_HIT = (ERASE_X >= {EWLR.X1,3'b000}) & (ERASE_X <= {EWRR.X3,3'b111}) & (ERASE_Y >= EWLR.Y1) & (ERASE_Y <= EWRR.Y3) & VBLANK_ERASE & ~VTIM_N;
+	assign FRAME_ERASE_HIT = (OUT_X >= {EWLR.X1,3'b000}) & (OUT_X < {EWRR.X3,3'b000}) & (OUT_Y >= EWLR.Y1) & (OUT_Y <= EWRR.Y3) & FRAME_ERASE & VTIM_N;
+	assign VBLANK_ERASE_HIT = (ERASE_X >= {EWLR.X1,3'b000}) & (ERASE_X < {EWRR.X3,3'b000}) & (ERASE_Y >= EWLR.Y1) & (ERASE_Y <= EWRR.Y3) & VBLANK_ERASE & ~VTIM_N;
 	
 	assign FB_DISP_A = {OUT_Y[7:0],OUT_X};
 	bit DCLK;
@@ -1447,7 +1446,7 @@ module VDP1 (
 			PTMR <= '0;
 			EWDR <= '0;
 			EWLR <= 16'h0000;
-			EWRR <= 16'h4EFF;
+			EWRR <= 16'h0000;
 			EDSR <= '0;
 			IRQ_N <= 1;
 			
@@ -1459,20 +1458,7 @@ module VDP1 (
 			
 			REG_DO <= '0;
 		end else if (!RES_N) begin
-			TVMR <= '0;
-			FBCR <= '0;
 			PTMR <= '0;
-			EWDR <= '0;
-			EWLR <= 16'h0000;
-			EWRR <= 16'h4EFF;
-			EDSR <= '0;
-			IRQ_N <= 1;
-				
-			FRAME_ERASECHANGE_PEND <= 0;
-			FRAME_ERASE <= 0;
-			VBLANK_ERASE <= 0;
-			DRAW_TERMINATE <= 0;
-			VBE_CHECK <= 0;
 		end else begin
 			START_DRAW_PEND <= 0;
 			DRAW_TERMINATE <= 0;
