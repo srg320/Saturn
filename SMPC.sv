@@ -64,8 +64,13 @@ module SMPC (
 	
 	always_comb begin
 		PDR1I = 7'h7F;
-		if (DDR1 == 7'h00 || DDR1 == 7'h40) begin
+		if (DDR1 == 7'h00) begin
 			PDR1I = 7'h7C;
+		end else if (DDR1 == 7'h40) begin
+			case (PDR1O[6])
+				1'b0:  PDR1I = {3'b011,JOY1[15:12]};
+				1'b1:  PDR1I = {3'b111,JOY1[ 3: 3],3'b100};
+			endcase
 		end else if (DDR1 == 7'h60) begin
 			case (PDR1O[6:5])
 				2'b00: PDR1I = {3'b001,JOY1[ 7: 4]};
@@ -76,8 +81,13 @@ module SMPC (
 		end
 		
 		PDR2I = 7'h7F;
-		if (DDR2 == 7'h00 || DDR2 == 7'h40) begin
+		if (DDR2 == 7'h00) begin
 			PDR2I = 7'h7C;
+		end else if (DDR1 == 7'h40) begin
+			case (PDR2O[6])
+				1'b0:  PDR2I = {3'b011,JOY2[15:12]};
+				1'b1:  PDR2I = {3'b111,JOY2[ 3: 3],3'b100};
+			endcase
 		end else if (DDR2 == 7'h60) begin
 			case (PDR2O[6:5])
 				2'b00: PDR2I = {3'b001,JOY2[ 7: 4]};
