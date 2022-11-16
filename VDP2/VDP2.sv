@@ -1683,10 +1683,8 @@ module VDP2 (
 					Ysp[1] <= $signed(Ysp[1]) + $signed(dY[1]);
 				end
 				
-				if (RBG_CALC) begin
-					RxKA[0] <= $unsigned(KAst[0]) + $signed(KAx[0]);
-					RxKA[1] <= $unsigned(KAst[1]) + $signed(KAx[1]);
-				end
+				RxKA[0] <= $unsigned(KAst[0]) + $signed(KAx[0]);
+				RxKA[1] <= $unsigned(KAst[1]) + $signed(KAx[1]);
 			end
 				
 			case (DOTCLK_DIV)
@@ -2016,21 +2014,17 @@ module VDP2 (
 						NBG_CDC[3][3'b111               ^ {3{NHF[3]}}] <= {4'h0,NCH[3][ 3: 0]}; NBG_CDP[3][3'b111               ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
 					end
 					3'b001: begin				//8bits/dot, 256 colors
-						NBG_CDC[3][{NCNT[3][0:0],2'b00} ^ {3{NHF[3]}}] <= {     NCH[3][31:24]}; NBG_CDP[3][{NCNT[3][0:0],2'b00} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
-						NBG_CDC[3][{NCNT[3][0:0],2'b01} ^ {3{NHF[3]}}] <= {     NCH[3][23:16]}; NBG_CDP[3][{NCNT[3][0:0],2'b01} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
-						NBG_CDC[3][{NCNT[3][0:0],2'b10} ^ {3{NHF[3]}}] <= {     NCH[3][15: 8]}; NBG_CDP[3][{NCNT[3][0:0],2'b10} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
-						NBG_CDC[3][{NCNT[3][0:0],2'b11} ^ {3{NHF[3]}}] <= {     NCH[3][ 7: 0]}; NBG_CDP[3][{NCNT[3][0:0],2'b11} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
+						NBG_CDC[3][{NCNT[3][0:0],2'b00 ^ {2{NHF[3]}}}] <= {     NCH[3][31:24]}; NBG_CDP[3][{NCNT[3][0:0],2'b00} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
+						NBG_CDC[3][{NCNT[3][0:0],2'b01 ^ {2{NHF[3]}}}] <= {     NCH[3][23:16]}; NBG_CDP[3][{NCNT[3][0:0],2'b01} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
+						NBG_CDC[3][{NCNT[3][0:0],2'b10 ^ {2{NHF[3]}}}] <= {     NCH[3][15: 8]}; NBG_CDP[3][{NCNT[3][0:0],2'b10} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
+						NBG_CDC[3][{NCNT[3][0:0],2'b11 ^ {2{NHF[3]}}}] <= {     NCH[3][ 7: 0]}; NBG_CDP[3][{NCNT[3][0:0],2'b11} ^ {3{NHF[3]}}] <= {NPR[3], NCC[3], NTPON[3], NPALN[3]};
 					end
 					3'b010,3'b011: begin				//16bits/dot, 2048 colors
-						NBG_CDC[3][{NCNT[3][1:0], 1'b0} ^ {3{NHF[1]}}] <= {     NCH[3][31:24]}; 
-						NBG_CDC[3][{NCNT[3][1:0], 1'b1} ^ {3{NHF[1]}}] <= {     NCH[3][15: 8]}; 
+						NBG_CDC[3][{NCNT[3][1:0], 1'b0 ^ {1{NHF[1]}}}] <= {     NCH[3][31:24]}; 
+						NBG_CDC[3][{NCNT[3][1:0], 1'b1 ^ {1{NHF[1]}}}] <= {     NCH[3][15: 8]}; 
 					end
-//					3'b011: begin				//16bits/dot, 32768 colors
-//						NBG_CDC[3][{NCNT[3][1:0], 1'b0} ^ {3{NHF[1]}}] <= {     NCH[3][31:24]}; 
-//						NBG_CDC[3][{NCNT[3][1:0], 1'b1} ^ {3{NHF[1]}}] <= {     NCH[3][15: 8]}; 
-//					end
 					3'b100: begin				//32bits/dot, 16M colors
-						NBG_CDC[3][{NCNT[3][2:0]      } ^ {3{NHF[3]}}] <= {     NCH[3][31:24]}; 
+						NBG_CDC[3][{NCNT[3][2:0]                    }] <= {     NCH[3][31:24]}; 
 					end
 					default:;
 				endcase
@@ -2082,21 +2076,17 @@ module VDP2 (
 						NBG_CDC[2][3'b111               ^ {3{NHF[2]}}] <= {4'h0,NCH[2][ 3: 0]}; NBG_CDP[2][3'b111               ^ {3{NHF[2]}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
 					end
 					3'b001: begin				//8bits/dot, 256 colors
-						NBG_CDC[2][{NCNT[2][0:0],2'b00} ^ {3{NHF[2]}}] <= {     NCH[2][31:24]}; NBG_CDP[2][{NCNT[2][0:0],2'b00} ^ {3{NHF[2]}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
-						NBG_CDC[2][{NCNT[2][0:0],2'b01} ^ {3{NHF[2]}}] <= {     NCH[2][23:16]}; NBG_CDP[2][{NCNT[2][0:0],2'b01} ^ {3{NHF[2]}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
-						NBG_CDC[2][{NCNT[2][0:0],2'b10} ^ {3{NHF[2]}}] <= {     NCH[2][15: 8]}; NBG_CDP[2][{NCNT[2][0:0],2'b10} ^ {3{NHF[2]}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
-						NBG_CDC[2][{NCNT[2][0:0],2'b11} ^ {3{NHF[2]}}] <= {     NCH[2][ 7: 0]}; NBG_CDP[2][{NCNT[2][0:0],2'b11} ^ {3{NHF[2]}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
+						NBG_CDC[2][{NCNT[2][0:0],2'b00 ^ {2{NHF[2]}}}] <= {     NCH[2][31:24]}; NBG_CDP[2][{NCNT[2][0:0],2'b00 ^ {2{NHF[2]}}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
+						NBG_CDC[2][{NCNT[2][0:0],2'b01 ^ {2{NHF[2]}}}] <= {     NCH[2][23:16]}; NBG_CDP[2][{NCNT[2][0:0],2'b01 ^ {2{NHF[2]}}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
+						NBG_CDC[2][{NCNT[2][0:0],2'b10 ^ {2{NHF[2]}}}] <= {     NCH[2][15: 8]}; NBG_CDP[2][{NCNT[2][0:0],2'b10 ^ {2{NHF[2]}}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
+						NBG_CDC[2][{NCNT[2][0:0],2'b11 ^ {2{NHF[2]}}}] <= {     NCH[2][ 7: 0]}; NBG_CDP[2][{NCNT[2][0:0],2'b11 ^ {2{NHF[2]}}}] <= {NPR[2], NCC[2], NTPON[2], NPALN[2]};
 					end
 					3'b010,3'b011: begin				//16bits/dot, 2048 colors (NBG0)
-						NBG_CDC[2][{NCNT[2][1:0], 1'b0} ^ {3{NHF[2]}}] <= {     NCH[2][31:24]}; 
-						NBG_CDC[2][{NCNT[2][1:0], 1'b1} ^ {3{NHF[2]}}] <= {     NCH[2][15: 8]}; 
+						NBG_CDC[2][{NCNT[2][1:0], 1'b0 ^ {1{NHF[2]}}}] <= {     NCH[2][31:24]}; 
+						NBG_CDC[2][{NCNT[2][1:0], 1'b1 ^ {1{NHF[2]}}}] <= {     NCH[2][15: 8]}; 
 					end
-//					3'b011: begin				//16bits/dot, 32768 colors (NBG0)
-//						NBG_CDC[2][{NCNT[2][1:0], 1'b0} ^ {3{NHF[2]}}] <= {     NCH[2][31:24]}; 
-//						NBG_CDC[2][{NCNT[2][1:0], 1'b1} ^ {3{NHF[2]}}] <= {     NCH[2][15: 8]}; 
-//					end
 					3'b100: begin				//32bits/dot, 16M colors (NBG0)
-						NBG_CDC[2][{NCNT[2][2:0]      } ^ {3{NHF[2]}}] <= {     NCH[2][15: 8]}; 
+						NBG_CDC[2][{NCNT[2][2:0]                    }] <= {     NCH[2][15: 8]}; 
 					end
 					default:;
 				endcase
@@ -2148,14 +2138,14 @@ module VDP2 (
 				case (NCHCN[1])//                                               DC                                                                PR      CC      TPON      PALN
 					3'b000: begin				//4bits/dot, 16 colors
 						if (NCNT[1][0] && REGS.ZMCTL.N1ZMHF) begin
-						NBG_CDC[1][3'b000               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][31:28]; //NBG_CDP[1][3'b000               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b001               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][27:24]; //NBG_CDP[1][3'b001               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b010               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][23:20]; //NBG_CDP[1][3'b010               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b011               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][19:16]; //NBG_CDP[1][3'b011               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b100               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][15:12]; //NBG_CDP[1][3'b100               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b101               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][11: 8]; //NBG_CDP[1][3'b101               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b110               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][ 7: 4]; //NBG_CDP[1][3'b110               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][3'b111               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][ 3: 0]; //NBG_CDP[1][3'b111               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
+						NBG_CDC[1][3'b000               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][31:28];
+						NBG_CDC[1][3'b001               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][27:24];
+						NBG_CDC[1][3'b010               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][23:20];
+						NBG_CDC[1][3'b011               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][19:16];
+						NBG_CDC[1][3'b100               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][15:12];
+						NBG_CDC[1][3'b101               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][11: 8];
+						NBG_CDC[1][3'b110               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][ 7: 4];
+						NBG_CDC[1][3'b111               ^ {3{NHF[1]}}][ 7: 4] <= NCH[1][ 3: 0];
 						end else begin
 						NBG_CDC[1][3'b000               ^ {3{NHF[1]}}][ 3: 0] <= NCH[1][31:28]; NBG_CDP[1][3'b000               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
 						NBG_CDC[1][3'b001               ^ {3{NHF[1]}}][ 3: 0] <= NCH[1][27:24]; NBG_CDP[1][3'b001               ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
@@ -2168,21 +2158,17 @@ module VDP2 (
 						end
 					end
 					3'b001: begin				//8bits/dot, 256 colors
-						NBG_CDC[1][{NCNT[1][0:0],2'b00} ^ {3{NHF[1]}}] <= {     NCH[1][31:24]}; NBG_CDP[1][{NCNT[1][0:0],2'b00} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][{NCNT[1][0:0],2'b01} ^ {3{NHF[1]}}] <= {     NCH[1][23:16]}; NBG_CDP[1][{NCNT[1][0:0],2'b01} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][{NCNT[1][0:0],2'b10} ^ {3{NHF[1]}}] <= {     NCH[1][15: 8]}; NBG_CDP[1][{NCNT[1][0:0],2'b10} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
-						NBG_CDC[1][{NCNT[1][0:0],2'b11} ^ {3{NHF[1]}}] <= {     NCH[1][ 7: 0]}; NBG_CDP[1][{NCNT[1][0:0],2'b11} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
+						NBG_CDC[1][{NCNT[1][0:0],2'b00 ^ {2{NHF[1]}}}] <= {     NCH[1][31:24]}; NBG_CDP[1][{NCNT[1][0:0],2'b00 ^ {2{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
+						NBG_CDC[1][{NCNT[1][0:0],2'b01 ^ {2{NHF[1]}}}] <= {     NCH[1][23:16]}; NBG_CDP[1][{NCNT[1][0:0],2'b01 ^ {2{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
+						NBG_CDC[1][{NCNT[1][0:0],2'b10 ^ {2{NHF[1]}}}] <= {     NCH[1][15: 8]}; NBG_CDP[1][{NCNT[1][0:0],2'b10 ^ {2{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
+						NBG_CDC[1][{NCNT[1][0:0],2'b11 ^ {2{NHF[1]}}}] <= {     NCH[1][ 7: 0]}; NBG_CDP[1][{NCNT[1][0:0],2'b11 ^ {2{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], NPALN[1]};
 					end
 					3'b010,3'b011: begin				//16bits/dot, 2048 colors
-						NBG_CDC[1][{NCNT[1][1:0], 1'b0} ^ {3{NHF[1]}}] <= {     NCH[1][23:16]}; NBG_CDP[1][{NCNT[1][1:0], 1'b0} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
-						NBG_CDC[1][{NCNT[1][1:0], 1'b1} ^ {3{NHF[1]}}] <= {     NCH[1][ 7: 0]}; NBG_CDP[1][{NCNT[1][1:0], 1'b1} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
+						NBG_CDC[1][{NCNT[1][1:0], 1'b0 ^ {1{NHF[1]}}}] <= {     NCH[1][23:16]}; NBG_CDP[1][{NCNT[1][1:0], 1'b0 ^ {1{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
+						NBG_CDC[1][{NCNT[1][1:0], 1'b1 ^ {1{NHF[1]}}}] <= {     NCH[1][ 7: 0]}; NBG_CDP[1][{NCNT[1][1:0], 1'b1 ^ {1{NHF[1]}}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
 					end
-//					3'b011: begin				//16bits/dot, 32768 colors
-//						NBG_CDC[1][{NCNT[1][1:0], 1'b0} ^ {3{NHF[1]}}] <= {     NCH[1][23:16]}; NBG_CDP[1][{NCNT[1][1:0], 1'b0} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
-//						NBG_CDC[1][{NCNT[1][1:0], 1'b1} ^ {3{NHF[1]}}] <= {     NCH[1][ 7: 0]}; NBG_CDP[1][{NCNT[1][1:0], 1'b1} ^ {3{NHF[1]}}] <= {NPR[1], NCC[1], NTPON[1], 7'h00};
-//					end
 					3'b100: begin				//32bits/dot, 16M colors
-						NBG_CDC[1][{NCNT[1][2:0]      } ^ {3{NHF[1]}}] <= {     NCH[1][23:16]}; 
+						NBG_CDC[1][{NCNT[1][2:0]                    }] <= {     NCH[1][23:16]}; 
 					end
 					default:;
 				endcase
@@ -2244,21 +2230,17 @@ module VDP2 (
 						end
 					end
 					3'b001: begin				//8bits/dot, 256 colors
-						NBG_CDC[0][{NCNT[0][0:0],2'b00} ^ {3{NHF[0]}}] <= {     NCH[0][31:24]}; NBG_CDP[0][{NCNT[0][0:0],2'b00} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
-						NBG_CDC[0][{NCNT[0][0:0],2'b01} ^ {3{NHF[0]}}] <= {     NCH[0][23:16]}; NBG_CDP[0][{NCNT[0][0:0],2'b01} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
-						NBG_CDC[0][{NCNT[0][0:0],2'b10} ^ {3{NHF[0]}}] <= {     NCH[0][15: 8]}; NBG_CDP[0][{NCNT[0][0:0],2'b10} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
-						NBG_CDC[0][{NCNT[0][0:0],2'b11} ^ {3{NHF[0]}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][0:0],2'b11} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
+						NBG_CDC[0][{NCNT[0][0:0],2'b00 ^ {2{NHF[0]}}}] <= {     NCH[0][31:24]}; NBG_CDP[0][{NCNT[0][0:0],2'b00 ^ {2{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
+						NBG_CDC[0][{NCNT[0][0:0],2'b01 ^ {2{NHF[0]}}}] <= {     NCH[0][23:16]}; NBG_CDP[0][{NCNT[0][0:0],2'b01 ^ {2{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
+						NBG_CDC[0][{NCNT[0][0:0],2'b10 ^ {2{NHF[0]}}}] <= {     NCH[0][15: 8]}; NBG_CDP[0][{NCNT[0][0:0],2'b10 ^ {2{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
+						NBG_CDC[0][{NCNT[0][0:0],2'b11 ^ {2{NHF[0]}}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][0:0],2'b11 ^ {2{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], NPALN[0]};
 					end
 					3'b010,3'b011: begin				//16bits/dot, 2048 colors
-						NBG_CDC[0][{NCNT[0][1:0], 1'b0} ^ {3{NHF[0]}}] <= {     NCH[0][23:16]}; NBG_CDP[0][{NCNT[0][1:0], 1'b0} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
-						NBG_CDC[0][{NCNT[0][1:0], 1'b1} ^ {3{NHF[0]}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][1:0], 1'b1} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
+						NBG_CDC[0][{NCNT[0][1:0], 1'b0 ^ {1{NHF[0]}}}] <= {     NCH[0][23:16]}; NBG_CDP[0][{NCNT[0][1:0], 1'b0 ^ {1{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
+						NBG_CDC[0][{NCNT[0][1:0], 1'b1 ^ {1{NHF[0]}}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][1:0], 1'b1 ^ {1{NHF[0]}}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
 					end
-//					3'b011: begin				//16bits/dot, 32768 colors
-//						NBG_CDC[0][{NCNT[0][1:0], 1'b0} ^ {3{NHF[0]}}] <= {     NCH[0][23:16]}; NBG_CDP[0][{NCNT[0][1:0], 1'b0} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
-//						NBG_CDC[0][{NCNT[0][1:0], 1'b1} ^ {3{NHF[0]}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][1:0], 1'b1} ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
-//					end
 					3'b100: begin				//32bits/dot, 16M colors
-						NBG_CDC[0][{NCNT[0][2:0]      } ^ {3{NHF[0]}}] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][2:0]      } ^ {3{NHF[0]}}] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
+						NBG_CDC[0][{NCNT[0][2:0]                    }] <= {     NCH[0][ 7: 0]}; NBG_CDP[0][{NCNT[0][2:0]                    }] <= {NPR[0], NCC[0], NTPON[0], 7'h00};
 					end
 					default:;
 				endcase
@@ -2353,7 +2335,7 @@ module VDP2 (
 							2'b11: begin RBG_DC[i][0] <= {     RCH[i][ 7: 0]}; RBG_DP[i] <= {RPR[i], RCC[i], RTPON[i], RPALN[i]}; end
 							endcase
 						end
-						3'b010,3'b011: begin				//16bits/dot, 2048 colors
+						3'b010,3'b011: begin		//16bits/dot, 2048/32768 colors
 							case (RCELLX[i][0:0] ^ {1{RHF[i]}})
 							1'b0: begin  RBG_DC[i][2] <= {     RCH[i][31:24]};
 							             RBG_DC[i][0] <= {     RCH[i][23:16]}; RBG_DP[i] <= {RPR[i], RCC[i], RTPON[i], 7'h00}; end
@@ -2361,14 +2343,6 @@ module VDP2 (
 							             RBG_DC[i][0] <= {     RCH[i][ 7: 0]}; RBG_DP[i] <= {RPR[i], RCC[i], RTPON[i], 7'h00}; end
 							endcase
 						end
-//						3'b011: begin				//16bits/dot, 32768 colors
-//							case (RCELLX[i][0:0] ^ {1{RHF[i]}})
-//							1'b0: begin  RBG_DC[i][2] <= {     RCH[i][31:24]};
-//							             RBG_DC[i][0] <= {     RCH[i][23:16]}; RBG_DP[i] <= {RPR[i], RCC[i], RTPON[i], 7'h00}; end
-//							1'b1: begin  RBG_DC[i][2] <= {     RCH[i][15: 8]};
-//							             RBG_DC[i][0] <= {     RCH[i][ 7: 0]}; RBG_DP[i] <= {RPR[i], RCC[i], RTPON[i], 7'h00}; end
-//							endcase
-//						end
 						3'b100: begin				//32bits/dot, 16M colors
 									       RBG_DC[i][3] <= {     RCH[i][31:24]}; 
 									       RBG_DC[i][1] <= {     RCH[i][23:16]}; 
