@@ -75,25 +75,25 @@ package YGR019_PKG;
 	parameter bit [15:0] TRCTL_RMASK = 16'h000F;
 	parameter bit [15:0] TRCTL_INIT = 16'h0000;
 	
-	typedef bit [15:0] REG04_t;	//R/W;0A000004
-	parameter bit [15:0] REG04_WMASK = 16'h0002;
-	parameter bit [15:0] REG04_RMASK = 16'h0002;
-	parameter bit [15:0] REG04_INIT = 16'h0000;
+	typedef bit [15:0] CDIRQL_t;	//R/W;0A000004
+	parameter bit [15:0] CDIRQL_WMASK = 16'h0003;
+	parameter bit [15:0] CDIRQL_RMASK = 16'h0003;
+	parameter bit [15:0] CDIRQL_INIT = 16'h0000;
 	
-	typedef bit [15:0] CDIRQ_t;	//R/W;0A000006
-	parameter bit [15:0] CDIRQ_WMASK = 16'h0070;
-	parameter bit [15:0] CDIRQ_RMASK = 16'h0070;
-	parameter bit [15:0] CDIRQ_INIT = 16'h0000;
+	typedef bit [15:0] CDIRQU_t;	//R/W;0A000006
+	parameter bit [15:0] CDIRQU_WMASK = 16'h0070;
+	parameter bit [15:0] CDIRQU_RMASK = 16'h0070;
+	parameter bit [15:0] CDIRQU_INIT = 16'h0000;
 	
-	typedef bit [15:0] REG08_t;	//R/W;0A000008
-	parameter bit [15:0] REG08_WMASK = 16'h0003;
-	parameter bit [15:0] REG08_RMASK = 16'h0003;
-	parameter bit [15:0] REG08_INIT = 16'h0000;
+	typedef bit [15:0] CDMASKL_t;	//R/W;0A000008
+	parameter bit [15:0] CDMASKL_WMASK = 16'h0003;
+	parameter bit [15:0] CDMASKL_RMASK = 16'h0003;
+	parameter bit [15:0] CDMASKL_INIT = 16'h0000;
 	
-	typedef bit [15:0] CDMASK_t;	//R/W;0A00000A
-	parameter bit [15:0] CDMASK_WMASK = 16'h0070;
-	parameter bit [15:0] CDMASK_RMASK = 16'h0070;
-	parameter bit [15:0] CDMASK_INIT = 16'h0000;
+	typedef bit [15:0] CDMASKU_t;	//R/W;0A00000A
+	parameter bit [15:0] CDMASKU_WMASK = 16'h0070;
+	parameter bit [15:0] CDMASKU_RMASK = 16'h0070;
+	parameter bit [15:0] CDMASKU_INIT = 16'h0000;
 	
 	typedef bit [15:0] REG1A_t;	//R/W;0A00001A
 	parameter bit [15:0] REG1A_WMASK = 16'h00FF;
