@@ -583,8 +583,12 @@ module SMPC (
 									0: begin
 										CURRPAD_TYPE <= JOY1_TYPE;
 										CURRPAD_BUTTONS <= JOY1;
-										CURRPAD_ANALOGX1 <= JOY1_X1;
-										CURRPAD_ANALOGY1 <= JOY1_Y1;
+										// MiSTer gives signed with 0,0 at center.
+										// Saturn uses unsigned with 0,0 at top-left.
+										CURRPAD_ANALOGX1 <= {~JOY1_X1[7], JOY1_X1[6:0]};
+										CURRPAD_ANALOGY1 <= {~JOY1_Y1[7], JOY1_Y1[6:0]};
+										CURRPAD_ANALOGX2 <= {~JOY1_X2[7], JOY1_X2[6:0]};
+										CURRPAD_ANALOGY2 <= {~JOY1_Y2[7], JOY1_Y2[6:0]};
 
 										case (JOY1_TYPE)
 											PAD_OFF: begin
