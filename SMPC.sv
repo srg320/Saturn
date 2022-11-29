@@ -31,10 +31,16 @@ module SMPC (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
-    input       [7:0] JOY1_X,
-    input       [7:0] JOY1_Y,
-    input       [7:0] JOY2_X,
-    input       [7:0] JOY2_Y,
+
+    input       [7:0] JOY1_X1,
+    input       [7:0] JOY1_Y1,
+    input       [7:0] JOY1_X2,
+    input       [7:0] JOY1_Y2,
+    input       [7:0] JOY2_X1,
+    input       [7:0] JOY2_Y1,
+    input       [7:0] JOY2_X2,
+    input       [7:0] JOY2_Y2,
+
 	input       [2:0] JOY1_TYPE,
 	input       [2:0] JOY2_TYPE
 );
@@ -185,9 +191,9 @@ module SMPC (
 
 		PADSTATE_ANALOG_BUTTONSMSB,
 		PADSTATE_ANALOG_BUTTONSLSB,
-		PADSTATE_ANALOG_X,
-		PADSTATE_ANALOG_Y,
-		PADSTATE_ANALOG_Z,
+		PADSTATE_ANALOG_AXIS0,
+		PADSTATE_ANALOG_AXIS1,
+		PADSTATE_ANALOG_AXIS2,
 
 		PADSTATE_IDLE
 	} PadState_t;
@@ -215,8 +221,10 @@ module SMPC (
 		bit [1:0]  CURRPAD_ID;
 		bit [1:0]  CURRPAD_TYPE;
 		bit [15:0] CURRPAD_BUTTONS;
-		bit [7:0]  CURRPAD_ANALOGX;
-		bit [7:0]  CURRPAD_ANALOGY;
+		bit [7:0]  CURRPAD_ANALOGX1;
+		bit [7:0]  CURRPAD_ANALOGY1;
+		bit [7:0]  CURRPAD_ANALOGX2;
+		bit [7:0]  CURRPAD_ANALOGY2;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -575,8 +583,8 @@ module SMPC (
 									0: begin
 										CURRPAD_TYPE <= JOY1_TYPE;
 										CURRPAD_BUTTONS <= JOY1;
-										CURRPAD_ANALOGX <= JOY1_X;
-										CURRPAD_ANALOGY <= JOY1_Y;
+										CURRPAD_ANALOGX1 <= JOY1_X1;
+										CURRPAD_ANALOGY1 <= JOY1_Y1;
 
 										case (JOY1_TYPE)
 											PAD_OFF: begin
@@ -595,8 +603,8 @@ module SMPC (
 									1: begin
 										CURRPAD_TYPE <= JOY2_TYPE;
 										CURRPAD_BUTTONS <= JOY2;
-										CURRPAD_ANALOGX <= JOY2_X;
-										CURRPAD_ANALOGY <= JOY2_Y;
+										CURRPAD_ANALOGX1 <= JOY2_X1;
+										CURRPAD_ANALOGY1 <= JOY2_Y1;
 
 										case (JOY2_TYPE)
 											PAD_OFF: begin
@@ -665,17 +673,17 @@ module SMPC (
 							end
 							PADSTATE_ANALOG_BUTTONSLSB: begin
 								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
-								PADSTATE <= PADSTATE_ANALOG_X;
+								PADSTATE <= PADSTATE_ANALOG_AXIS0;
 							end
-							PADSTATE_ANALOG_X: begin
-								OREG_RAM_D <= CURRPAD_ANALOGX;
-								PADSTATE <= PADSTATE_ANALOG_Y;
+							PADSTATE_ANALOG_AXIS0: begin
+								OREG_RAM_D <= CURRPAD_ANALOGX1;
+								PADSTATE <= PADSTATE_ANALOG_AXIS1;
 							end
-							PADSTATE_ANALOG_Y: begin
-								OREG_RAM_D <= CURRPAD_ANALOGY;
-								PADSTATE <= PADSTATE_ANALOG_Z;
+							PADSTATE_ANALOG_AXIS1: begin
+								OREG_RAM_D <= CURRPAD_ANALOGY1;
+								PADSTATE <= PADSTATE_ANALOG_AXIS2;
 							end
-							PADSTATE_ANALOG_Z: begin
+							PADSTATE_ANALOG_AXIS2: begin
 								OREG_RAM_D <= 0; // TODO: shoulder triggers available?
 
 								// done with this peripheral

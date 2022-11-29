@@ -106,10 +106,14 @@ module Saturn (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
-	input       [7:0] JOY1_X,
-	input       [7:0] JOY1_Y,
-	input       [7:0] JOY2_X,
-	input       [7:0] JOY2_Y,
+	input       [7:0] JOY1_X1,
+	input       [7:0] JOY1_Y1,
+	input       [7:0] JOY1_X2,
+	input       [7:0] JOY1_Y2,
+	input       [7:0] JOY2_X1,
+	input       [7:0] JOY2_Y1,
+	input       [7:0] JOY2_X2,
+	input       [7:0] JOY2_Y2,
 	input       [2:0] JOY1_TYPE,
 	input       [2:0] JOY2_TYPE,
 	
@@ -667,10 +671,14 @@ module Saturn (
 		.JOY1(JOY1),
 		.JOY2(JOY2),
 
-		.JOY1_X(joy0_x),
-		.JOY1_Y(joy0_y),
-		.JOY2_X(joy1_x),
-		.JOY2_Y(joy1_y),
+		.JOY1_X1(JOY1_X1),
+		.JOY1_Y1(JOY1_Y1),
+		.JOY1_X2(JOY1_X2),
+		.JOY1_Y2(JOY1_Y2),
+		.JOY2_X1(JOY2_X1),
+		.JOY2_Y1(JOY2_Y1),
+		.JOY2_X2(JOY2_X2),
+		.JOY2_Y2(JOY2_Y2),
 
 		.JOY1_TYPE(JOY1_TYPE),
 		.JOY2_TYPE(JOY2_TYPE)
