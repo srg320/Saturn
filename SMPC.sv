@@ -31,7 +31,8 @@ module SMPC (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
-	input             JOY2_EN
+	input       [2:0] JOY1_TYPE,
+	input       [2:0] JOY2_TYPE
 );
 
 	//Registers
@@ -58,7 +59,7 @@ module SMPC (
 	bit   [7:0] DAY;
 	
 	bit   [7:0] SMEM[4];
-	
+
 	parameter SR_PDE = 2;
 	parameter SR_RESB = 3;
 	
@@ -161,7 +162,7 @@ module SMPC (
 	end
 	
 	typedef enum bit [6:0] {
-		CS_IDLE         = 7'b0000001,  
+		CS_IDLE	        = 7'b0000001,
 		CS_START        = 7'b0000010, 
 		CS_WAIT         = 7'b0000100, 
 		CS_EXEC         = 7'b0001000,
@@ -170,6 +171,21 @@ module SMPC (
 		CS_END          = 7'b1000000
 	} CommExecState_t;
 	CommExecState_t COMM_ST;
+
+	typedef enum {
+		PADSTATE_STATUS,
+		PADSTATE_ID,
+		PADSTATE_DIGITAL_MSB,
+		PADSTATE_DIGITAL_LSB,
+		PADSTATE_IDLE
+	} PadState_t;
+	PadState_t PADSTATE;
+
+	parameter PAD_DIGITAL    = 0;
+	parameter PAD_OFF        = 1;
+	parameter PAD_3D         = 2;
+	parameter PAD_WHEEL      = 3;
+	parameter PAD_LIGHTGUN   = 4;
 	
 	bit [7:0] REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
@@ -184,6 +200,9 @@ module SMPC (
 		bit        INTBACK_PERI;
 		bit        COMREG_SET;
 		bit        CONT;
+		bit [1:0]  CURRPAD_ID;
+		bit [1:0]  CURRPAD_TYPE;
+		bit [15:0] CURRPAD_BUTTONS;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -215,7 +234,7 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 			INTBACK_EXEC <= 0;
-			INTBACK_PERI <= 0;    
+			INTBACK_PERI <= 0;	  
 			CONT <= 0;
 		end
 		else if (!MRES_N) begin
@@ -259,6 +278,8 @@ module SMPC (
 							INTBACK_PERI <= 0;
 							OREG_CNT <= '0;
 							COMM_ST <= CS_INTBACK_PERI;
+							PADSTATE <= PADSTATE_STATUS;
+							CURRPAD_ID <= 0;
 						end else if (COMREG_SET && !SRES_EXEC) begin
 							COMREG_SET <= 0;
 							OREG_CNT <= '0;
@@ -522,28 +543,92 @@ module SMPC (
 					end
 					
 					CS_INTBACK_WAIT: begin
-						if (!WAIT_CNT) COMM_ST <= CS_INTBACK_PERI;
+						if (!WAIT_CNT) begin
+							COMM_ST <= CS_INTBACK_PERI;
+							PADSTATE <= PADSTATE_STATUS;
+							CURRPAD_ID <= 0;
+						end
 					end
 					
 					CS_INTBACK_PERI: begin
 						OREG_RAM_WA <= OREG_CNT;
-						case (OREG_CNT)
-							5'd0: OREG_RAM_D <= 8'hF1;
-							5'd1: OREG_RAM_D <= 8'h02;
-							5'd2: OREG_RAM_D <= JOY1[15:8];
-							5'd3: OREG_RAM_D <= JOY1[7:0];
-							5'd4: OREG_RAM_D <= JOY2_EN ? 8'hF1 : 8'hF0;
-							5'd5: OREG_RAM_D <= 8'h02;
-							5'd6: OREG_RAM_D <= JOY2[15:8];
-							5'd7: OREG_RAM_D <= JOY2[7:0];
-							5'd8: OREG_RAM_D <= 8'hF0;
-							
-							5'd31: OREG_RAM_D <= COMREG;
-							default:OREG_RAM_D <= 8'h00;
+
+						// default value if no peripheral writes
+						OREG_RAM_D <= 8'h00;
+
+						case (PADSTATE)
+							// States common to all pads
+							// Status: F1 for directly connected, F0 for not
+							PADSTATE_STATUS: begin
+								case (CURRPAD_ID)
+									0: begin
+										CURRPAD_TYPE <= JOY1_TYPE;
+										CURRPAD_BUTTONS <= JOY1;
+
+										case (JOY1_TYPE)
+											PAD_OFF: begin
+												OREG_RAM_D <= 8'hF0;
+												PADSTATE <= PADSTATE_STATUS;
+											end
+											default: begin
+												OREG_RAM_D <= 8'hF1;
+												PADSTATE <= PADSTATE_ID;
+											end
+										endcase
+									end
+									1: begin
+										CURRPAD_TYPE <= JOY2_TYPE;
+										CURRPAD_BUTTONS <= JOY2;
+
+										case (JOY2_TYPE)
+											PAD_OFF: begin
+												OREG_RAM_D <= 8'hF0;
+												PADSTATE <= PADSTATE_STATUS;
+											end
+											default: begin
+												OREG_RAM_D <= 8'hF1;
+												PADSTATE <= PADSTATE_ID;
+											end
+										endcase
+									end
+									2: begin
+										OREG_RAM_D <= 8'hF0;
+										PADSTATE <= PADSTATE_IDLE;
+									end
+								endcase
+							end
+							// ID: unique for each pad?
+							PADSTATE_ID: begin
+								case (CURRPAD_TYPE)
+									PAD_DIGITAL: begin
+										OREG_RAM_D <= 8'h02;
+										PADSTATE <= PADSTATE_DIGITAL_MSB;
+									end
+								endcase
+							end
+
+							// Saturn 6-button digital pad
+							/*
+								5'd0: OREG_RAM_D <= 8'hF0;
+								5'd1: OREG_RAM_D <= 8'h02;
+								5'd2: OREG_RAM_D <= JOY1[15:8];
+								5'd3: OREG_RAM_D <= JOY1[7:0];
+							*/
+							PADSTATE_DIGITAL_MSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[15:8];
+								PADSTATE <= PADSTATE_DIGITAL_LSB;
+							end
+							PADSTATE_DIGITAL_LSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
+								PADSTATE <= PADSTATE_STATUS;
+								CURRPAD_ID <= CURRPAD_ID + 1;
+							end
 						endcase
+
 						OREG_RAM_WE <= 1;
 									
 						if (OREG_CNT == 5'd31) begin
+							OREG_RAM_D <= COMREG;
 							SR[7:5] <= {1'b1,1'b1,1'b0};
 							SF <= 0;
 							MIRQ_N <= 0;

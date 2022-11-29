@@ -106,7 +106,8 @@ module Saturn (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
-	input             JOY2_EN,
+	input       [2:0] JOY1_TYPE,
+	input       [2:0] JOY2_TYPE,
 	
 	input       [6:0] SCRN_EN,
 	input       [2:0] SND_EN,
@@ -661,7 +662,8 @@ module Saturn (
 		
 		.JOY1(JOY1),
 		.JOY2(JOY2),
-		.JOY2_EN(JOY2_EN)
+		.JOY1_TYPE(JOY1_TYPE),
+		.JOY2_TYPE(JOY2_TYPE)
 	);
 	
 	VDP1 VDP1
