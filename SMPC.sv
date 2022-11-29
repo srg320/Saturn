@@ -31,6 +31,10 @@ module SMPC (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
+    input       [7:0] JOY1_X,
+    input       [7:0] JOY1_Y,
+    input       [7:0] JOY2_X,
+    input       [7:0] JOY2_Y,
 	input       [2:0] JOY1_TYPE,
 	input       [2:0] JOY2_TYPE
 );
@@ -175,8 +179,16 @@ module SMPC (
 	typedef enum {
 		PADSTATE_STATUS,
 		PADSTATE_ID,
+
 		PADSTATE_DIGITAL_MSB,
 		PADSTATE_DIGITAL_LSB,
+
+		PADSTATE_ANALOG_BUTTONSMSB,
+		PADSTATE_ANALOG_BUTTONSLSB,
+		PADSTATE_ANALOG_X,
+		PADSTATE_ANALOG_Y,
+		PADSTATE_ANALOG_Z,
+
 		PADSTATE_IDLE
 	} PadState_t;
 	PadState_t PADSTATE;
@@ -203,6 +215,8 @@ module SMPC (
 		bit [1:0]  CURRPAD_ID;
 		bit [1:0]  CURRPAD_TYPE;
 		bit [15:0] CURRPAD_BUTTONS;
+		bit [7:0]  CURRPAD_ANALOGX;
+		bit [7:0]  CURRPAD_ANALOGY;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -564,6 +578,8 @@ module SMPC (
 									0: begin
 										CURRPAD_TYPE <= JOY1_TYPE;
 										CURRPAD_BUTTONS <= JOY1;
+										CURRPAD_ANALOGX <= JOY1_X;
+										CURRPAD_ANALOGY <= JOY1_Y;
 
 										case (JOY1_TYPE)
 											PAD_OFF: begin
@@ -579,6 +595,8 @@ module SMPC (
 									1: begin
 										CURRPAD_TYPE <= JOY2_TYPE;
 										CURRPAD_BUTTONS <= JOY2;
+										CURRPAD_ANALOGX <= JOY2_X;
+										CURRPAD_ANALOGY <= JOY2_Y;
 
 										case (JOY2_TYPE)
 											PAD_OFF: begin
@@ -597,12 +615,16 @@ module SMPC (
 									end
 								endcase
 							end
-							// ID: unique for each pad?
+							// ID: unique for each pad
 							PADSTATE_ID: begin
 								case (CURRPAD_TYPE)
 									PAD_DIGITAL: begin
 										OREG_RAM_D <= 8'h02;
 										PADSTATE <= PADSTATE_DIGITAL_MSB;
+									end
+									PAD_3D: begin
+										OREG_RAM_D <= 8'h15;
+										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
 									end
 								endcase
 							end
@@ -623,6 +645,33 @@ module SMPC (
 								PADSTATE <= PADSTATE_STATUS;
 								CURRPAD_ID <= CURRPAD_ID + 1;
 							end
+
+							// Analog controllers (wheel, Mission Stick, 3D
+							// Control Pad) - all appear to encode basically
+							// the same, just with different numbers of analog
+							// bytes.
+							PADSTATE_ANALOG_BUTTONSMSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[15:8];
+								PADSTATE <= PADSTATE_ANALOG_BUTTONSLSB;
+							end
+							PADSTATE_ANALOG_BUTTONSLSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
+								PADSTATE <= PADSTATE_ANALOG_X;
+							end
+							PADSTATE_ANALOG_X: begin
+								OREG_RAM_D <= CURRPAD_ANALOGX;
+								PADSTATE <= PADSTATE_ANALOG_Y;
+							end
+							PADSTATE_ANALOG_Y: begin
+								OREG_RAM_D <= CURRPAD_ANALOGY;
+								PADSTATE <= PADSTATE_ANALOG_Z;
+							end
+							PADSTATE_ANALOG_Z: begin
+								OREG_RAM_D <= 0; // TODO: shoulder button available?
+								PADSTATE <= PADSTATE_STATUS;
+								CURRPAD_ID <= CURRPAD_ID + 1;
+							end
+
 						endcase
 
 						OREG_RAM_WE <= 1;
