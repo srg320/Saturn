@@ -567,12 +567,9 @@ module SMPC (
 					CS_INTBACK_PERI: begin
 						OREG_RAM_WA <= OREG_CNT;
 
-						// default value if no peripheral writes
-						OREG_RAM_D <= 8'h00;
-
 						case (PADSTATE)
-							// States common to all pads
-							// Status: F1 for directly connected, F0 for not
+							// STATUS and ID are common to all pads
+							// STATUS: F1 for directly connected, F0 for not
 							PADSTATE_STATUS: begin
 								case (CURRPAD_ID)
 									0: begin
@@ -584,7 +581,10 @@ module SMPC (
 										case (JOY1_TYPE)
 											PAD_OFF: begin
 												OREG_RAM_D <= 8'hF0;
+
+												// done with this peripheral
 												PADSTATE <= PADSTATE_STATUS;
+												CURRPAD_ID <= CURRPAD_ID + 1;
 											end
 											default: begin
 												OREG_RAM_D <= 8'hF1;
@@ -615,6 +615,7 @@ module SMPC (
 									end
 								endcase
 							end
+
 							// ID: unique for each pad
 							PADSTATE_ID: begin
 								case (CURRPAD_TYPE)
@@ -622,16 +623,21 @@ module SMPC (
 										OREG_RAM_D <= 8'h02;
 										PADSTATE <= PADSTATE_DIGITAL_MSB;
 									end
-									PAD_3D: begin
+									// TODO: currently passing through wheel
+									// and lightgun to analog handling. Wheel
+									// should be 1 byte of analog. Lightgun
+									// shouldn't be here at all.
+									PAD_LIGHTGUN, PAD_WHEEL, PAD_3D: begin
 										OREG_RAM_D <= 8'h15;
 										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
 									end
 								endcase
 							end
 
+
 							// Saturn 6-button digital pad
 							/*
-								5'd0: OREG_RAM_D <= 8'hF0;
+								5'd0: OREG_RAM_D <= 8'hF1;
 								5'd1: OREG_RAM_D <= 8'h02;
 								5'd2: OREG_RAM_D <= JOY1[15:8];
 								5'd3: OREG_RAM_D <= JOY1[7:0];
@@ -642,9 +648,12 @@ module SMPC (
 							end
 							PADSTATE_DIGITAL_LSB: begin
 								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
+
+								// done with this peripheral
 								PADSTATE <= PADSTATE_STATUS;
 								CURRPAD_ID <= CURRPAD_ID + 1;
 							end
+
 
 							// Analog controllers (wheel, Mission Stick, 3D
 							// Control Pad) - all appear to encode basically
@@ -667,9 +676,17 @@ module SMPC (
 								PADSTATE <= PADSTATE_ANALOG_Z;
 							end
 							PADSTATE_ANALOG_Z: begin
-								OREG_RAM_D <= 0; // TODO: shoulder button available?
+								OREG_RAM_D <= 0; // TODO: shoulder triggers available?
+
+								// done with this peripheral
 								PADSTATE <= PADSTATE_STATUS;
 								CURRPAD_ID <= CURRPAD_ID + 1;
+							end
+
+
+							// all connected peripherals finished
+							PADSTATE_IDLE: begin
+								OREG_RAM_D <= 8'h00;
 							end
 
 						endcase
