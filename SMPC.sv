@@ -191,13 +191,13 @@ module SMPC (
 
 		PADSTATE_ANALOG_BUTTONSMSB,
 		PADSTATE_ANALOG_BUTTONSLSB,
-		PADSTATE_ANALOG_AXIS0,
-		PADSTATE_ANALOG_AXIS1,
-		PADSTATE_ANALOG_AXIS2,
+		PADSTATE_ANALOG_X1,
+		PADSTATE_ANALOG_Y1,
+		PADSTATE_ANALOG_Z1,
 		PADSTATE_ANALOG_DUMMY,
-		PADSTATE_ANALOG_AXIS3,
-		PADSTATE_ANALOG_AXIS4,
-		PADSTATE_ANALOG_AXIS5,
+		PADSTATE_ANALOG_X2,
+		PADSTATE_ANALOG_Y2,
+		PADSTATE_ANALOG_Z2,
 
 		PADSTATE_IDLE
 	} PadState_t;
@@ -659,10 +659,9 @@ module SMPC (
 										OREG_RAM_D <= 8'h15;
 										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
 									end
-									// 3D Pad is a 4-axis analog device,
-									// maybe with a dummy/expansion byte? TODO
+									// 3D Pad is a 4-axis analog device
 									PAD_3D: begin
-										OREG_RAM_D <= 8'h17;
+										OREG_RAM_D <= 8'h16;
 										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
 									end
 									// Dual Mission is a 6-axis device,
@@ -688,20 +687,17 @@ module SMPC (
 								CURRPAD_ID <= CURRPAD_ID + 1;
 							end
 
-
-							// Analog controllers (wheel, Mission Stick, 3D
-							// Control Pad) - all appear to encode basically
-							// the same, just with different numbers of analog
-							// bytes.
+							// Button encoding is the same for analog pads
 							PADSTATE_ANALOG_BUTTONSMSB: begin
 								OREG_RAM_D <= CURRPAD_BUTTONS[15:8];
 								PADSTATE <= PADSTATE_ANALOG_BUTTONSLSB;
 							end
 							PADSTATE_ANALOG_BUTTONSLSB: begin
 								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
-								PADSTATE <= PADSTATE_ANALOG_AXIS0;
+								PADSTATE <= PADSTATE_ANALOG_X1;
 							end
-							PADSTATE_ANALOG_AXIS0: begin
+
+							PADSTATE_ANALOG_X1: begin
 								OREG_RAM_D <= CURRPAD_ANALOGX1;
 
 								case (CURRPAD_TYPE)
@@ -711,60 +707,70 @@ module SMPC (
 										CURRPAD_ID <= CURRPAD_ID + 1;
 									end
 									default: begin
-										PADSTATE <= PADSTATE_ANALOG_AXIS1;
+										PADSTATE <= PADSTATE_ANALOG_Y1;
 									end
 								endcase
 							end
-							PADSTATE_ANALOG_AXIS1: begin
+
+							PADSTATE_ANALOG_Y1: begin
 								OREG_RAM_D <= CURRPAD_ANALOGY1;
-								PADSTATE <= PADSTATE_ANALOG_AXIS2;
+
+								case (CURRPAD_TYPE)
+									// On 3D Pad, the RIGHT trigger is first
+									PAD_3D: begin
+										PADSTATE <= PADSTATE_ANALOG_Z2;
+									end
+									// Mission and Dual Mission go to Z1
+									default: begin
+										PADSTATE <= PADSTATE_ANALOG_Z1;
+									end
+								endcase
 							end
-							PADSTATE_ANALOG_AXIS2: begin
+
+							PADSTATE_ANALOG_Z1: begin
 								OREG_RAM_D <= 0; // TODO: left shoulder trigger
 
 								case (CURRPAD_TYPE)
-									PAD_MISSION: begin
-										// done with this peripheral
-										PADSTATE <= PADSTATE_STATUS;
-										CURRPAD_ID <= CURRPAD_ID + 1;
-									end
-									default: begin
+									PAD_DUALMISSION: begin
 										PADSTATE <= PADSTATE_ANALOG_DUMMY;
 									end
-								endcase
-							end
-							PADSTATE_ANALOG_DUMMY: begin
-								// Axis 3 is dummy/expansion data on Dual
-								// Mission, and I think also on 3D Pad. TODO
-								OREG_RAM_D <= 0;
-								PADSTATE <= PADSTATE_ANALOG_AXIS3;
-							end
-							PADSTATE_ANALOG_AXIS3: begin
-								case (CURRPAD_TYPE)
-									PAD_3D: begin
-										OREG_RAM_D <= 0; // TODO: right shoulder trigger
-
+									default: begin
 										// done with this peripheral
 										PADSTATE <= PADSTATE_STATUS;
 										CURRPAD_ID <= CURRPAD_ID + 1;
 									end
-									default: begin
-										OREG_RAM_D <= CURRPAD_ANALOGX2;
-										PADSTATE <= PADSTATE_ANALOG_AXIS4;
-									end
 								endcase
 							end
-							// Dual Mission only past this point
-							PADSTATE_ANALOG_AXIS4: begin
-								OREG_RAM_D <= CURRPAD_ANALOGY2;
-								PADSTATE <= PADSTATE_ANALOG_AXIS5;
+
+							// DUMMY, X2, Y2 all Dual Mission only
+							PADSTATE_ANALOG_DUMMY: begin
+								OREG_RAM_D <= 0;
+								PADSTATE <= PADSTATE_ANALOG_X2;
 							end
-							PADSTATE_ANALOG_AXIS5: begin
+							PADSTATE_ANALOG_X2: begin
+								OREG_RAM_D <= CURRPAD_ANALOGX2;
+								PADSTATE <= PADSTATE_ANALOG_Y2;
+							end
+							PADSTATE_ANALOG_Y2: begin
+								OREG_RAM_D <= CURRPAD_ANALOGY2;
+								PADSTATE <= PADSTATE_ANALOG_Z2;
+							end
+
+							// Z2 reached by Dual Mission and 3D Pad
+							PADSTATE_ANALOG_Z2: begin
 								OREG_RAM_D <= 0; // TODO: right shoulder trigger
 
-								// done with this peripheral
-								PADSTATE <= PADSTATE_STATUS;
-								CURRPAD_ID <= CURRPAD_ID + 1;
+								case (CURRPAD_TYPE)
+									PAD_3D: begin
+										// triggers reversed on 3D Pad
+										PADSTATE <= PADSTATE_ANALOG_Z1;
+									end
+									default: begin
+										// done with this peripheral
+										PADSTATE <= PADSTATE_STATUS;
+										CURRPAD_ID <= CURRPAD_ID + 1;
+									end
+								endcase
 							end
 
 
