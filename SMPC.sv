@@ -31,7 +31,18 @@ module SMPC (
 	
 	input      [15:0] JOY1,
 	input      [15:0] JOY2,
-	input             JOY2_EN
+
+    input       [7:0] JOY1_X1,
+    input       [7:0] JOY1_Y1,
+    input       [7:0] JOY1_X2,
+    input       [7:0] JOY1_Y2,
+    input       [7:0] JOY2_X1,
+    input       [7:0] JOY2_Y1,
+    input       [7:0] JOY2_X2,
+    input       [7:0] JOY2_Y2,
+
+	input       [2:0] JOY1_TYPE,
+	input       [2:0] JOY2_TYPE
 );
 
 	//Registers
@@ -58,7 +69,7 @@ module SMPC (
 	bit   [7:0] DAY;
 	
 	bit   [7:0] SMEM[4];
-	
+
 	parameter SR_PDE = 2;
 	parameter SR_RESB = 3;
 	
@@ -161,7 +172,7 @@ module SMPC (
 	end
 	
 	typedef enum bit [6:0] {
-		CS_IDLE         = 7'b0000001,  
+		CS_IDLE	        = 7'b0000001,
 		CS_START        = 7'b0000010, 
 		CS_WAIT         = 7'b0000100, 
 		CS_EXEC         = 7'b0001000,
@@ -170,6 +181,35 @@ module SMPC (
 		CS_END          = 7'b1000000
 	} CommExecState_t;
 	CommExecState_t COMM_ST;
+
+	typedef enum {
+		PADSTATE_STATUS,
+		PADSTATE_ID,
+
+		PADSTATE_DIGITAL_MSB,
+		PADSTATE_DIGITAL_LSB,
+
+		PADSTATE_ANALOG_BUTTONSMSB,
+		PADSTATE_ANALOG_BUTTONSLSB,
+		PADSTATE_ANALOG_X1,
+		PADSTATE_ANALOG_Y1,
+		PADSTATE_ANALOG_Z1,
+		PADSTATE_ANALOG_DUMMY,
+		PADSTATE_ANALOG_X2,
+		PADSTATE_ANALOG_Y2,
+		PADSTATE_ANALOG_Z2,
+
+		PADSTATE_IDLE
+	} PadState_t;
+	PadState_t PADSTATE;
+
+	parameter PAD_DIGITAL     = 0;
+	parameter PAD_OFF         = 1;
+	parameter PAD_WHEEL       = 2;
+	parameter PAD_MISSION     = 3;
+	parameter PAD_3D          = 4;
+	parameter PAD_DUALMISSION = 5;
+	parameter PAD_LIGHTGUN    = 6;
 	
 	bit [7:0] REG_DO;
 	always @(posedge CLK or negedge RST_N) begin
@@ -184,6 +224,13 @@ module SMPC (
 		bit        INTBACK_PERI;
 		bit        COMREG_SET;
 		bit        CONT;
+		bit [1:0]  CURRPAD_ID;
+		bit [2:0]  CURRPAD_TYPE;
+		bit [15:0] CURRPAD_BUTTONS;
+		bit [7:0]  CURRPAD_ANALOGX1;
+		bit [7:0]  CURRPAD_ANALOGY1;
+		bit [7:0]  CURRPAD_ANALOGX2;
+		bit [7:0]  CURRPAD_ANALOGY2;
 		
 		if (!RST_N) begin
 			COMREG <= '0;
@@ -215,7 +262,7 @@ module SMPC (
 			COMM_ST <= CS_IDLE;
 			SRES_EXEC <= 0;
 			INTBACK_EXEC <= 0;
-			INTBACK_PERI <= 0;    
+			INTBACK_PERI <= 0;	  
 			CONT <= 0;
 		end
 		else if (!MRES_N) begin
@@ -259,6 +306,8 @@ module SMPC (
 							INTBACK_PERI <= 0;
 							OREG_CNT <= '0;
 							COMM_ST <= CS_INTBACK_PERI;
+							PADSTATE <= PADSTATE_STATUS;
+							CURRPAD_ID <= 0;
 						end else if (COMREG_SET && !SRES_EXEC) begin
 							COMREG_SET <= 0;
 							OREG_CNT <= '0;
@@ -522,28 +571,220 @@ module SMPC (
 					end
 					
 					CS_INTBACK_WAIT: begin
-						if (!WAIT_CNT) COMM_ST <= CS_INTBACK_PERI;
+						if (!WAIT_CNT) begin
+							COMM_ST <= CS_INTBACK_PERI;
+							PADSTATE <= PADSTATE_STATUS;
+							CURRPAD_ID <= 0;
+						end
 					end
 					
 					CS_INTBACK_PERI: begin
 						OREG_RAM_WA <= OREG_CNT;
-						case (OREG_CNT)
-							5'd0: OREG_RAM_D <= 8'hF1;
-							5'd1: OREG_RAM_D <= 8'h02;
-							5'd2: OREG_RAM_D <= JOY1[15:8];
-							5'd3: OREG_RAM_D <= JOY1[7:0];
-							5'd4: OREG_RAM_D <= JOY2_EN ? 8'hF1 : 8'hF0;
-							5'd5: OREG_RAM_D <= 8'h02;
-							5'd6: OREG_RAM_D <= JOY2[15:8];
-							5'd7: OREG_RAM_D <= JOY2[7:0];
-							5'd8: OREG_RAM_D <= 8'hF0;
-							
-							5'd31: OREG_RAM_D <= COMREG;
-							default:OREG_RAM_D <= 8'h00;
+
+						case (PADSTATE)
+							// STATUS and ID are common to all pads
+							// STATUS: F1 for directly connected, F0 for not
+							PADSTATE_STATUS: begin
+								case (CURRPAD_ID)
+									0: begin
+										CURRPAD_TYPE <= JOY1_TYPE;
+										CURRPAD_BUTTONS <= JOY1;
+										// MiSTer gives signed with 0,0 at center.
+										// Saturn uses unsigned with 0,0 at top-left.
+										CURRPAD_ANALOGX1 <= {~JOY1_X1[7], JOY1_X1[6:0]};
+										CURRPAD_ANALOGY1 <= {~JOY1_Y1[7], JOY1_Y1[6:0]};
+										CURRPAD_ANALOGX2 <= {~JOY1_X2[7], JOY1_X2[6:0]};
+										CURRPAD_ANALOGY2 <= {~JOY1_Y2[7], JOY1_Y2[6:0]};
+
+										case (JOY1_TYPE)
+											PAD_OFF: begin
+												OREG_RAM_D <= 8'hF0;
+
+												// done with this peripheral
+												PADSTATE <= PADSTATE_STATUS;
+												CURRPAD_ID <= CURRPAD_ID + 1;
+											end
+											default: begin
+												OREG_RAM_D <= 8'hF1;
+												PADSTATE <= PADSTATE_ID;
+											end
+										endcase
+									end
+									1: begin
+										CURRPAD_TYPE <= JOY2_TYPE;
+										CURRPAD_BUTTONS <= JOY2;
+										// MiSTer gives signed with 0,0 at center.
+										// Saturn uses unsigned with 0,0 at top-left.
+										CURRPAD_ANALOGX1 <= {~JOY2_X1[7], JOY2_X1[6:0]};
+										CURRPAD_ANALOGY1 <= {~JOY2_Y1[7], JOY2_Y1[6:0]};
+										CURRPAD_ANALOGX2 <= {~JOY2_X2[7], JOY2_X2[6:0]};
+										CURRPAD_ANALOGY2 <= {~JOY2_Y2[7], JOY2_Y2[6:0]};
+
+										case (JOY2_TYPE)
+											PAD_OFF: begin
+												OREG_RAM_D <= 8'hF0;
+
+												// done with this peripheral
+												PADSTATE <= PADSTATE_STATUS;
+												CURRPAD_ID <= CURRPAD_ID + 1;
+											end
+											default: begin
+												OREG_RAM_D <= 8'hF1;
+												PADSTATE <= PADSTATE_ID;
+											end
+										endcase
+									end
+									2: begin
+										OREG_RAM_D <= 8'hF0;
+										PADSTATE <= PADSTATE_IDLE;
+									end
+								endcase
+							end
+
+							// ID: unique for each pad
+							PADSTATE_ID: begin
+								case (CURRPAD_TYPE)
+									// TODO: lightgun currently just digital
+									PAD_DIGITAL, PAD_LIGHTGUN: begin
+										OREG_RAM_D <= 8'h02;
+										PADSTATE <= PADSTATE_DIGITAL_MSB;
+									end
+									// Wheel is a 1-axis analog device
+									PAD_WHEEL: begin
+										OREG_RAM_D <= 8'h13;
+										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
+									end
+									// Mission Stick is a 3-axis analog device
+									PAD_MISSION: begin
+										OREG_RAM_D <= 8'h15;
+										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
+									end
+									// 3D Pad is a 4-axis analog device
+									PAD_3D: begin
+										OREG_RAM_D <= 8'h16;
+										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
+									end
+									// Dual Mission is a 6-axis device,
+									// with a dummy/expansion byte
+									PAD_DUALMISSION: begin
+										OREG_RAM_D <= 8'h19;
+										PADSTATE <= PADSTATE_ANALOG_BUTTONSMSB;
+									end
+								endcase
+							end
+
+
+							// Saturn 6-button digital pad
+							PADSTATE_DIGITAL_MSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[15:8];
+								PADSTATE <= PADSTATE_DIGITAL_LSB;
+							end
+							PADSTATE_DIGITAL_LSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
+
+								// done with this peripheral
+								PADSTATE <= PADSTATE_STATUS;
+								CURRPAD_ID <= CURRPAD_ID + 1;
+							end
+
+							// Button encoding is the same for analog pads
+							PADSTATE_ANALOG_BUTTONSMSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[15:8];
+								PADSTATE <= PADSTATE_ANALOG_BUTTONSLSB;
+							end
+							PADSTATE_ANALOG_BUTTONSLSB: begin
+								OREG_RAM_D <= CURRPAD_BUTTONS[7:0];
+								PADSTATE <= PADSTATE_ANALOG_X1;
+							end
+
+							PADSTATE_ANALOG_X1: begin
+								OREG_RAM_D <= CURRPAD_ANALOGX1;
+
+								case (CURRPAD_TYPE)
+									PAD_WHEEL: begin
+										// done with this peripheral
+										PADSTATE <= PADSTATE_STATUS;
+										CURRPAD_ID <= CURRPAD_ID + 1;
+									end
+									default: begin
+										PADSTATE <= PADSTATE_ANALOG_Y1;
+									end
+								endcase
+							end
+
+							PADSTATE_ANALOG_Y1: begin
+								OREG_RAM_D <= CURRPAD_ANALOGY1;
+
+								case (CURRPAD_TYPE)
+									// On 3D Pad, the RIGHT trigger is first
+									PAD_3D: begin
+										PADSTATE <= PADSTATE_ANALOG_Z2;
+									end
+									// Mission and Dual Mission go to Z1
+									default: begin
+										PADSTATE <= PADSTATE_ANALOG_Z1;
+									end
+								endcase
+							end
+
+							PADSTATE_ANALOG_Z1: begin
+								OREG_RAM_D <= 0; // TODO: left shoulder trigger
+
+								case (CURRPAD_TYPE)
+									PAD_DUALMISSION: begin
+										PADSTATE <= PADSTATE_ANALOG_DUMMY;
+									end
+									default: begin
+										// done with this peripheral
+										PADSTATE <= PADSTATE_STATUS;
+										CURRPAD_ID <= CURRPAD_ID + 1;
+									end
+								endcase
+							end
+
+							// DUMMY, X2, Y2 all Dual Mission only
+							PADSTATE_ANALOG_DUMMY: begin
+								OREG_RAM_D <= 0;
+								PADSTATE <= PADSTATE_ANALOG_X2;
+							end
+							PADSTATE_ANALOG_X2: begin
+								OREG_RAM_D <= CURRPAD_ANALOGX2;
+								PADSTATE <= PADSTATE_ANALOG_Y2;
+							end
+							PADSTATE_ANALOG_Y2: begin
+								OREG_RAM_D <= CURRPAD_ANALOGY2;
+								PADSTATE <= PADSTATE_ANALOG_Z2;
+							end
+
+							// Z2 reached by Dual Mission and 3D Pad
+							PADSTATE_ANALOG_Z2: begin
+								OREG_RAM_D <= 0; // TODO: right shoulder trigger
+
+								case (CURRPAD_TYPE)
+									PAD_3D: begin
+										// triggers reversed on 3D Pad
+										PADSTATE <= PADSTATE_ANALOG_Z1;
+									end
+									default: begin
+										// done with this peripheral
+										PADSTATE <= PADSTATE_STATUS;
+										CURRPAD_ID <= CURRPAD_ID + 1;
+									end
+								endcase
+							end
+
+
+							// all connected peripherals finished
+							PADSTATE_IDLE: begin
+								OREG_RAM_D <= 8'h00;
+							end
+
 						endcase
+
 						OREG_RAM_WE <= 1;
 									
 						if (OREG_CNT == 5'd31) begin
+							OREG_RAM_D <= COMREG;
 							SR[7:5] <= {1'b1,1'b1,1'b0};
 							SF <= 0;
 							MIRQ_N <= 0;
