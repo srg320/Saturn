@@ -2,6 +2,8 @@ module CART (
 	input             CLK,
 	input             RST_N,
 	
+	input       [2:0] MODE,	//0-none, 1-ROM 2M, 2-DRAM 1M, 3-DRAM 4M
+	
 	input             RES_N,
 	
 	input             CE_R,
@@ -21,50 +23,93 @@ module CART (
 	output            AWAIT_N,
 	output            ARQT_N,
 	
-	output     [24:1] MEMA,
-	input      [15:0] MEMDI,
-	output     [15:0] MEMDO,
-	output            MEMWRL_N,
-	output            MEMWRH_N,
-	output            MEMRD_N
+	output     [21:1] MEM_A,
+	input      [15:0] MEM_DI,
+	output     [15:0] MEM_DO,
+	output     [ 1:0] MEM_WE,
+	output            MEM_RD,
+	input             MEM_RDY
 );
 
-	wire CART_SEL = ~ACS0_N;
-	bit [15:0] CART_DO;
+	wire        DRAM1M_SEL = (AA[24:20] ==? 5'b001?0) && ~ACS0_N;
+	wire [21:1] DRAM1M_ADDR = {2'b00,AA[21],AA[18:1]};
+	
+	wire        DRAM4M_SEL = (AA[24:20] ==? 5'b001??) && ~ACS0_N;
+	wire [21:1] DRAM4M_ADDR = {AA[21:1]};
+	
+	wire        ROM2M_SEL =  ~ACS0_N;
+	wire [21:1] ROM2M_ADDR = {1'b0,AA[20:1]};
+	
+	wire CART_ID_SEL = (AA[23:1] == 24'hFFFFFF>>1) && ~ACS1_N;
+	wire CART_MEM_SEL = ~ACS0_N || ~ACS1_N;
+	bit [15:0] ABUS_DO;
 	bit        ABUS_WAIT;
 	always @(posedge CLK or negedge RST_N) begin
 		bit        AWR_N_OLD;
 		bit        ARD_N_OLD;
+		
 		if (!RST_N) begin
 			ABUS_WAIT <= 0;
 		end else begin
 			if (!RES_N) begin
 				
 			end else begin
-				if (CE_R) begin
-					AWR_N_OLD <= AWRL_N & AWRU_N;
-					ARD_N_OLD <= ARD_N;
-				end
+				AWR_N_OLD <= AWRL_N & AWRU_N;
+				ARD_N_OLD <= ARD_N;
 
-				if (CART_SEL) begin
-					if ((!AWRL_N || !AWRU_N) && AWR_N_OLD && CE_R) begin
-						
-					end else if (!ARD_N && ARD_N_OLD && CE_F) begin
-						CART_DO <= 16'hFFFF;
+				if (CART_ID_SEL) begin
+					if (!ARD_N && ARD_N_OLD) begin
+						case (MODE)
+							3'h1: ABUS_DO <= 16'hFFFF;
+							3'h2: ABUS_DO <= 16'hFF5A;
+							3'h3: ABUS_DO <= 16'hFF5C;
+							default: ABUS_DO <= 16'hFFFF;
+						endcase
 					end
+				end
+				else if (CART_MEM_SEL) begin
+					if ((!AWRL_N || !AWRU_N) && AWR_N_OLD) begin
+						case (MODE)
+							3'h2: MEM_A <= DRAM1M_ADDR;
+							3'h3: MEM_A <= DRAM4M_ADDR;
+							default: MEM_A <= '1;
+						endcase
+						MEM_DO <= ADI;
+						case (MODE)
+							3'h2,
+							3'h3: MEM_WE <= ~{AWRU_N,AWRL_N};
+							default: MEM_WE <= '0;
+						endcase
+						ABUS_WAIT <= (MODE == 3'h2 || MODE == 3'h3);
+					end else if (!ARD_N && ARD_N_OLD) begin
+						case (MODE)
+							3'h1: MEM_A <= ROM2M_ADDR;
+							3'h2: MEM_A <= DRAM1M_ADDR;
+							3'h3: MEM_A <= DRAM4M_ADDR;
+							default: MEM_A <= '1;
+						endcase
+						MEM_RD <= 1;
+						ABUS_WAIT <= 1;
+					end
+				end
+				
+				if (ABUS_WAIT && MEM_RDY) begin
+					case (MODE)
+						3'h1,
+						3'h2,
+						3'h3: ABUS_DO <= MEM_DI;
+						default: ABUS_DO <= 16'hFFFF;
+					endcase
+					MEM_WE <= '0;
+					MEM_RD <= 0;
+					ABUS_WAIT <= 0;
 				end
 			end
 		end
 	end
 
-	assign ADO = CART_DO;
-	assign AWAIT_N = 1;
+	assign ADO = ABUS_DO;
+	assign AWAIT_N = ~ABUS_WAIT;
 	assign ARQT_N = 1;
-	
-	assign MEMA = '0;
-	assign MEMDO = '1;
-	assign MEMWRL_N = 1;
-	assign MEMWRH_N = 1;
-	assign MEMRD_N = 1;
 	
 endmodule

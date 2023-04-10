@@ -1,13 +1,12 @@
 module Saturn (
 	input             CLK,
 	input             RST_N,
-	input             CE,
 	input             EN,
 	
-	input             SRES_N,
+	input             SYS_CE_F,
+	input             SYS_CE_R,
 	
-	input             TIME_SET,
-	input       [3:0] AREA,
+	input             SRES_N,
 	
 	output     [24:0] MEM_A,
 	input      [31:0] MEM_DI,
@@ -22,7 +21,7 @@ module Saturn (
 	
 	output     [18:1] VDP1_VRAM_A,
 	output     [15:0] VDP1_VRAM_D,
-	input      [31:0] VDP1_VRAM_Q,
+	input      [15:0] VDP1_VRAM_Q,
 	output      [1:0] VDP1_VRAM_WE,
 	output            VDP1_VRAM_RD,
 	input             VDP1_VRAM_RDY,
@@ -66,17 +65,32 @@ module Saturn (
 	input      [15:0] SCSP_RAM_Q,
 	output            SCSP_RAM_RFS,
 	input             SCSP_RAM_RDY,
+	
+	input             SMPC_CE,
+	input             TIME_SET,
+	input       [3:0] SMPC_AREA,
+	
+	input     [ 6: 0] SMPC_PDR1I,
+	output    [ 6: 0] SMPC_PDR1O,
+	output    [ 6: 0] SMPC_DDR1,
+	input     [ 6: 0] SMPC_PDR2I,
+	output    [ 6: 0] SMPC_PDR2O,
+	output    [ 6: 0] SMPC_DDR2,
+	output            SMPC_INPUT_ACT,
+	output     [ 4:0] SMPC_INPUT_POS,
+	input      [ 7:0] SMPC_INPUT_DATA,
+	input             SMPC_INPUT_WE,
 
 	input             CD_CE,
-	input             CDD_CE,
 	input             CD_CDATA,
 	output            CD_HDATA,
 	output            CD_COMCLK,
 	input             CD_COMREQ_N,
 	input             CD_COMSYNC_N,
 	output            CD_DEMP,
-	input      [17:0] CD_D,
+	input      [15:0] CD_D,
 	input             CD_CK,
+	input             CD_AUDIO,
 	output     [18:1] CD_RAM_A,
 	output     [15:0] CD_RAM_D,
 	output      [1:0] CD_RAM_WE,
@@ -84,6 +98,14 @@ module Saturn (
 	output            CD_RAM_CS,
 	input      [15:0] CD_RAM_Q,
 	input             CD_RAM_RDY,
+	
+	input       [2:0] CART_MODE,
+	output     [21:1] CART_MEM_A,
+	output     [15:0] CART_MEM_D,
+	output     [ 1:0] CART_MEM_WE,
+	output            CART_MEM_RD,
+	input      [15:0] CART_MEM_Q,
+	input             CART_MEM_RDY,
 	
 	output      [7:0] R,
 	output      [7:0] G,
@@ -104,28 +126,12 @@ module Saturn (
 	output     [15:0] SOUND_L,
 	output     [15:0] SOUND_R,
 	
-	input      [15:0] JOY1,
-	input      [15:0] JOY2,
-	input       [7:0] JOY1_X1,
-	input       [7:0] JOY1_Y1,
-	input       [7:0] JOY1_X2,
-	input       [7:0] JOY1_Y2,
-	input       [7:0] JOY2_X1,
-	input       [7:0] JOY2_Y1,
-	input       [7:0] JOY2_X2,
-	input       [7:0] JOY2_Y2,
-	input       [2:0] JOY1_TYPE,
-	input       [2:0] JOY2_TYPE,
-	
-	input       [6:0] SCRN_EN,
+	input       [7:0] SCRN_EN,
 	input       [2:0] SND_EN,
 	input             DBG_PAUSE,
 	input             DBG_BREAK,
 	input             DBG_RUN,
-	input             H320_END_INC,
-	input             H320_END_DEC,
-	input             H352_END_INC,
-	input             H352_END_DEC,
+	input       [3:0] DBG_EXT,
 	
 	output      [7:0] DBG_WAIT_CNT,
 	output reg        DBG_HOOK
@@ -156,13 +162,6 @@ module Saturn (
 		end
 	end
 	wire PAUSE = DBG_PAUSE | BREAK;
-	
-	bit MCLK;
-	always @(posedge CLK) begin
-		if (!PAUSE && CE) MCLK <= ~MCLK;
-	end
-	wire CE_R =  MCLK & ~PAUSE;
-	wire CE_F = ~MCLK & ~PAUSE;
 	
 	
 	//MSH
@@ -308,8 +307,8 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.EN(EN),
 		
 		.RES_N(MSHRES_N),
@@ -375,8 +374,8 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.EN(EN),
 		
 		.RES_N(SSHRES_N),
@@ -462,9 +461,9 @@ module Saturn (
 	
 	
 	
-	assign ADI      = !ACS0_N ? CART_DO  : 
-	                  !ACS2_N ? CD_DO  : 16'hFFFF;
-//	assign AWAIT_N  = 1;
+	assign ADI      = !ACS0_N || !ACS1_N ? CART_DO  : 
+	                  !ACS2_N            ? CD_DO    : 16'hFFFF;
+	assign AWAIT_N  = YGR019_AWAIT_N & CART_AWAIT_N;
 	assign AIRQ_N   = ARQT_N;
 	
 	assign BDI      = !BCS1_N ? VDP1_DO :
@@ -472,12 +471,13 @@ module Saturn (
 							!BCSS_N ? SCSP_DO : 16'h0000;
 	assign IRQL_N   = 1;
 
+	bit DBG_ABUS_END;
 	SCU SCU
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		
 		.RES_N(SYSRES_N),
 		
@@ -547,8 +547,8 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		
 		.RES_N(SYSRES_N),
 		
@@ -604,7 +604,7 @@ module Saturn (
 		if (!RST_N) begin
 			DBG_WAIT_CNT <= '0;
 			DBG_HOOK <= 0;
-		end else if (CE_R) begin
+		end else if (SYS_CE_R) begin
 			DBG_WAIT_CNT <= DBG_WAIT_CNT + 8'd1;
 			if (!CRD_N || !CDQM_N[0] || !CDQM_N[1] || !CDQM_N[2] || !CDQM_N[3]) begin
 				DBG_WAIT_CNT <= 8'd0;
@@ -613,25 +613,11 @@ module Saturn (
 		end
 	end
 	
-	bit SMPC_CE;
 	bit MRES_N;
 	always @(posedge CLK or negedge RST_N) begin
-		bit [2:0] CLK_CNT;
-		
 		if (!RST_N) begin
-			SMPC_CE <= 0;
-			CLK_CNT <= '0;
 			MRES_N <= 0;
 		end else begin
-			SMPC_CE <= 0;
-			if (CE_R) begin
-				CLK_CNT <= CLK_CNT + 3'd1;
-				if (CLK_CNT == 3'd6) begin
-					CLK_CNT <= 3'd0;
-					SMPC_CE <= 1;
-				end
-			end
-			
 			if (SMPC_CE) MRES_N <= 1;
 		end
 	end
@@ -645,7 +631,7 @@ module Saturn (
 		.MRES_N(MRES_N),
 		.TIME_SET(TIME_SET),
 		
-		.AC(AREA),	
+		.AC(SMPC_AREA),	
 		
 		.A(CA[6:1]),
 		.DI(CDI[7:0]),
@@ -668,28 +654,25 @@ module Saturn (
 		
 		.MIRQ_N(MIRQ_N),
 		
-		.JOY1(JOY1),
-		.JOY2(JOY2),
-
-		.JOY1_X1(JOY1_X1),
-		.JOY1_Y1(JOY1_Y1),
-		.JOY1_X2(JOY1_X2),
-		.JOY1_Y2(JOY1_Y2),
-		.JOY2_X1(JOY2_X1),
-		.JOY2_Y1(JOY2_Y1),
-		.JOY2_X2(JOY2_X2),
-		.JOY2_Y2(JOY2_Y2),
-
-		.JOY1_TYPE(JOY1_TYPE),
-		.JOY2_TYPE(JOY2_TYPE)
+		.PDR1I(SMPC_PDR1I),
+		.PDR1O(SMPC_PDR1O),
+		.DDR1(SMPC_DDR1),
+		.PDR2I(SMPC_PDR2I),
+		.PDR2O(SMPC_PDR2O),
+		.DDR2(SMPC_DDR2),
+		
+		.INPUT_ACT(SMPC_INPUT_ACT),
+		.INPUT_POS(SMPC_INPUT_POS),
+		.INPUT_DATA(SMPC_INPUT_DATA),
+		.INPUT_WE(SMPC_INPUT_WE)
 	);
 	
 	VDP1 VDP1
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.EN(EN),
 		
 		.RES_N(SYSRES_N),
@@ -741,8 +724,8 @@ module Saturn (
 	(
 		.CLK(CLK),
 		.RST_N(RST_N),
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		
 		.RES_N(SYSRES_N),
 		
@@ -795,7 +778,9 @@ module Saturn (
 		.HRES(HRES),
 		.VRES(VRES),
 		
-		.SCRN_EN(SCRN_EN)
+		.SCRN_EN(SCRN_EN),
+		
+		.DBG_EXT(DBG_EXT)
 	);
 	
 	
@@ -820,8 +805,8 @@ module Saturn (
 		
 		.RES_N(SYSRES_N),
 		
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.DI(BDO),
 		.DO(SCSP_DO),
 		.CS_N(BCSS_N),
@@ -974,6 +959,8 @@ module Saturn (
 	assign SDI = !SCS1_N ? CD_RAM_Q : YGR019_SDO;
 	
 	bit YGR019_AWAIT_N;
+	bit [15:0] DBG_SEC_SUM;
+	bit DBG_SEC_END;
 	YGR019 ygr 
 	(
 		.CLK(CLK),
@@ -981,8 +968,8 @@ module Saturn (
 		
 		.RES_N(CDRES_N),
 		
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.AA(AA[14:1]),
 		.ADI(ADO),
 		.ADO(CD_DO),
@@ -1014,11 +1001,10 @@ module Saturn (
 		.DACK1(DACK1),
 		.DREQ0_N(DREQ0_N),
 		.DREQ1_N(DREQ1_N),
-
-		.CDD_CE(CDD_CE),
 		
 		.CD_D(CD_D),
 		.CD_CK(CD_CK),
+		.CD_AUDIO(CD_AUDIO),
 		
 		.CD_SL(CD_SL),
 		.CD_SR(CD_SR)
@@ -1027,7 +1013,7 @@ module Saturn (
 	assign SWAIT_N = CD_RAM_RDY;
 	
 	assign CD_RAM_A = SA[18:1];
-	assign CD_RAM_D = !DACK0 ? YGR019_SDO : SDO;
+	assign CD_RAM_D = !DACK0 || !DACK1 ? YGR019_SDO : SDO;
 	assign CD_RAM_CS = ~SCS1_N;
 	assign CD_RAM_WE = ~{SWRH_N,SWRL_N};
 	assign CD_RAM_RD = ~SRD_N;
@@ -1040,10 +1026,12 @@ module Saturn (
 		.CLK(CLK),
 		.RST_N(RST_N),
 		
+		.MODE(CART_MODE),
+		
 		.RES_N(SYSRES_N),
 		
-		.CE_R(CE_R),
-		.CE_F(CE_F),
+		.CE_R(SYS_CE_R),
+		.CE_F(SYS_CE_F),
 		.AA(AA),
 		.ADI(ADO),
 		.ADO(CART_DO),
@@ -1059,15 +1047,15 @@ module Saturn (
 		.AWAIT_N(CART_AWAIT_N),
 		.ARQT_N(),
 		
-		.MEMA(),
-		.MEMDO(),
-		.MEMDI(16'hFFFF),
-		.MEMWRL_N(),
-		.MEMWRH_N(),
-		.MEMRD_N()
+		.MEM_A(CART_MEM_A),
+		.MEM_DO(CART_MEM_D),
+		.MEM_DI(CART_MEM_Q),
+		.MEM_WE(CART_MEM_WE),
+		.MEM_RD(CART_MEM_RD),
+		.MEM_RDY(CART_MEM_RDY)
 	);
 	
-	assign AWAIT_N = YGR019_AWAIT_N & CART_AWAIT_N;
+	
 	
 	
 endmodule

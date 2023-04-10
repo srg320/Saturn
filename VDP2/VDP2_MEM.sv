@@ -244,12 +244,15 @@ endmodule
 
 module VDP2_WRITE_FIFO (
 	input	        CLK,
+	input         RST_N,
+	
 	input	 [33:0] DATA,
 	input	        WRREQ,
 	input	        RDREQ,
 	output [33:0] Q,
 	output	     EMPTY,
-	output	     FULL
+	output	     FULL,
+	output	     LAST
 );
 
 	wire [33: 0] sub_wire0;
@@ -257,22 +260,30 @@ module VDP2_WRITE_FIFO (
 	bit  [ 2: 0] WADDR;
 	bit  [ 3: 0] AMOUNT;
 	
-	always @(posedge CLK) begin
-		if (WRREQ && !AMOUNT[3]) begin
-			WADDR <= WADDR + 3'd1;
+	always @(posedge CLK or negedge RST_N) begin
+		if (!RST_N) begin
+			AMOUNT <= '0;
+			RADDR <= '0;
+			WADDR <= '0;
 		end
-		if (RDREQ && AMOUNT) begin
-			RADDR <= RADDR + 3'd1;
-		end
-		
-		if (WRREQ && !RDREQ && !AMOUNT[3]) begin
-			AMOUNT <= AMOUNT + 4'd1;
-		end else if (!WRREQ && RDREQ && AMOUNT) begin
-			AMOUNT <= AMOUNT - 4'd1;
+		else begin
+			if (WRREQ && !AMOUNT[3]) begin
+				WADDR <= WADDR + 3'd1;
+			end
+			if (RDREQ && AMOUNT) begin
+				RADDR <= RADDR + 3'd1;
+			end
+			
+			if (WRREQ && !RDREQ && !AMOUNT[3]) begin
+				AMOUNT <= AMOUNT + 4'd1;
+			end else if (!WRREQ && RDREQ && AMOUNT) begin
+				AMOUNT <= AMOUNT - 4'd1;
+			end
 		end
 	end
 	assign EMPTY = ~|AMOUNT;
 	assign FULL = AMOUNT[3];
+	assign LAST = (AMOUNT == 4'd1);
 	
 	altdpram	altdpram_component (
 				.data (DATA),

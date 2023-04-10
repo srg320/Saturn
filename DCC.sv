@@ -88,7 +88,7 @@ module DCC (
 			DRAM_WAIT_CNT <= '0;
 		end else begin
 			RD_N_OLD <= RD_N;
-			WE_N_OLD <= WE_N;
+			WE_N_OLD <= |WE_N;
 			if ((!RD_N && RD_N_OLD && !DCE_N) || (!WE_N && WE_N_OLD && !DCE_N)) begin
 				DRAM_WAIT <= 1;
 				DRAM_WAIT_CNT <= 3'd5;
