@@ -848,10 +848,11 @@ module Saturn (
 		.SND_EN(SND_EN)
 	);
 	
+	bit M68K_RESETOn;
 	fx68k M68K
 	(
 		.clk(CLK),
-		.extReset(~SNDRES_N),
+		.extReset(~SNDRES_N | ~M68K_RESETOn),
 		.pwrUp(~RST_N),
 		.enPhi1(SCCE_R),
 		.enPhi2(SCCE_F),
@@ -880,7 +881,9 @@ module Saturn (
 		.BGACKn(1),
 
 		.BERRn(1),
-		.HALTn(1)
+		.HALTn(1),
+		
+		.oRESETn(M68K_RESETOn)
 	);
 
 	
