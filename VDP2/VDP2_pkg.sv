@@ -1807,6 +1807,48 @@ package VDP2_PKG;
 		return addr;
 	endfunction
 	
+	function bit [19:1] NxCHAddr2(input PN_t NxPN[2], input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
+	                             input bit [2:0] NxCHCN, input bit NxCHSZ, input bit NxZMHF, input bit NxZMQT);
+		bit  [19: 1] addr;
+		PN_t         PN;
+		bit  [10: 0] OFFX;
+		bit  [ 4: 0] cell_offs;
+		bit  [ 3: 0] x_offs;
+		bit  [ 3: 0] y_offs;
+		bit  [ 2: 0] ch_cnt;
+		
+		case (NxCHCN)
+			3'b000:  PN = NxPN[0];	//4bits/dot, 16 colors
+			3'b001:  PN = NxPN[NxCH_CNT[0]];	//8bits/dot, 256 colors
+			default: PN = NxPN[0];
+		endcase
+		
+		case (NxCHCN)
+			3'b000:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[0],3'b000};
+			3'b001:  OFFX = NxOFFX + {NxZMHF&NxCH_CNT[1],3'b000};
+			default: OFFX = NxOFFX;
+		endcase
+
+		x_offs =   OFFX[3:0] ^ {4{PN.HF}};
+		y_offs = NxOFFY[3:0] ^ {4{PN.VF}};
+		ch_cnt = NxCH_CNT[2:0] ^ {3{PN.HF}};
+		
+		case (NxCHSZ)
+			1'b0: cell_offs = {      1'b0,     1'b0,y_offs[2:0] };
+			1'b1: cell_offs = { y_offs[3],x_offs[3],y_offs[2:0] };
+		endcase
+		case (NxCHCN)
+			3'b000: addr = {PN.CHRN[14:0],4'b0000} + {13'b000000000000,cell_offs[4:0],1'b0   };									//4bits/dot, 16 colors
+			3'b001: addr = {PN.CHRN[14:0],4'b0000} + {12'b00000000000, cell_offs[4:0],2'b00  } + {ch_cnt[0:0],1'b0};		//8bits/dot, 256 colors
+			3'b010,
+			3'b011: addr = {PN.CHRN[14:0],4'b0000} + {11'b0000000000,  cell_offs[4:0],3'b000 } + {ch_cnt[1:0],1'b0};		//16bits/dot, 2048/32768 colors
+			3'b100: addr = {PN.CHRN[14:0],4'b0000} + {10'b000000000,   cell_offs[4:0],4'b0000} + {ch_cnt[2:0],1'b0};		//32bits/dot, 16M colors
+			default: addr = '0;
+		endcase
+	
+		return addr;
+	endfunction
+	
 	function bit [19:1] NxBMAddr(input bit [2:0] NxMP, input bit [2:0] NxCH_CNT, input bit [10:0] NxOFFX, input bit [10:0] NxOFFY, 
 	                             input bit [2:0] NxCHCN, input bit [1:0] NxBMSZ, input bit NxZMHF, input bit NxZMQT);
 		bit   [19:1] addr;
@@ -2288,10 +2330,11 @@ package VDP2_PKG;
 		bit         COEN;
 		bit         COSL;
 		bit         SDEN;
+		bit         LCEN;
 		bit         P;
 		bit [23: 0] DC;
 	} ScreenDot_t;
-	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,24'h000000};
+	parameter ScreenDot_t SD_NULL = {3'b000,1'b0,1'b0,5'b00000,1'b0,1'b0,1'b0,1'b0,1'b0,24'h000000};
 	
 
 	//Color calculation
