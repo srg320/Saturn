@@ -1851,16 +1851,16 @@ module SCU (
 					TM1_PEND <= 1;
 					TM0_OCCUR <= 0;
 				end
-			end
 			
-			if (HBL_IN) begin
-				TM0 <= TM0 + 10'd1;
-				TM0_OCCUR <= ~T1MD.MD;
-				if (TM0 == T0C[9:0]) begin
-					TM0_PEND <= 1;
-					TM0_OCCUR <= 1;
+				if (HBL_IN) begin
+					TM0 <= TM0 + 10'd1;
+					TM0_OCCUR <= ~T1MD.MD;
+					if (TM0 == T0C[9:0]) begin
+						TM0_PEND <= 1;
+						TM0_OCCUR <= 1;
+					end
+					TM1 <= {T1S[8:0],2'b11};
 				end
-				TM1 <= {T1S[8:0],2'b11};
 			end
 			
 			if (VBL_OUT) begin
