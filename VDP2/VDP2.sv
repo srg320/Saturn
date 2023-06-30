@@ -3119,33 +3119,33 @@ module VDP2 (
 		end
 	end
 	
-	VDP2_DPRAM #(10,16," "," ") pal1
+	VDP2_PAL_RAM pal1
 	(
 		.CLK(CLK),
 		
 		.ADDR_A(PAL_A),
 		.DATA_A(16'h0000),
-		.WREN_A(1'b0),
+		.WREN_A(2'b00),
 		.Q_A(PAL0_Q),
 		
 		.ADDR_B(IO_PAL_A),
 		.DATA_B(DI),
-		.WREN_B(IO_PAL0_WE),
+		.WREN_B({2{IO_PAL0_WE}} & ~DQM),
 		.Q_B(PAL0_DO)
 	);
 	
-	VDP2_DPRAM #(10,16," "," ") pal2
+	VDP2_PAL_RAM pal2
 	(
 		.CLK(CLK),
 		
 		.ADDR_A(!REGS.RAMCTL.CRKTE ? PAL_A : (CT_CRAM_A + DOTCLK_DIV[0])),
 		.DATA_A(16'h0000),
-		.WREN_A(1'b0),
+		.WREN_A(2'b00),
 		.Q_A(PAL1_Q),
 		
 		.ADDR_B(IO_PAL_A),
 		.DATA_B(DI),
-		.WREN_B(IO_PAL1_WE),
+		.WREN_B({2{IO_PAL1_WE}} & ~DQM),
 		.Q_B(PAL1_DO)
 	);
 	wire [15:0] PAL_DO = !IO_PAL_RD ? PAL0_DO : PAL1_DO;
