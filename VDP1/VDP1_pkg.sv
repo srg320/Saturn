@@ -111,7 +111,7 @@ package VDP1_PKG;
 	parameter bit [15:0] CMDCOLR_MASK = 16'hFFFF;
 	
 	typedef bit [15:0] CMDSRCA_t;	//08
-	parameter bit [15:0] CMDSRCA_MASK = 16'hFFFC;
+	parameter bit [15:0] CMDSRCA_MASK = 16'hFFFF;
 	
 	typedef struct packed	//0A
 	{
@@ -179,97 +179,6 @@ package VDP1_PKG;
 	} Coord_t;
 	parameter Coord_t COORD_NULL = {11'h000,11'h000};
 	
-	function Coord_t SSprCoordACalc(CMDTBL_t CMD);
-		bit [10:0] x,y;
-		bit [10:0] xa,XB;
-		bit [10:0] ya,YB;
-		
-//		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
-//		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
-		XB = !CMD.CMDXB.COORD[10] ? $signed(CMD.CMDXB.COORD) : 11'sd0 - $signed(CMD.CMDXB.COORD);
-		YB = !CMD.CMDYB.COORD[10] ? $signed(CMD.CMDYB.COORD) : 11'sd0 - $signed(CMD.CMDYB.COORD);
-		case (CMD.CMDCTRL.ZP[1:0])
-			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXA.COORD) : $signed(CMD.CMDXC.COORD);
-			2'b01: x = $signed(CMD.CMDXA.COORD);
-			2'b10: x = $signed(CMD.CMDXA.COORD) - $signed($signed(XB)>>>1);
-			2'b11: x = $signed(CMD.CMDXA.COORD) - $signed(XB);
-		endcase
-		case (CMD.CMDCTRL.ZP[3:2])
-			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYA.COORD) : $signed(CMD.CMDYC.COORD);
-			2'b01: y = $signed(CMD.CMDYA.COORD);
-			2'b10: y = $signed(CMD.CMDYA.COORD) - $signed($signed(YB)>>>1);
-			2'b11: y = $signed(CMD.CMDYA.COORD) - $signed(YB);
-		endcase
-		return {x,y};
-	endfunction
-	
-	function Coord_t SSprCoordBCalc(CMDTBL_t CMD);
-		bit [10:0] x,y;
-		bit [10:0] xa,XB;
-		bit [10:0] ya,YB;
-//		
-//		{xa,xb} = CMD.CMDXB.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXB.COORD} : {CMD.CMDXB.COORD,CMD.CMDXA.COORD};
-//		{ya,yb} = CMD.CMDYB.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYB.COORD} : {CMD.CMDYB.COORD,CMD.CMDYA.COORD};
-		XB = !CMD.CMDXB.COORD[10] ? $signed(CMD.CMDXB.COORD) : 11'sd0 - $signed(CMD.CMDXB.COORD);
-		YB = !CMD.CMDYB.COORD[10] ? $signed(CMD.CMDYB.COORD) : 11'sd0 - $signed(CMD.CMDYB.COORD);
-		case (CMD.CMDCTRL.ZP[1:0])
-			2'b00: x = $signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD) ? $signed(CMD.CMDXC.COORD) : $signed(CMD.CMDXA.COORD);
-			2'b01: x = $signed(CMD.CMDXA.COORD) + $signed(XB);
-			2'b10: x = $signed(CMD.CMDXA.COORD) + $signed(($signed(XB) + 11'd1)>>>1);
-			2'b11: x = $signed(CMD.CMDXA.COORD);
-		endcase
-		case (CMD.CMDCTRL.ZP[3:2])
-			2'b00: y = $signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD) ? $signed(CMD.CMDYC.COORD) : $signed(CMD.CMDYA.COORD);
-			2'b01: y = $signed(CMD.CMDYA.COORD) + $signed(YB);
-			2'b10: y = $signed(CMD.CMDYA.COORD) + $signed(($signed(YB) + 11'd1)>>>1);
-			2'b11: y = $signed(CMD.CMDYA.COORD);
-		endcase
-		return {x,y};
-	endfunction
-	
-	function bit [10:0] SSprWidthXCalc(CMDTBL_t CMD);
-		bit [10:0] w;
-//		bit [10:0] xa,xc;
-//		
-//		{xa,xc} = CMD.CMDXC.COORD >= CMD.CMDXA.COORD ? {CMD.CMDXA.COORD,CMD.CMDXC.COORD} : {CMD.CMDXC.COORD,CMD.CMDXA.COORD};
-		case (CMD.CMDCTRL.ZP)
-			4'b0000: w = $signed(CMD.CMDXC.COORD) - $signed(CMD.CMDXA.COORD);
-			default: w = $signed(CMD.CMDXB.COORD);
-		endcase
-		return $signed(w) >= 0 ? $signed(w) : -$signed(w);
-	endfunction
-	
-	function bit [10:0] SSprWidthYCalc(CMDTBL_t CMD);
-		bit [10:0] w;
-//		bit [10:0] ya,yc;
-//		
-//		{ya,yc} = CMD.CMDYC.COORD >= CMD.CMDYA.COORD ? {CMD.CMDYA.COORD,CMD.CMDYC.COORD} : {CMD.CMDYC.COORD,CMD.CMDYA.COORD};
-		case (CMD.CMDCTRL.ZP)
-			4'b0000: w = $signed(CMD.CMDYC.COORD) - $signed(CMD.CMDYA.COORD);
-			default: w = $signed(CMD.CMDYB.COORD);
-		endcase
-		return $signed(w) >= 0 ? $signed(w) : -$signed(w);
-	endfunction
-	
-	function bit SSprDirXCalc(CMDTBL_t CMD);
-		bit        dir;
-		
-		case (CMD.CMDCTRL.ZP)
-			4'b0000: dir = ~($signed(CMD.CMDXC.COORD) >= $signed(CMD.CMDXA.COORD));
-			default: dir = CMD.CMDXB.COORD[10];
-		endcase
-		return dir;
-	endfunction
-	
-	function bit SSprDirYCalc(CMDTBL_t CMD);
-		bit        dir;
-		
-		case (CMD.CMDCTRL.ZP)
-			4'b0000: dir = ~($signed(CMD.CMDYC.COORD) >= $signed(CMD.CMDYA.COORD));
-			default: dir = CMD.CMDYB.COORD[10];
-		endcase
-		return dir;
-	endfunction
 	
 	typedef struct packed
 	{
@@ -278,29 +187,16 @@ package VDP1_PKG;
 	} Vertex_t;
 	parameter Vertex_t VERT_NULL = {11'h000,11'h000};
 	
-	typedef struct packed
-	{
-		bit [10: 0] X;
-		bit [10: 0] Y;
-	} Size_t;
-	parameter Size_t SIZE_NULL = {11'h000,11'h000};
-	
-	function bit [18:1] SprAddr(input bit [8:0] X, input bit [8:0] Y, input CMDSIZE_t CMDSIZE, input bit [1:0] DIR, input CMDSRCA_t CMDSRCA, input bit [2:0] CM);
+	function bit [18:1] SprAddr(input bit [16:3] OFFSY, input CMDSRCA_t CMDSRCA, input bit [2:0] CM);
 		bit [18:1] ADDR;
-		bit  [8:0] offs_x;
-		bit  [8:0] offs_y;
-		bit [15:0] offs;
-		
-		offs_x = !DIR[0] ? X : {CMDSIZE.SX,3'b000} - X - 9'd1;
-		offs_y = !DIR[1] ? Y : {1'b0,CMDSIZE.SY} - Y - 9'd1;
-		offs = (offs_y * CMDSIZE.SX);
+
 		case (CM)
 			3'b000,
-			3'b001:  ADDR = {CMDSRCA,2'b00} + {1'b0,offs,1'b0}   + offs_x[8:2];
+			3'b001:  ADDR = {CMDSRCA,2'b00} + {3'b000,OFFSY,1'b0};
 			3'b010,
 			3'b011,
-			3'b100:  ADDR = {CMDSRCA,2'b00} + {offs,2'b00}  + offs_x[8:1];
-			default: ADDR = {CMDSRCA,2'b00} + {offs[14:0],3'b000} + offs_x[8:0];
+			3'b100:  ADDR = {CMDSRCA,2'b00} + {2'b00,OFFSY,2'b00};
+			default: ADDR = {CMDSRCA[15:1],1'b0,2'b00} + {1'b0,OFFSY,3'b000};
 		endcase
 		return ADDR;
 	endfunction
@@ -330,7 +226,7 @@ package VDP1_PKG;
 			3'b010,
 			3'b011,
 			3'b100:
-				case (OFFSX[0])
+				case (OFFSX[1])
 					1'b0: begin C = {8'h00,DATA[15: 8]}; TP = ~|DATA[15: 8]; EC = &DATA[15: 8]; end
 					1'b1: begin C = {8'h00,DATA[ 7: 0]}; TP = ~|DATA[ 7: 0]; EC = &DATA[ 7: 0]; end
 				endcase
@@ -340,87 +236,78 @@ package VDP1_PKG;
 		return {C,TP,EC};
 	endfunction
 	
-	function bit [15:0] GetEC(input bit [15:0] DATA, input bit [2:0] CM, input bit [1:0] OFFSX);
-		bit [15:0] P;
+	typedef struct packed
+	{
+		bit [ 4: 0] B;
+		bit [ 4: 0] G;
+		bit [ 4: 0] R;
+	} RGB_t;
+	
+	function RGB_t ColorHalf(input RGB_t CA);
+		RGB_t CH;
 		
-		case (CM)
-			3'b000,
-			3'b001: begin
-				case (OFFSX)
-					2'b00: P = {12'h000,DATA[15:12]};
-					2'b01: P = {12'h000,DATA[11:8]};
-					2'b10: P = {12'h000,DATA[7:4]};
-					2'b11: P = {12'h000,DATA[3:0]};
-				endcase
-			end
-			3'b010,
-			3'b011,
-			3'b100: begin
-				case (OFFSX[0])
-					1'b0: P = {8'h00,DATA[15:8]};
-					1'b1: P = {8'h00,DATA[7:0]};
-				endcase
-			end
-			default: P = DATA;
-		endcase
-
-		return P;
+		CH.R = {1'b0,CA.R[4:1]};
+		CH.G = {1'b0,CA.G[4:1]};
+		CH.B = {1'b0,CA.B[4:1]};
+		return CH;
 	endfunction
 	
-	function bit [14:0] ColorHalf(input bit [14:0] A);
-		bit [4:0] AR,AG,AB;
-		bit [4:0] HR,HG,HB;
+	function RGB_t ColorAdd(input RGB_t CA, input RGB_t CB);
+		RGB_t CR;
 		
-		{AB,AG,AR} = A;
-		
-		HR = {1'b0,AR[4:1]};
-		HG = {1'b0,AG[4:1]};
-		HB = {1'b0,AB[4:1]};
-		return {HB,HG,HR};
+		CR.R = CA.R + CB.R;
+		CR.G = CA.G + CB.G;
+		CR.B = CA.B + CB.B;
+		return CR;
 	endfunction
 	
-	function bit [14:0] ColorAdd(input bit [14:0] A, input bit [14:0] B);
-		bit [4:0] AR,AG,AB;
-		bit [4:0] BR,BG,BB;
-		bit [4:0] SR,SG,SB;
+	function RGB_t GouraudAdd(input RGB_t CO, input RGB_t CG);
+		bit [6:0] SUMR,SUMG,SUMB;
+		RGB_t CR;
 		
-		{AB,AG,AR} = A;
-		{BB,BG,BR} = B;
+		SUMR = {2'b00,CO.R} + {2'b00,CG.R} - 7'h10;
+		SUMG = {2'b00,CO.G} + {2'b00,CG.G} - 7'h10;
+		SUMB = {2'b00,CO.B} + {2'b00,CG.B} - 7'h10;
 		
-		SR = AR + BR;
-		SG = AG + BG;
-		SB = AB + BB;
-		return {SB,SG,SR};
+		CR.R = SUMR[6:5] == 2'b11 ? 5'h00 : SUMR[6:5] == 2'b01 ? 5'h1F : SUMR[4:0];
+		CR.G = SUMG[6:5] == 2'b11 ? 5'h00 : SUMG[6:5] == 2'b01 ? 5'h1F : SUMG[4:0];
+		CR.B = SUMB[6:5] == 2'b11 ? 5'h00 : SUMB[6:5] == 2'b01 ? 5'h1F : SUMB[4:0];
+		
+		return CR;
 	endfunction
 	
-	function bit [15:0] ColorCalc(input bit [15:0] ORIG, input bit [15:0] BACK, input bit [2:0] CCB, input bit MON);
-		bit [15:0] CC;
-		bit [14:0] ORIG_HALF,ORIG_ONE;
-		bit [14:0] BACK_HALF,BACK_ONE;
-		bit [14:0] A,B;
+	function bit [15:0] ColorCalc(input bit [15:0] ORIG, input bit [15:0] BACK, input bit [14:0] CG, input bit [2:0] CCB, input bit MON);
+		RGB_t      GOUR;
+		RGB_t      ORIG_HALF,ORIG_ONE;
+		RGB_t      GOUR_HALF,GOUR_ONE;
+		RGB_t      BACK_HALF,BACK_ONE;
+		RGB_t      A,B,S;
 		bit        MSB;
+		
+		GOUR = GouraudAdd(ORIG[14:0],CG);
 		
 		ORIG_HALF = ColorHalf(ORIG[14:0]);
 		ORIG_ONE = ORIG[14:0];
+		GOUR_HALF = ColorHalf(GOUR);
+		GOUR_ONE = GOUR;
 		BACK_HALF = ColorHalf(BACK[14:0]);
 		BACK_ONE = BACK[14:0];
 		
 		case (CCB)
-			3'b000: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end
-			3'b001: begin A = '0;                              B = BACK[15] ? BACK_HALF : BACK_ONE; MSB = BACK[15]; end
-			3'b010: begin A = ORIG_HALF;                       B = '0;                              MSB = ORIG[15]; end
+			3'b000: begin A = ORIG_ONE;                        B = '0;                              MSB =            ORIG[15]; end
+			3'b001: begin A = '0;                              B = BACK[15] ? BACK_HALF : BACK_ONE; MSB = BACK[15];            end
+			3'b010: begin A = ORIG_HALF;                       B = '0;                              MSB =            ORIG[15]; end
 			3'b011: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15] | ORIG[15]; end
-			3'b100: begin A = ORIG_ONE;                        B = '0;                              MSB = ORIG[15]; end//TODO Gouraud
-			3'b101: begin A = '0;                              B = BACK_ONE;                        MSB = BACK[15]; end
-			3'b110: begin A = ORIG_HALF;                       B = '0;                              MSB = BACK[15] | ORIG[15]; end//TODO Gouraud
-			3'b111: begin A = BACK[15] ? ORIG_HALF : ORIG_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = ORIG[15]; end//TODO Gouraud
+			3'b100: begin A = GOUR_ONE;                        B = '0;                              MSB =            ORIG[15]; end
+			3'b101: begin A = '0;                              B = BACK_ONE;                        MSB = BACK[15];            end
+			3'b110: begin A = GOUR_HALF;                       B = '0;                              MSB =            ORIG[15]; end
+			3'b111: begin A = BACK[15] ? GOUR_HALF : GOUR_ONE; B = BACK[15] ? BACK_HALF : '0;       MSB = BACK[15] | ORIG[15]; end
 		endcase
+		S = ColorAdd(A,B);
 		
-		CC = {MON|MSB,ColorAdd(A,B)};		
-		return CC;
+		return {MON|MSB,S};
 	endfunction
 
-	
 	function bit [10:0] Abs(input bit [11:0] C);
 		bit [11:0] abs; 
 		
