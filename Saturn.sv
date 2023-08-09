@@ -128,10 +128,11 @@ module Saturn (
 	
 	input       [7:0] SCRN_EN,
 	input       [2:0] SND_EN,
+	input      [31:0] SLOT_EN,
 	input             DBG_PAUSE,
 	input             DBG_BREAK,
 	input             DBG_RUN,
-	input       [3:0] DBG_EXT,
+	input       [7:0] DBG_EXT,
 	
 	output      [7:0] DBG_WAIT_CNT,
 	output reg        DBG_HOOK
@@ -845,7 +846,8 @@ module Saturn (
 		.SOUND_L(SOUND_L),
 		.SOUND_R(SOUND_R),
 		
-		.SND_EN(SND_EN)
+		.SND_EN(SND_EN),
+		.SLOT_EN(SLOT_EN)
 	);
 	
 	bit M68K_RESETOn;

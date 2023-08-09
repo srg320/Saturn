@@ -387,9 +387,9 @@ package SCSP_PKG;
 		bit [ 4: 0] SLOT;	//
 		bit         KON;	//
 		bit         KOFF;	//
-		bit [15: 0] WD;//Wave form data
-		bit [ 1: 0] EST;//Envelope state
-		bit [ 9: 0] EVOL;//Envelope volume
+		bit [15: 0] WD;	//Wave form data
+		bit [ 1: 0] EST;	//Envelope state
+		bit [ 9: 0] EVOL;	//Envelope volume
 	} OP5_t;
 	parameter OP5_t OP5_RESET = '{5'h00,1'b0,1'b0,16'h0000,2'h0,10'h000};
 	
@@ -398,11 +398,12 @@ package SCSP_PKG;
 		bit [ 4: 0] SLOT;	//
 		bit         KON;	//
 		bit         KOFF;	//
+		bit [15: 0] WD;	//Wave form data
 		bit [15: 0] SD;	//Slot out data
 		bit [ 9: 0] EVOL;
 		bit         SDIR;
 	} OP6_t;
-	parameter OP6_t OP6_RESET = '{5'h00,1'b0,1'b0,16'h0000,10'h000,1'b0};
+	parameter OP6_t OP6_RESET = '{5'h00,1'b0,1'b0,16'h0000,16'h0000,10'h000,1'b0};
 	
 	typedef struct packed
 	{
@@ -631,18 +632,45 @@ package SCSP_PKG;
 		return RES;
 	endfunction
 	
-	function bit [15:0] VolCalc(bit [15:0] WAVE, bit [9:0] ENV, bit [7:0] TL);
+	function bit [15:0] EnvVolCalc(bit [15:0] WAVE, bit [9:0] EVOL);
+		bit [25:0] MULT;		
+		
+		MULT = $signed(WAVE) * $unsigned(~EVOL);
+				
+		return MULT[25:10];
+	endfunction
+	
+//	function bit [15:0] TotalVolCalc(bit [15:0] WAVE, bit [7:0] TL);
+//		bit [15:0] RES;		
+//		
+//		RES = $signed($signed(WAVE)>>>TL[7:4]);
+//				
+//		return RES;
+//	endfunction
+	
+	function bit [15:0] TotalVolCalc(bit [15:0] WAVE, bit [7:0] TL);
+		bit [20:0] MULT;
+		bit [15:0] RES;
+		
+		MULT = $signed(WAVE) * $unsigned({2'b01,~TL[3:0]} + 6'd1);
+		
+		RES = $signed($signed(MULT[20:5])>>>TL[7:4]);
+		
+		return RES;
+	endfunction
+	
+	function bit [15:0] VolCalc(bit [15:0] WAVE, bit [9:0] EVOL, bit [7:0] TL);
 		bit [10:0] ATT;
 		bit [22:0] MULT;
 		bit [15:0] RES;
 		
-		ATT = {1'b0,ENV} + {1'b0,TL,2'b00};
+		ATT = {1'b0,EVOL} + {1'b0,TL,2'b00};
 		
-		MULT = $signed(WAVE) * ({1'b1,~ATT[5:0]} + 7'd1);
+		MULT = $signed(WAVE) * ({2'b01,~ATT[5:0]} + 8'd1);
 		
-		RES = $signed($signed(MULT[22:7])>>>ATT[9:6]);
+		RES = $signed($signed(MULT[22:7])>>>ATT[10:6]);
 		
-		return !ATT[10] ? RES : 16'sh0000;
+		return RES;
 	endfunction
 	
 	function bit signed [15:0] LevelCalc(bit signed [15:0] WAVE, bit [2:0] SDL);
@@ -685,7 +713,7 @@ package SCSP_PKG;
 		
 		case (SHFT)
 			2'b00: S = !A[25] && A[24:23] != 2'b00 ? 24'h7FFFFF : A[25] && A[24:23] != 2'b11 ? 24'h800000 : A[23:0];
-			2'b01: S = !A[25] && A[24:23] != 2'b00 ? 24'h7FFFFF : A[25] && A[24:23] != 2'b11 ? 24'h800000 : {A[22:0],1'b0};
+			2'b01: S = !A[25] && A[24:22] != 3'b000 ? 24'h7FFFFF : A[25] && A[24:22] != 3'b111 ? 24'h800000 : {A[22:0],1'b0};
 			2'b10: S = A[23:0];
 			2'b11: S = {A[22:0],1'b0};
 		endcase
