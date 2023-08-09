@@ -627,12 +627,16 @@ module SCU (
 					end
 				end
 			end else if (DMA_WRITE_A || DMA_WRITE_B) begin
-				DMA_WTN_DEC = 3'd2;
+				case (DMA_WA[0])
+					1'b0: DMA_WTN_OFFS = 3'd2;
+					1'b1: DMA_WTN_OFFS = 3'd1;
+				endcase
+				DMA_WTN_DEC = DMA_WTN_OFFS;
 				if (DMA_WTN_LESS2 && DMA_WTN[0]) begin
-					DMA_WTN_DEC = {2'b00,DMA_WTN[0]};
+					DMA_WTN_DEC = 3'd1;
 				end
 			end else begin
-				DMA_WTN_OFFS = 3'd0;
+				DMA_WTN_DEC = 3'd0;
 			end
 			DMA_WTN_NEXT = (DMA_WTN - DMA_WTN_DEC) & (DMA_TN_MASK[DMA_CH] | {20{DMD[DMA_CH].MOD}});
 			
@@ -1059,7 +1063,10 @@ module SCU (
 					BADDT_N <= 0;
 					if (BBUS_RDY) begin
 						if (DMA_BUF_SIZE && (DMA_BUF_SIZE[2:1] || DMA_WA[0] || (DMA_WTN_LESS2 && DMA_WTN[0]))) begin
-							BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+1]};
+							case (DMA_WA[0])
+								1'b0: BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+1]};
+								1'b1: BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+0]};
+							endcase
 							BDTEN_N <= 0;
 							BREQ_N <= 0;
 							BBUS_DATA_ACK = 1;
@@ -1089,7 +1096,10 @@ module SCU (
 							BADDT_N <= 1;
 							BBUS_ST <= BBUS_DMA_WADDR0;
 						end else if (DMA_BUF_SIZE && (DMA_BUF_SIZE[2:1] || (DMA_WTN_LESS2 && DMA_WTN[0]))) begin
-							BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+1]};
+							case (DMA_WA[0])
+								1'b0: BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+1]};
+								1'b1: BDO <= {DMA_BUF[DMA_BUF_RPOS+0],DMA_BUF[DMA_BUF_RPOS+0]};
+							endcase
 							BDTEN_N <= 0;
 							BREQ_N <= 0;
 							BBUS_DATA_ACK = 1;
@@ -1125,8 +1135,8 @@ module SCU (
 			end
 			case (CBUS_ST)
 				CBUS_IDLE: if (CE_R) begin
-					if ((DMA_READ_C && !DMA_WRITE_C && (!DMA_WRITE_A || ABUS_ST == ABUS_IDLE) && (!DMA_WRITE_B || BBUS_ST == BBUS_IDLE) && CBRLS) || 
-					    (DMA_WRITE_C && !DMA_READ_C && (!DMA_READ_A || ABUS_ST == ABUS_IDLE) && (!DMA_READ_B || BBUS_ST == BBUS_IDLE) && CBRLS)) begin
+					if ((DMA_READ_C && !DMA_WRITE_C && !DMA_WA_ERR  && (!DMA_WRITE_A || ABUS_ST == ABUS_IDLE) && (!DMA_WRITE_B || BBUS_ST == BBUS_IDLE) && CBRLS) || 
+					    (DMA_WRITE_C && !DMA_READ_C && !DMA_RA_ERR && (!DMA_READ_A || ABUS_ST == ABUS_IDLE) && (!DMA_READ_B || BBUS_ST == BBUS_IDLE) && CBRLS)) begin
 						CBUS_REQ <= 1;
 						CBUS_ST <= CBUS_REQUEST;
 					end
@@ -1355,34 +1365,40 @@ module SCU (
 					DBG_WAIT_CNT <= DBG_WAIT_CNT + 1'd1;
 `endif
 					DMA_RA_ERR <= 1;
-					if (DMA_RA[26:20] >= 7'h20 && DMA_RA[26:20] < 7'h59 && (!DMA_DSP || !DSP_DMA_WE)) begin
+					if (DMA_DSP && DSP_DMA_WE) begin
+						DMA_RA_ERR <= 0;
+					end
+					else if (DMA_RA[26:20] >= 7'h20 && DMA_RA[26:20] < 7'h59) begin
 						DMA_READ_A <= 1;
 						DMA_WRITE_DSP <= DMA_DSP & ~DSP_DMA_WE;
 						DMA_RA_ERR <= 0;
 					end
-					else if (DMA_RA[26:16] >= 11'h5A0 && DMA_RA[26:16] < 11'h5FE && (!DMA_DSP || !DSP_DMA_WE)) begin
+					else if (DMA_RA[26:16] >= 11'h5A0 && DMA_RA[26:16] < 11'h5FE) begin
 						DMA_READ_B <= 1;
 						DMA_WRITE_DSP <= DMA_DSP & ~DSP_DMA_WE;
 						DMA_RA_ERR <= 0;
 					end
-					else if (DMA_RA[26:24] == 3'h6 && (!DMA_DSP || !DSP_DMA_WE)) begin
+					else if (DMA_RA[26:24] == 3'h6) begin
 						DMA_READ_C <= 1;
 						DMA_WRITE_DSP <= DMA_DSP & ~DSP_DMA_WE;
 						DMA_RA_ERR <= 0;
 					end
 					
 					DMA_WA_ERR <= 1;
-					if (DMA_WA[26:20] >= 7'h20 && DMA_WA[26:20] < 7'h59 && (!DMA_DSP || DSP_DMA_WE)) begin
+					if (DMA_DSP && !DSP_DMA_WE) begin
+						DMA_WA_ERR <= 0;
+					end
+					else if (DMA_WA[26:20] >= 7'h20 && DMA_WA[26:20] < 7'h59) begin
 						DMA_WRITE_A <= 1;
 						DMA_READ_DSP <= DMA_DSP & DSP_DMA_WE;
 						DMA_WA_ERR <= 0;
 					end
-					else if (DMA_WA[26:16] >= 11'h5A0 && DMA_WA[26:16] < 11'h5FE && (!DMA_DSP || DSP_DMA_WE)) begin
+					else if (DMA_WA[26:16] >= 11'h5A0 && DMA_WA[26:16] < 11'h5FE) begin
 						DMA_WRITE_B <= 1;
 						DMA_READ_DSP <= DMA_DSP & DSP_DMA_WE;
 						DMA_WA_ERR <= 0;
 					end
-					else if (DMA_WA[26:24] == 3'h6 && (!DMA_DSP || DSP_DMA_WE)) begin
+					else if (DMA_WA[26:24] == 3'h6) begin
 						DMA_WRITE_C <= 1;
 						DMA_READ_DSP <= DMA_DSP & DSP_DMA_WE;
 						DMA_WA_ERR <= 0;
@@ -1840,8 +1856,6 @@ module SCU (
 		else if (!RES_N) begin
 			TM0 <= '0;
 			TM1 <= '0;
-			TM0_PEND <= 0;
-			TM1_PEND <= 0;
 		end else if (CE_R) begin
 			TM0_PEND <= 0;
 			TM1_PEND <= 0;
