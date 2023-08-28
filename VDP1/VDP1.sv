@@ -404,7 +404,6 @@ module VDP1 (
 		bit [18: 1] NEXT_ADDR;
 		bit [18: 1] CMD_RET_ADDR;
 		bit         CMD_SUB_RUN;
-		CMDCOLR_t   CMDCOLR_LAST;
 		bit [11: 0] NEXT_LINE_D;
 		bit         LINE_VERTA_NEXT;
 		bit [11: 0] NEW_LINE_SX;
@@ -632,7 +631,7 @@ module VDP1 (
 							if (CMD_POS == 4'hE) CMD_ST <= CMDS_END;
 						end
 						
-						if (CMD_POS == 4'd14) begin 
+						if (CMD_POS == 4'hE) begin 
 							LOPR <= COPR;
 							COPR <= CMD_ADDR[18:3];
 `ifdef DEBUG
@@ -659,8 +658,7 @@ module VDP1 (
 							4'h1,			//scaled sprite
 							4'h2,
 							4'h3: begin	//distored sprite
-								if (CMD.CMDPMOD.CM == 3'b001 && CMDCOLR_LAST != CMD.CMDCOLR) begin
-									CMDCOLR_LAST <= CMD.CMDCOLR;
+								if (CMD.CMDPMOD.CM == 3'b001) begin
 									CLT_READ <= 1;
 									CMD_ST <= CMDS_CLT_LOAD;
 								end else begin
@@ -2140,20 +2138,20 @@ module VDP1 (
 				if (!FBCR.FCM) begin
 					FB_SEL <= ~FB_SEL;
 					FRAME_ERASE <= 1;
+					EDSR.CEF <= 0;
+					EDSR.BEF <= EDSR.CEF;
 					if (PTMR.PTM[1]) begin
 						FRAME_START <= 1;
-						EDSR.CEF <= 0;
-						EDSR.BEF <= EDSR.CEF;
 					end
 `ifdef DEBUG
 					FRAMES_DBG <= 8'd0;
 `endif
 				end else if (FRAME_ERASECHANGE_PEND && FBCR.FCT) begin
 					FB_SEL <= ~FB_SEL;
+					EDSR.CEF <= 0;
+					EDSR.BEF <= EDSR.CEF;
 					if (PTMR.PTM[1]) begin
 						FRAME_START <= 1;
-						EDSR.CEF <= 0;
-						EDSR.BEF <= EDSR.CEF;
 					end
 					FRAME_ERASECHANGE_PEND <= 0;
 `ifdef DEBUG
