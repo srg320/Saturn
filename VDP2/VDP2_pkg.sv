@@ -2366,14 +2366,36 @@ package VDP2_PKG;
 		return (S[12:5] | {8{S[13]}}); 
 	endfunction
 	
-	function DotColor_t ColorCalc(input DotColor_t CT, input DotColor_t CS, input bit [4:0] CCRT, input bit CCEN, input bit CCMD);
+	function DotColor_t ColorCalc(input DotColor_t CFST, input DotColor_t CSEC, input bit [4:0] CCRT, input bit CCEN, input bit CCMD);
 		DotColor_t TEMP;
 		
-		TEMP.R = ColorCalcRatio(CT.R, CS.R, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
-		TEMP.G = ColorCalcRatio(CT.G, CS.G, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
-		TEMP.B = ColorCalcRatio(CT.B, CS.B, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
+		TEMP.R = ColorCalcRatio(CFST.R, CSEC.R, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
+		TEMP.G = ColorCalcRatio(CFST.G, CSEC.G, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
+		TEMP.B = ColorCalcRatio(CFST.B, CSEC.B, !CCMD ? {1'b0,~CCRT} : 6'h20, !CCMD ? {1'b0,CCRT}+1 : 6'h20);
 		
-		return !CCEN ? CT : TEMP;
+		return !CCEN ? CFST : TEMP;
+	endfunction
+	
+	function bit [7:0] ColorCalcExtRatio(input bit [7:0] CA, input bit [7:0] CB, input bit [7:0] CC, input bit RTA, input bit RTB);
+		bit [7:0] S;
+		
+		S = (!RTA ? CA : {1'b0,CA[7:1]}) + (!RTA ? 8'h00 : !RTB ? {1'b0,CB[7:1]} : {2'b00,CB[7:2]}) + (!RTA || !RTB ? 8'h00 : {2'b00,CC[7:2]});
+		return S; 
+	endfunction
+	
+	function DotColor_t ExtColorCalc(input DotColor_t DCSEC, input bit CCENSEC, input DotColor_t DCTHD, input bit CCENTHD, input bit PTHD, input DotColor_t DCFTH, 
+	                                 input bit LCEN, input bit [1:0] CRMD);
+		bit RTSEC,RTTHD;
+		DotColor_t TEMP;
+
+		RTSEC = CCENSEC & ~(|CRMD && PTHD);
+		RTTHD = CCENTHD & LCEN;
+		
+		TEMP.R = ColorCalcExtRatio(DCSEC.R, DCTHD.R, DCFTH.R, RTSEC, RTTHD);
+		TEMP.G = ColorCalcExtRatio(DCSEC.G, DCTHD.G, DCFTH.G, RTSEC, RTTHD);
+		TEMP.B = ColorCalcExtRatio(DCSEC.B, DCTHD.B, DCFTH.B, RTSEC, RTTHD);
+		
+		return TEMP;
 	endfunction
 	
 	function bit [7:0] ColorOffset(input bit [7:0] C, input bit [8:0] COAx, input bit [8:0] COBx, input bit COEN, input bit COSL);
