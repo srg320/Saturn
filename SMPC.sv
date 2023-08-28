@@ -151,6 +151,7 @@ module SMPC (
 		bit        SRES_EXEC;
 		bit        INTBACK_EXEC;
 		bit        INTBACK_PERI;
+		bit        INTBACK_OPTIM;
 		bit        COMREG_SET;
 		bit        CONT;
 		bit        SF_CLR;
@@ -233,7 +234,7 @@ module SMPC (
 				
 				case (COMM_ST)
 					CS_IDLE: begin
-						if (INTBACK_PERI && !INTBACK_WAIT_CNT && !SRES_EXEC /*&& IRQV_N*/) begin
+						if (INTBACK_PERI && ((!INTBACK_WAIT_CNT && INTBACK_OPTIM) || !INTBACK_OPTIM) && !SRES_EXEC /*&& IRQV_N*/) begin
 							INTBACK_PERI <= 0;
 							SF <= 1;
 							OREG_CNT <= '0;
@@ -307,6 +308,7 @@ module SMPC (
 									end else begin
 										INTBACK_EXEC <= 1;
 										INTBACK_PERI <= 1;
+										INTBACK_OPTIM <= ~IREG[1][1];
 										CONT <= 0;
 //										SR[7:5] <= 3'b010;
 										COMM_ST <= CS_END;
@@ -456,6 +458,7 @@ module SMPC (
 										SR[7:5] <= 3'b010;
 										if (IREG[1][3]) begin
 											INTBACK_EXEC <= 1;
+											INTBACK_OPTIM <= ~IREG[1][1];
 											SR[5] <= 1;
 											SF_CLR <= 0;
 										end
@@ -519,6 +522,7 @@ module SMPC (
 							OREG_RAM_D <= COMREG;
 							OREG_RAM_WE <= 1;
 							SR[7:5] <= {1'b1,1'b1,1'b0};
+							SF <= 0;
 							MIRQ_N <= 0;
 							COMM_ST <= CS_IDLE;
 						end
