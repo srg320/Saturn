@@ -369,18 +369,18 @@ module SCSP (
 				end else begin
 					case (SCR0.LPCTL)
 					2'b00: begin
-						if (CALC_SO >= LEA) begin
+						if (CALC_SO > LEA - 1) begin
 							OP3.LOOP_END <= 1;
 						end
 					end
 					2'b01: begin
-						if (CALC_SO >= LEA) begin
+						if (CALC_SO > LEA - 1) begin
 							SAO <= LSA;
 						end
 					end
 					2'b10: begin
 						if (!CUR_SADIR) begin
-							if (CALC_SO >= LEA) begin
+							if (CALC_SO > LEA - 1) begin
 								SAO <= LEA;
 								SADIR <= 1;
 							end
