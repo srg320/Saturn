@@ -55,7 +55,7 @@ module SCSP (
                       ,
 	output reg         DBG_68K_ERR,
 	output reg         DBG_SCU_HOOK,
-	output reg [ 7: 0] DBG_SCU_710,
+	output reg [ 7: 0] DBG_SCU_700,
 	output             PCM_EN_DBG,
 	output     [23: 0] SCA_DBG,
 	output     [12: 0] ENV_SAMPLE_CNT_DBG,
@@ -1069,7 +1069,7 @@ module SCSP (
 			
 			DMA_LEN_NEXT = DMA_LEN - 11'd1;
 			if (DMA_EXEC) begin
-				if (!DMA_WR && MEM_ST == MS_DMA_WAIT && RAM_RDY) begin
+				if (!DMA_WR && MEM_DEV_LATCH == 3'd3 && CYCLE0_CE) begin
 					DMA_MA <= DMA_MA + 19'd1;
 					DMA_WR <= 1;
 				end else if (DMA_WR && REG_ST == MS_DMA_WAIT && CYCLE1_CE) begin
@@ -1083,27 +1083,29 @@ module SCSP (
 	end
 	
 	//RAM access
-	bit [20:1] A;
-	bit        WE_N;
-	bit  [1:0] DQM;
-//	bit        BURST;
+	bit [20: 1] A;
+	bit         WE_N;
+	bit [ 1: 0] DQM;
+//	bit         BURST;
 	
 	wire SCU_REQ = ~AD_N & ~CS_N & ~REQ_N;	//25A00000-25BFFFFF
-	bit [20:1] SCU_RA;
-	bit        SCU_RPEND;
-	bit        SCU_RRDY;
-	bit [20:1] SCU_WA;
-	bit [15:0] SCU_D;
-	bit  [1:0] SCU_WE;
-	bit        SCU_WPEND;
-	bit        SCU_WRDY;
-	bit [20:1] SAVE_WA;
-	bit [15:0] SAVE_D;
-	bit  [1:0] SAVE_WE;
-	bit        SCPU_PEND;
+	bit [20: 1] SCU_RA;
+	bit         SCU_RPEND;
+	bit         SCU_RRDY;
+	bit [20: 1] SCU_WA;
+	bit [15: 0] SCU_D;
+	bit [ 1: 0] SCU_WE;
+	bit         SCU_WPEND;
+	bit         SCU_WRDY;
+	bit [20: 1] SAVE_WA;
+	bit [15: 0] SAVE_D;
+	bit [ 1: 0] SAVE_WE;
+	bit         SCPU_PEND;
+	bit [ 2: 0] MEM_DEV_LATCH;
 	always @(posedge CLK or negedge RST_N) begin
-		bit MEM_START;
-		bit REG_START;
+		bit         MEM_START;
+		bit [ 2: 0] MEM_DEV;
+		bit         REG_START;
 		
 		if (!RST_N) begin
 			MEM_ST <= MS_IDLE;
@@ -1111,6 +1113,7 @@ module SCSP (
 			MEM_D <= '0;
 			MEM_WE <= '0;
 			MEM_RD <= 0;
+			MEM_DEV_LATCH <= '0;
 			REG_ST <= MS_IDLE;
 			REG_A <= '0;
 			REG_D <= '0;
@@ -1169,16 +1172,15 @@ module SCSP (
 				SCU_WRDY <= 1;
 			end
 			
-			if ((MEM_ST == MS_SCU_WAIT && MEM_RD && RAM_RDY) || (REG_ST == MS_SCU_WAIT && REG_RD && CYCLE1_CE)) begin
+			if ((MEM_DEV_LATCH == 3'd4 && CYCLE0_CE) || (REG_ST == MS_SCU_WAIT && REG_RD && CYCLE1_CE)) begin
 				SCU_RRDY <= 1;
 				SCU_RPEND <= 0;
 			end
 			
-			if (!SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N && SCFC != 3'b111 && !SCPU_PEND) SCPU_PEND <= 1;
-			if ((MEM_ST == MS_SCPU_WAIT && RAM_RDY) || (REG_ST == MS_SCPU_WAIT && CYCLE1_CE)) SCPU_PEND <= 0;
+			if (!SCAS_N && (!SCLDS_N || !SCUDS_N) && SCDTACK_N && SCFC != 3'b111 && MEM_DEV_LATCH != 3'd5 && !SCPU_PEND) SCPU_PEND <= 1;
+			if ((MEM_ST == MS_SCPU_WAIT && CYCLE1_CE) || (REG_ST == MS_SCPU_WAIT && CYCLE1_CE)) SCPU_PEND <= 0;
 			
 			MEM_START <= CYCLE1_CE;
-			
 			MEM_RFS <= 0;
 			case (MEM_ST)
 				MS_IDLE: if (MEM_START) begin
@@ -1188,6 +1190,7 @@ module SCSP (
 						MEM_WE <= '0;
 						MEM_RD <= 1;
 						MEM_CS <= 1;
+						MEM_DEV <= 3'd1;
 						MEM_ST <= MS_WD_WAIT;
 					end else if ((DSP_READ || DSP_WRITE) && DSP_EN) begin
 						MEM_A <= DSP_MEMA_REG[18:1];
@@ -1195,6 +1198,7 @@ module SCSP (
 						MEM_WE <= {2{DSP_WRITE}};
 						MEM_RD <= DSP_READ;
 						MEM_CS <= 1;
+						MEM_DEV <= 3'd2;
 						MEM_ST <= MS_DSP_WAIT;
 					end else if (DMA_EXEC && !DMA_WR) begin
 						MEM_A <= DMA_MA[18:1];
@@ -1202,6 +1206,7 @@ module SCSP (
 						MEM_WE <= '0;
 						MEM_RD <= 1;
 						MEM_CS <= 1;
+						MEM_DEV <= 3'd3;
 						MEM_ST <= MS_DMA_WAIT;
 					end else if (!SCU_WA[20] && SCU_WPEND) begin
 						SCU_WPEND <= 0;
@@ -1210,16 +1215,18 @@ module SCSP (
 						MEM_WE <= SCU_WE;
 						MEM_RD <= 0;
 						MEM_CS <= ~SCU_WA[19];
+						MEM_DEV <= 3'd0;
 						MEM_ST <= MS_SCU_WAIT;
 `ifdef DEBUG
 						if ({SCU_WA[19:1],1'b0} == 20'h004E0 && SCU_WE == 2'b10) DBG_SCU_HOOK <= SCU_D[15];
-						if ({SCU_WA[19:1],1'b0} == 20'h00710 && SCU_WE[1]) DBG_SCU_710 <= SCU_D[15:8];
+						if ({SCU_WA[19:1],1'b0} == 20'h00700 && SCU_WE[1]) DBG_SCU_700 <= SCU_D[15:8];
 `endif
-					end else if (!SCU_RA[20] && SCU_RPEND) begin
+					end else if (!SCU_RA[20] && SCU_RPEND && MEM_DEV_LATCH != 3'd4) begin
 						MEM_A <= SCU_RA[18:1];
 						MEM_WE <= 2'b00;
 						MEM_RD <= 1;
 						MEM_CS <= ~SCU_RA[19];
+						MEM_DEV <= 3'd4;
 						MEM_ST <= MS_SCU_WAIT;
 					end else if (!SCA[20] && SCPU_PEND) begin
 						MEM_A <= SCA[18:1];
@@ -1227,21 +1234,23 @@ module SCSP (
 						MEM_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
 						MEM_RD <= SCRW_N;
 						MEM_CS <= 1;
+						MEM_DEV <= SCRW_N ? 3'd5 : 3'd0;
+						if (!SCRW_N) SCDTACK_N <= 0;
 						MEM_ST <= MS_SCPU_WAIT;
 `ifdef DEBUG
 //						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h001682) || ({SCA[20:1],1'b0} == 21'h00168C) || ({SCA[20:1],1'b0} == 21'h001696);
 						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h0015F2) || ({SCA[20:1],1'b0} == 21'h0015FC) || ({SCA[20:1],1'b0} == 21'h001606);
 						if ({SCA[19:1],1'b0} == 20'h004E0 && !SCUDS_N && !SCRW_N) DBG_SCU_HOOK <= SCDI[15];
-						if ({SCA[19:1],1'b0} == 20'h00710 && !SCUDS_N && !SCRW_N) DBG_SCU_710 <= SCDI[15:8];
+						if ({SCA[19:1],1'b0} == 20'h00700 && !SCUDS_N && !SCRW_N) DBG_SCU_700 <= SCDI[15:8];
 `endif
 					end else begin
+						MEM_DEV <= 3'd0;
 						MEM_RFS <= 1;
 					end
 				end
 				
 				MS_WD_WAIT: begin
-					if (RAM_RDY) begin
-						MEM_WD <= RAM_Q;
+					if (CYCLE1_CE) begin
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
@@ -1251,8 +1260,7 @@ module SCSP (
 
 				
 				MS_DSP_WAIT: begin
-					if (RAM_RDY) begin
-						DSP_INP_REG <= RAM_Q;
+					if (CYCLE1_CE) begin
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
@@ -1261,8 +1269,7 @@ module SCSP (
 				end
 				
 				MS_DMA_WAIT: begin
-					if (RAM_RDY) begin
-						DMA_DAT <= RAM_Q;
+					if (CYCLE1_CE) begin
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
@@ -1271,8 +1278,7 @@ module SCSP (
 				end
 				
 				MS_SCU_WAIT: begin
-					if (RAM_RDY) begin
-						DO <= RAM_Q;
+					if (CYCLE1_CE) begin
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
@@ -1281,10 +1287,7 @@ module SCSP (
 				end
 				
 				MS_SCPU_WAIT: begin
-					if (SCCE_R) SCDTACK_N <= 0;
-					if (RAM_RDY) begin
-//						SCDTACK_N <= 0;
-						SCDO <= RAM_Q;
+					if (CYCLE1_CE) begin
 						MEM_WE <= '0;
 						MEM_RD <= 0;
 						MEM_CS <= 0;
@@ -1294,6 +1297,22 @@ module SCSP (
 				
 				default:;
 			endcase
+			
+			if (CYCLE0_CE) begin
+				MEM_DEV_LATCH <= MEM_DEV;
+				case (MEM_DEV_LATCH)
+					3'd1: MEM_WD <= RAM_Q;
+					3'd2: DSP_INP_REG <= RAM_Q;
+					3'd3: DMA_DAT <= RAM_Q;
+					3'd4: DO <= RAM_Q;
+					3'd5: SCDO <= RAM_Q;
+				endcase
+			end
+			if (CYCLE1_CE) begin
+				case (MEM_DEV_LATCH)
+					3'd5: SCDTACK_N <= 0;
+				endcase
+			end
 			
 			REG_START <= CYCLE0_CE;
 			case (REG_ST)
@@ -1345,7 +1364,6 @@ module SCSP (
 				
 				MS_SCPU_WAIT: begin
 					if (CYCLE1_CE) begin
-//						SCDTACK_N <= 0;
 						SCDO <= REG_Q;
 						REG_WE <= '0;
 						REG_RD <= 0;
