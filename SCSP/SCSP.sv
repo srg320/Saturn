@@ -56,6 +56,8 @@ module SCSP (
 	output reg         DBG_68K_ERR,
 	output reg         DBG_SCU_HOOK,
 	output reg [ 7: 0] DBG_SCU_700,
+	output reg [ 7: 0] DBG_SCU_710,
+	output reg [ 7: 0] DBG_SCU_720,
 	output             PCM_EN_DBG,
 	output     [23: 0] SCA_DBG,
 	output     [12: 0] ENV_SAMPLE_CNT_DBG,
@@ -1130,7 +1132,20 @@ module SCSP (
 			SCU_WPEND <= 0;
 			SCU_WRDY <= 1;
 		end else if (!RES_N) begin
+			MEM_ST <= MS_IDLE;
+			MEM_WE <= '0;
+			MEM_RD <= 0;
+			MEM_DEV_LATCH <= '0;
+			REG_ST <= MS_IDLE;
+			REG_WE <= '0;
+			REG_RD <= 0;
 			
+			SCPU_PEND <= 0;
+			SCDTACK_N <= 1;
+			SCU_RPEND <= 0;
+			SCU_RRDY <= 1;
+			SCU_WPEND <= 0;
+			SCU_WRDY <= 1;
 		end else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
 				if (!DI[15]) begin
@@ -1220,6 +1235,8 @@ module SCSP (
 `ifdef DEBUG
 						if ({SCU_WA[19:1],1'b0} == 20'h004E0 && SCU_WE == 2'b10) DBG_SCU_HOOK <= SCU_D[15];
 						if ({SCU_WA[19:1],1'b0} == 20'h00700 && SCU_WE[1]) DBG_SCU_700 <= SCU_D[15:8];
+						if ({SCU_WA[19:1],1'b0} == 20'h00710 && SCU_WE[1]) DBG_SCU_710 <= SCU_D[15:8];
+						if ({SCU_WA[19:1],1'b0} == 20'h00720 && SCU_WE[1]) DBG_SCU_720 <= SCU_D[15:8];
 `endif
 					end else if (!SCU_RA[20] && SCU_RPEND && MEM_DEV_LATCH != 3'd4) begin
 						MEM_A <= SCU_RA[18:1];
@@ -1239,9 +1256,11 @@ module SCSP (
 						MEM_ST <= MS_SCPU_WAIT;
 `ifdef DEBUG
 //						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h001682) || ({SCA[20:1],1'b0} == 21'h00168C) || ({SCA[20:1],1'b0} == 21'h001696);
-						DBG_68K_ERR <= ({SCA[20:1],1'b0} == 21'h0015F2) || ({SCA[20:1],1'b0} == 21'h0015FC) || ({SCA[20:1],1'b0} == 21'h001606);
+						DBG_68K_ERR <= ({SCA[23:1],1'b0} >= 24'h080000 && {SCA[23:1],1'b0} < 24'h100000) || ({SCA[23:1],1'b0} >= 24'h100EE4);
 						if ({SCA[19:1],1'b0} == 20'h004E0 && !SCUDS_N && !SCRW_N) DBG_SCU_HOOK <= SCDI[15];
 						if ({SCA[19:1],1'b0} == 20'h00700 && !SCUDS_N && !SCRW_N) DBG_SCU_700 <= SCDI[15:8];
+						if ({SCA[19:1],1'b0} == 20'h00710 && !SCUDS_N && !SCRW_N) DBG_SCU_710 <= SCDI[15:8];
+						if ({SCA[19:1],1'b0} == 20'h00720 && !SCUDS_N && !SCRW_N) DBG_SCU_720 <= SCDI[15:8];
 `endif
 					end else begin
 						MEM_DEV <= 3'd0;
@@ -1342,6 +1361,9 @@ module SCSP (
 						REG_WE <= {~SCRW_N&~SCUDS_N,~SCRW_N&~SCLDS_N};
 						REG_RD <= SCRW_N;
 						REG_ST <= MS_SCPU_WAIT;
+`ifdef DEBUG
+						DBG_68K_ERR <= ({SCA[23:1],1'b0} >= 24'h080000 && {SCA[23:1],1'b0} < 24'h100000) || ({SCA[23:1],1'b0} >= 24'h100EE4);
+`endif
 					end
 				end
 				
@@ -1397,7 +1419,7 @@ module SCSP (
 			CR1 <= '0;
 			CR2 <= '0;
 			CR3 <= '0;
-			CR4 <= '0;
+			CR4 <= 16'h007F;
 			CR5 <= '0;
 			CR6 <= '0;
 			CR7 <= '0;
@@ -1421,7 +1443,7 @@ module SCSP (
 				CR1 <= '0;
 				CR2 <= '0;
 				CR3 <= '0;
-				CR4 <= '0;
+				CR4 <= 16'h007F;
 				CR5 <= '0;
 				CR6 <= '0;
 				CR7 <= '0;
@@ -1637,6 +1659,7 @@ module SCSP (
 				
 				if (OP3.SLOT == CR4.MSLC && SLOT1_CE) begin
 					CR4.CA <= SAO[15:12];
+					CR4.SGC <= 2'b11;
 				end
 			end
 		end

@@ -137,8 +137,9 @@ package SCSP_PKG;
 	{
 		bit [ 4: 0] MSLC;		//W
 		bit [ 3: 0] CA;		//R
+		bit [ 1: 0] UNUSED;
 		bit [ 1: 0] SGC;		//R
-		bit [ 4: 0] EG;		//R
+		bit [ 2: 0] UNUSED2;
 	} CR4_t;
 	parameter bit [15:0] CR4_RMASK = 16'h07FF;
 	parameter bit [15:0] CR4_WMASK = 16'hF800;
@@ -278,7 +279,7 @@ package SCSP_PKG;
 //	typedef SOUS_t STACK_t[32];
 	
 	typedef bit [12:0]  COEF_t;		//RW,100700-10077F
-	parameter bit [12:0] COEF_MASK = 13'h1FFF;
+	parameter bit [15:0] COEF_MASK = 16'hFFF8;
 	
 	typedef bit [16:1] MADRS_t;		//RW,100780-1007BF
 	parameter bit [16:1] MADRS_MASK = 16'hFFFF;
