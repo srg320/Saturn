@@ -69,6 +69,7 @@ module Saturn (
 	input             SMPC_CE,
 	input             TIME_SET,
 	input       [3:0] SMPC_AREA,
+	output            SMPC_DOTSEL,
 	
 	input     [ 6: 0] SMPC_PDR1I,
 	output    [ 6: 0] SMPC_PDR1O,
@@ -654,6 +655,7 @@ module Saturn (
 		.CDRES_N(CDRES_N),
 		
 		.MIRQ_N(MIRQ_N),
+		.DOTSEL(SMPC_DOTSEL),
 		
 		.PDR1I(SMPC_PDR1I),
 		.PDR1O(SMPC_PDR1O),

@@ -28,6 +28,8 @@ module SMPC (
 	output reg         CDRES_N,
 	
 	output reg         MIRQ_N,
+
+	output reg         DOTSEL,
 	
 	input      [ 6: 0] PDR1I,
 	output reg [ 6: 0] PDR1O,
@@ -52,7 +54,6 @@ module SMPC (
 //	bit   [1:0] IOSEL;
 //	bit   [1:0] EXLE;
 	
-	bit         DOTSEL;
 	bit         RESD;
 	bit         STE;
 	
@@ -176,6 +177,7 @@ module SMPC (
 			SNDRES_N <= 0;
 			CDRES_N <= 0;
 			MIRQ_N <= 1;
+			DOTSEL <= 0;
 			RESD <= 1;
 			STE <= 0;
 			
@@ -200,6 +202,7 @@ module SMPC (
 			SNDRES_N <= 0;
 			CDRES_N <= 1;
 			MIRQ_N <= 1;
+			DOTSEL <= 0;
 			SR <= '0;
 			RESD <= 1;
 			STE <= TIME_SET;/////////////////
@@ -286,17 +289,17 @@ module SMPC (
 							end
 							
 							8'h0D: begin		//SYSRES
-								WAIT_CNT <= 16'd400;
+								WAIT_CNT <= 16'd00;
 								COMM_ST <= CS_WAIT;
 							end
 							
 							8'h0E: begin		//CKCHG352
-								WAIT_CNT <= 16'd400;
+								WAIT_CNT <= 16'd100;
 								COMM_ST <= CS_WAIT;
 							end
 							
 							8'h0F: begin		//CKCHG320
-								WAIT_CNT <= 16'd400;
+								WAIT_CNT <= 16'd100;
 								COMM_ST <= CS_WAIT;
 							end
 							
