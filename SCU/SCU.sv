@@ -1137,7 +1137,7 @@ module SCU (
 			end
 			case (CBUS_ST)
 				CBUS_IDLE: if (CE_R) begin
-					if ((DMA_READ_C && !DMA_WRITE_C && !DMA_WA_ERR  && (!DMA_WRITE_A || ABUS_ST == ABUS_IDLE) && (!DMA_WRITE_B || BBUS_ST == BBUS_IDLE) && CBRLS) || 
+					if ((DMA_READ_C && !DMA_WRITE_C && !DMA_WA_ERR && (!DMA_WRITE_A || ABUS_ST == ABUS_IDLE) && (!DMA_WRITE_B || BBUS_ST == BBUS_IDLE) && CBRLS) || 
 					    (DMA_WRITE_C && !DMA_READ_C && !DMA_RA_ERR && (!DMA_READ_A || ABUS_ST == ABUS_IDLE) && (!DMA_READ_B || BBUS_ST == BBUS_IDLE) && CBRLS)) begin
 						CBUS_REQ <= 1;
 						CBUS_ST <= CBUS_REQUEST;
@@ -1941,7 +1941,7 @@ module SCU (
 	always @(posedge CLK or negedge RST_N) begin
 		bit        VBII_PEND,VBOI_PEND,HBII_PEND,T0I_PEND,T1I_PEND;
 		bit        TM1_SYNC_ALLOW;
-
+		
 		if (!RST_N) begin
 			IST <= IST_INIT;
 			
@@ -1975,12 +1975,12 @@ module SCU (
 			if (HBIN_PEND      && !HBIN_INT ) HBII_PEND <= 1;
 			if (TM0_PEND       && !TM0_INT  ) T0I_PEND <= 1;
 			if (TM1_PEND       && !TM1_INT  ) T1I_PEND <= 1;
-
-			if (VBIN_PEND      && !VBIN_INT ) IST.VBII <= 1;
-			if (VBOUT_PEND     && !VBOUT_INT) IST.VBOI <= 1;
-			if (HBIN_PEND      && !HBIN_INT ) IST.HBII <= 1;
-			if (TM0_PEND       && !TM0_INT  ) IST.T0I <= 1;
-			if (TM1_PEND       && !TM1_INT  ) IST.T1I <= 1;
+			
+			if (VBIN_PEND      ) IST.VBII <= 1;
+			if (VBOUT_PEND     ) IST.VBOI <= 1;
+			if (HBIN_PEND      ) IST.HBII <= 1;
+			if (TM0_PEND       ) IST.T0I <= 1;
+			if (TM1_PEND       ) IST.T1I <= 1;
 			if (DSP_PEND       ) IST.DSPEI <= 1;
 			if (SCSP_PEND      ) IST.SRI <= 1;
 			if (SM_PEND        ) IST.SMI <= 1;
@@ -2156,7 +2156,6 @@ module SCU (
 			end
 		end
 	end
-
 	
 	
 	//Registers
