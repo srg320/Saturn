@@ -83,6 +83,7 @@ module VDP1 (
 	LOPR_t       LOPR;
 	COPR_t       COPR;
 	MODR_t       MODR;
+	bit          DIE,DIL;
 
 	bit          FRAME_START;
 	bit          FRAME_ERASE;
@@ -1560,9 +1561,9 @@ module VDP1 (
 		SCLIP = !DRAW_X[10] && DRAW_X[9:0] <= SYS_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] <= SYS_CLIP.Y2[8:0];
 		UCLIP = !DRAW_X[10] && DRAW_X[9:0] >= USR_CLIP.X1[9:0] && DRAW_X[9:0] <= USR_CLIP.X2[9:0] && !DRAW_Y[10] && !DRAW_Y[9] && DRAW_Y[8:0] >= USR_CLIP.Y1[8:0] && DRAW_Y[8:0] <= USR_CLIP.Y2[8:0];
 		MESH = ~(DRAW_X[0] ^ DRAW_Y[0]);
-		IDRAW = ~(~FBCR.DIL ^ DRAW_Y[0]);
+		IDRAW = ~(DIL ^ DRAW_Y[0]);
 		FB_DRAW_D = CALC_C;
-		FB_DRAW_WE = (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & ((UCLIP^CMD.CMDPMOD.CMOD) | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH) & (IDRAW | ~FBCR.DIE);
+		FB_DRAW_WE = (~TP | CMD.CMDPMOD.SPD) & (~EC | CMD.CMDPMOD.ECD) & SCLIP & ((UCLIP^CMD.CMDPMOD.CMOD) | ~CMD.CMDPMOD.CLIP) & (MESH | ~CMD.CMDPMOD.MESH) & (IDRAW | ~DIE);
 	end
 `ifdef DEBUG
 	assign ORIG_C_DBG = ORIG_C;
@@ -2004,12 +2005,12 @@ module VDP1 (
 					end
 					else if (((FB_READ_PEND && !FB_RD) || (FB_DRAW_PEND && !FB_WE)) && FB_DRAW_WE) begin
 						if (!TVMR.TVM[0]) begin
-							FB_A <= {(!FBCR.DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[8:0]};
+							FB_A <= {(!DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[8:0]};
 							FB_D <= FB_DRAW_D;
 							FB_WE <= {2{FB_DRAW_PEND}};
 							FB_RD <= FB_READ_PEND;
 						end else begin
-							FB_A <= {(!FBCR.DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[9:1]};
+							FB_A <= {(!DIE ? DRAW_Y[7:0] : DRAW_Y[8:1]),DRAW_X[9:1]};
 							FB_D <= {FB_DRAW_D[7:0],FB_DRAW_D[7:0]};
 							FB_WE <= {~DRAW_X[0],DRAW_X[0]} & {2{FB_DRAW_PEND}};
 							FB_RD <= FB_READ_PEND;
@@ -2132,6 +2133,8 @@ module VDP1 (
 				FRAME_START <= 1;
 				EDSR.CEF <= 0;
 				EDSR.BEF <= EDSR.CEF;
+				DIE <= FBCR.DIE;
+				DIL <= FBCR.DIL;
 			end
 			if (VTIM_N && !VTIM_N_OLD) begin
 				VBLANK_ERASE <= 0;
@@ -2140,6 +2143,8 @@ module VDP1 (
 					FRAME_ERASE <= 1;
 					EDSR.CEF <= 0;
 					EDSR.BEF <= EDSR.CEF;
+					DIE <= FBCR.DIE;
+					DIL <= FBCR.DIL;
 					if (PTMR.PTM[1]) begin
 						FRAME_START <= 1;
 					end
@@ -2150,6 +2155,8 @@ module VDP1 (
 					FB_SEL <= ~FB_SEL;
 					EDSR.CEF <= 0;
 					EDSR.BEF <= EDSR.CEF;
+					DIE <= FBCR.DIE;
+					DIL <= FBCR.DIL;
 					if (PTMR.PTM[1]) begin
 						FRAME_START <= 1;
 					end
