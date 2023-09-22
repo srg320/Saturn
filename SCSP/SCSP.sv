@@ -1071,7 +1071,7 @@ module SCSP (
 			
 			DMA_LEN_NEXT = DMA_LEN - 11'd1;
 			if (DMA_EXEC) begin
-				if (!DMA_WR && MEM_DEV_LATCH == 3'd3 && CYCLE0_CE) begin
+				if (!DMA_WR && MEM_DEV_LATCH == 3'd3 && CYCLE1_CE) begin
 					DMA_MA <= DMA_MA + 19'd1;
 					DMA_WR <= 1;
 				end else if (DMA_WR && REG_ST == MS_DMA_WAIT && CYCLE1_CE) begin
