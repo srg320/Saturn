@@ -58,6 +58,7 @@ module SCSP (
 	output reg [ 7: 0] DBG_SCU_700,
 	output reg [ 7: 0] DBG_SCU_710,
 	output reg [ 7: 0] DBG_SCU_720,
+	output reg [ 7: 0] DBG_SCU_740,
 	output             PCM_EN_DBG,
 	output     [23: 0] SCA_DBG,
 	output     [12: 0] ENV_SAMPLE_CNT_DBG,
@@ -1131,21 +1132,21 @@ module SCSP (
 			SCU_RRDY <= 1;
 			SCU_WPEND <= 0;
 			SCU_WRDY <= 1;
-		end else if (!RES_N) begin
-			MEM_ST <= MS_IDLE;
-			MEM_WE <= '0;
-			MEM_RD <= 0;
-			MEM_DEV_LATCH <= '0;
-			REG_ST <= MS_IDLE;
-			REG_WE <= '0;
-			REG_RD <= 0;
-			
-			SCPU_PEND <= 0;
-			SCDTACK_N <= 1;
-			SCU_RPEND <= 0;
-			SCU_RRDY <= 1;
-			SCU_WPEND <= 0;
-			SCU_WRDY <= 1;
+//		end else if (!RES_N) begin
+//			MEM_ST <= MS_IDLE;
+//			MEM_WE <= '0;
+//			MEM_RD <= 0;
+//			MEM_DEV_LATCH <= '0;
+//			REG_ST <= MS_IDLE;
+//			REG_WE <= '0;
+//			REG_RD <= 0;
+//			
+//			SCPU_PEND <= 0;
+//			SCDTACK_N <= 1;
+//			SCU_RPEND <= 0;
+//			SCU_RRDY <= 1;
+//			SCU_WPEND <= 0;
+//			SCU_WRDY <= 1;
 		end else begin
 			if (!CS_N && DTEN_N && AD_N && CE_R) begin
 				if (!DI[15]) begin
@@ -1237,6 +1238,7 @@ module SCSP (
 						if ({SCU_WA[19:1],1'b0} == 20'h00700 && SCU_WE[1]) DBG_SCU_700 <= SCU_D[15:8];
 						if ({SCU_WA[19:1],1'b0} == 20'h00710 && SCU_WE[1]) DBG_SCU_710 <= SCU_D[15:8];
 						if ({SCU_WA[19:1],1'b0} == 20'h00720 && SCU_WE[1]) DBG_SCU_720 <= SCU_D[15:8];
+						if ({SCU_WA[19:1],1'b0} == 20'h00740 && SCU_WE[1]) DBG_SCU_740 <= SCU_D[15:8];
 `endif
 					end else if (!SCU_RA[20] && SCU_RPEND && MEM_DEV_LATCH != 3'd4) begin
 						MEM_A <= SCU_RA[18:1];
@@ -1261,6 +1263,7 @@ module SCSP (
 						if ({SCA[19:1],1'b0} == 20'h00700 && !SCUDS_N && !SCRW_N) DBG_SCU_700 <= SCDI[15:8];
 						if ({SCA[19:1],1'b0} == 20'h00710 && !SCUDS_N && !SCRW_N) DBG_SCU_710 <= SCDI[15:8];
 						if ({SCA[19:1],1'b0} == 20'h00720 && !SCUDS_N && !SCRW_N) DBG_SCU_720 <= SCDI[15:8];
+						if ({SCA[19:1],1'b0} == 20'h00740 && !SCUDS_N && !SCRW_N) DBG_SCU_740 <= SCDI[15:8];
 `endif
 					end else begin
 						MEM_DEV <= 3'd0;
