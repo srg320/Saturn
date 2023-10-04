@@ -8,6 +8,8 @@ module Saturn (
 	
 	input             SRES_N,
 	
+	input             PAL,
+	
 	output     [24:0] MEM_A,
 	input      [31:0] MEM_DI,
 	output     [31:0] MEM_DO,
@@ -714,7 +716,9 @@ module Saturn (
 		.FB1_WE(VDP1_FB1_WE),
 		.FB1_RD(VDP1_FB1_RD),
 		.FB1_Q(VDP1_FB1_Q),
-		.FB_RDY(VDP1_FB_RDY)
+		.FB_RDY(VDP1_FB_RDY),
+		
+		.DBG_EXT(DBG_EXT)
 		
 `ifdef DEBUG
 		,
@@ -749,7 +753,7 @@ module Saturn (
 		.VTIM_N(VTIM_N),
 		.FBD(VOUT),
 		
-		.PAL(0),
+		.PAL(PAL),
 		
 		.RA0_A(VDP2_RA0_A),
 		.RA1_A(VDP2_RA1_A),
