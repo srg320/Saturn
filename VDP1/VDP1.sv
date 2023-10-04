@@ -41,7 +41,9 @@ module VDP1 (
 	input      [15: 0] FB1_Q,
 	output     [ 1: 0] FB1_WE,
 	output             FB1_RD,
-	input              FB_RDY
+	input              FB_RDY,
+	
+	input      [ 7: 0] DBG_EXT
 	
 `ifdef DEBUG
 	                   ,
@@ -129,7 +131,6 @@ module VDP1 (
 		VS_CMD_READ,
 		VS_CMD_END,
 		VS_PAT_READ,
-		VS_PAT_END,
 		VS_CLT_READ,
 		VS_CLT_END,
 		VS_GRD_READ,
@@ -425,6 +426,7 @@ module VDP1 (
 		bit         GHCOLOR_DIR;
 		bit [10: 0] SYS_CLIP_X1,SYS_CLIP_X2,SYS_CLIP_Y1,SYS_CLIP_Y2;
 		bit [ 3: 0] CMD_COORD_LEFT_OVER,CMD_COORD_RIGHT_OVER,CMD_COORD_TOP_OVER,CMD_COORD_BOTTOM_OVER;
+		bit         CMD_NSPR_LEFT_OVER,CMD_NSPR_TOP_OVER;
 		bit         CMD_SSPR_WIDTH_OVER,CMD_SSPR_HEIGHT_OVER;
 		bit         CMD_SSPR_LEFT_OVER,CMD_SSPR_TOP_OVER;
 		bit         LINE_LEFT_OVER,LINE_RIGHT_OVER,LINE_TOP_OVER,LINE_BOTTOM_OVER;
@@ -491,6 +493,9 @@ module VDP1 (
 								           $signed(CMD.CMDYB) > $signed({{5{SYS_CLIP_Y2[10]}},SYS_CLIP_Y2}),
 								           $signed(CMD.CMDYA) > $signed({{5{SYS_CLIP_Y2[10]}},SYS_CLIP_Y2})};
 											  
+			CMD_NSPR_LEFT_OVER <= $signed(CMD.CMDXA) + $signed({7'h00,CMD.CMDSIZE.SX,3'b000}) < $signed({{5{SYS_CLIP_X1[10]}},SYS_CLIP_X1});
+			CMD_NSPR_TOP_OVER  <= $signed(CMD.CMDYA) + $signed({8'h00,CMD.CMDSIZE.SY}) < $signed({{5{SYS_CLIP_Y1[10]}},SYS_CLIP_Y1});
+			
 			CMD_SSPR_LEFT_OVER <= $signed(CMD.CMDXA) + $signed(CMD.CMDXB) < $signed({{5{SYS_CLIP_X1[10]}},SYS_CLIP_X1});
 			CMD_SSPR_TOP_OVER  <= $signed(CMD.CMDYA) + $signed(CMD.CMDYB) < $signed({{5{SYS_CLIP_Y1[10]}},SYS_CLIP_Y1});
 												
@@ -540,7 +545,7 @@ module VDP1 (
 						if (!CMD.CMDCTRL.JP[2] && !CMD.CMDCTRL.END) begin
 							case (CMD.CMDCTRL.COMM) 
 								4'h0: if (CMD_POS == 4'hE) begin	//normal sprite
-									if (CMD_COORD_RIGHT_OVER[0] || CMD_COORD_BOTTOM_OVER[0] || CMD_TEXT_SIZE_OVER) begin
+									if (CMD_NSPR_LEFT_OVER || CMD_NSPR_TOP_OVER || CMD_COORD_RIGHT_OVER[0] || CMD_COORD_BOTTOM_OVER[0] || CMD_TEXT_SIZE_OVER) begin
 										CMD_ST <= CMDS_END;
 									end else if (CMD.CMDPMOD.CCB[2]) begin
 										GRD_READ <= 1;
@@ -662,6 +667,7 @@ module VDP1 (
 								if (CMD.CMDPMOD.CM == 3'b001) begin
 									CLT_READ <= 1;
 									CMD_ST <= CMDS_CLT_LOAD;
+									
 								end else begin
 									case (CMD.CMDCTRL.COMM) 
 										4'h0: CMD_ST <= CMDS_NSPR_START;
@@ -1665,7 +1671,7 @@ module VDP1 (
 	bit          CPU_FB_RPEND;
 	bit          CPU_FB_WPEND;
 	
-	wire         PAT_FIFO_WRREQ = VRAM_ST == VS_PAT_END && VRAM_RDY;
+	wire         PAT_FIFO_WRREQ = VRAM_ST == VS_PAT_READ && VRAM_RDY;
 	wire         PAT_FIFO_RDREQ = PAT_WORD_NEXT && SPR_DATA_READY;
 	bit  [15: 0] PAT_FIFO_Q;
 	bit          PAT_FIFO_EMPTY;
@@ -1832,7 +1838,7 @@ module VDP1 (
 						VRAM_A <= !TEXT_DIRX ? SPR_ADDR + PAT_WORD_CNT : SPR_ADDR + (TEXT_SX - PAT_WORD_CNT - 9'd1);
 						VRAM_WE <= '0;
 						VRAM_RD <= 1;
-						VRAM_ST <= VS_PAT_END;
+						VRAM_ST <= VS_PAT_READ;
 					end else if (CLT_READ_PEND && !FRAME_START && !BURST) begin
 						CLT_READ_PEND <= 0;
 						VRAM_READ_POS <= '0;
@@ -1928,15 +1934,6 @@ module VDP1 (
 				end
 				
 				VS_PAT_READ: begin
-					VRAM_RD <= 0;
-					if (FRAME_START) begin
-						VRAM_ST <= VS_IDLE;
-					end else begin
-						VRAM_ST <= VS_PAT_END;
-					end
-				end
-				
-				VS_PAT_END: begin
 					VRAM_RD <= 0;
 					if (FRAME_START || !SPR_READ) begin
 						VRAM_WE <= '0;
