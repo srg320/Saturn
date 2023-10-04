@@ -2230,11 +2230,11 @@ package VDP2_PKG;
 		bit          MSD;
 		bit          TSD;
 		bit          TPEN;
-		bit          TP;
+		bit          TP,RGB_TP;
 		bit    [2:0] PR;
 		bit    [2:0] CC;
 		bit   [10:0] DC;
-		bit   [23:0] RGB;
+		bit   [23:0] RGB888;
 	
 		case (SPCTL.SPTYPE)
 		4'h0: begin MSB = 1'b0    ; NSD = &DATA[10:1] & ~DATA[0]; TPEN = 0;        PR = {1'b0    ,DATA[15],DATA[14]}; CC = {DATA[13],DATA[12],DATA[11]}; DC = {         DATA[10:0]}; end
@@ -2255,16 +2255,18 @@ package VDP2_PKG;
 		4'hF: begin MSB = 1'b0    ; NSD = &DATA[ 7:1] & ~DATA[0]; TPEN = 1;        PR = {1'b0    ,1'b0    ,1'b0    }; CC = {1'b0    ,DATA[ 7],DATA[ 6]}; DC = {3'b000  ,DATA[ 7:0]}; end
 		endcase
 		
-		MSD = MSB &  |DATA[14:0] & ~SPCTL.SPWINEN;
-		TSD = MSB & ~|DATA[14:0] & ~SPCTL.SPWINEN;
+		TP = ~|DATA[14:0];
 		
-		RGB = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};
-		TP = TPEN & ~|DATA[14:0] & SPCTL.SPWINEN;
+		MSD = MSB & ~TP & ~SPCTL.SPWINEN;
+		TSD = MSB &  TP & ~SPCTL.SPWINEN;
+		
+		RGB888 = {DATA[14:10],3'b000,DATA[9:5],3'b000,DATA[4:0],3'b000};
+		RGB_TP = TP & TPEN & SPCTL.SPWINEN;
 		
 		if (SPCTL.SPCLMD && DATA[15])
-			SDD = {1'b0,        TP, 1'b0,    1'b0, 3'h0, 3'h0, RGB          };
+			SDD = {1'b0, RGB_TP, 1'b0,    1'b0, 3'h0, 3'h0, RGB888       };
 		else
-			SDD = {1'b1, ~|DC | TP,  MSB, NSD|MSD, PR  , CC  , {13'h0000,DC}};
+			SDD = {1'b1, TP    , MSB , NSD|MSD, PR  , CC  , {13'h0000,DC}};
 
 		return SDD;
 	endfunction

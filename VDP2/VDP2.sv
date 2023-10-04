@@ -234,10 +234,10 @@ module VDP2 (
 	wire [8:0] VBL_START = VBL_START_224 + {VRES,4'h0};
 	wire [8:0] VS_START  = VS_START_224 + {VRES,4'h0};
 	wire [8:0] VS_END    = VS_END_224 + {VRES,4'h0};
-	wire [8:0] VBORD_START  = !VRES[1] ? (!VRES[0] ? 9'd263-12 : 9'd263-4) : 9'd263-0;
-	wire [8:0] VBORD_END  = !VRES[1] ? (!VRES[0] ? 9'd224+12 : 9'd240+4) : 9'd256+0;
-	wire [8:0] NEXT_TO_LAST_LINE  = !PAL ? (VRES_NTSC - 2) : (VRES_PAL - 2);
-	wire [8:0] LAST_LINE  = !PAL ? (VRES_NTSC - 1) : (VRES_PAL - 1);
+	wire [8:0] VBORD_START  = !VRES[1] ? (!VRES[0] ? 9'd263-9'd12 : 9'd263-9'd4) : 9'd313-9'd0;
+	wire [8:0] VBORD_END  = !VRES[1] ? (!VRES[0] ? 9'd224+9'd12 : 9'd240+9'd4) : 9'd256+9'd0;
+	wire [8:0] NEXT_TO_LAST_LINE  = !PAL ? (VRES_NTSC - 9'd2) : (VRES_PAL - 9'd2);
+	wire [8:0] LAST_LINE  = !PAL ? (VRES_NTSC - 9'd1) : (VRES_PAL - 9'd1);
 	wire IS_LAST_LINE = (V_CNT == LAST_LINE);
 	
 	bit  [ 8: 0] HDISP_CNT;
@@ -247,8 +247,6 @@ module VDP2 (
 	bit          VSYNC;
 	bit          HSYNC;
 	always @(posedge CLK or negedge RST_N) begin
-		
-		
 		if (!RST_N) begin
 			H_CNT <= '0;
 			V_CNT <= '0;
@@ -257,6 +255,17 @@ module VDP2 (
 			HBLANK <= 0;
 			VBLANK <= 0;
 			ODD <= 0;
+			HDISP_CNT <= '0;
+		end
+		else if (!RES_N) begin
+			H_CNT <= '0;
+			V_CNT <= !PAL ? VS_START : 9'd280;
+			HSYNC <= 0;
+			VSYNC <= 1;
+			HBLANK <= 0;
+			VBLANK <= 1;
+			ODD <= 0;
+			VBLANK2 <= 1;
 			HDISP_CNT <= '0;
 		end
 		else if (DOT_CE_R) begin
@@ -325,8 +334,12 @@ module VDP2 (
 	bit HINT;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
-			VINT <= 0;
 			HINT <= 0;
+			VINT <= 0;
+		end
+		else if (!RES_N) begin
+			HINT <= 0;
+			VINT <= 1;
 		end
 		else if (DOT_CE_R) begin
 			if (H_CNT == HINT_START - 1) begin
@@ -338,7 +351,7 @@ module VDP2 (
 			if (H_CNT == VINT_HPOS - 1) begin
 				if (V_CNT == VBL_START - 1) begin
 					VINT <= 1;
-				end else if (V_CNT == VRES_NTSC - 2) begin
+				end else if (V_CNT == NEXT_TO_LAST_LINE) begin
 					VINT <= 0;
 				end
 			end
@@ -378,6 +391,10 @@ module VDP2 (
 			HTIM <= 0;
 			VTIM <= 0;
 		end
+		else if (!RES_N) begin
+			HTIM <= 0;
+			VTIM <= 1;
+		end
 		else if (DOT_CE_R) begin
 			if (H_CNT == 9'h18B) begin///////////////////
 				HTIM <= 1;
@@ -388,7 +405,7 @@ module VDP2 (
 			if (H_CNT == 9'h18B - 1) begin
 				if (V_CNT == VBL_START - 1) begin
 					VTIM <= 1;
-				end else if (V_CNT == VRES_NTSC - 1) begin
+				end else if (V_CNT == LAST_LINE) begin
 					VTIM <= 0;
 				end
 			end
@@ -439,6 +456,23 @@ module VDP2 (
 	bit          DOT_FETCH;
 	always @(posedge CLK or negedge RST_N) begin
 		if (!RST_N) begin
+			CELLX <= '0;
+			NBG_FETCH <= 0;
+			NCH_FETCH <= 0;
+			NVCS_FETCH <= 0;
+			RBG_FETCH <= 0;
+			RBG_PRECALC <= 0;
+			RBG_CALC <= 0;
+			RCTA_FETCH <= 0;
+			RCTB_FETCH <= 0;
+			LS_FETCH <= 0;
+			LW_FETCH <= 0;
+			RPA_FETCH <= 0;
+			RPB_FETCH <= 0;
+			BACK_FETCH <= 0;
+			DOT_FETCH <= 0;
+		end
+		else if (!RES_N) begin
 			CELLX <= '0;
 			NBG_FETCH <= 0;
 			NCH_FETCH <= 0;
@@ -1524,7 +1558,7 @@ module VDP2 (
 						end
 						3'b001: begin
 							if (NSxREG[0].LSCY && RD0) begin NSY[0] <= NSxREG[0].SCY + LS_WD[26:8]; 
-							                                 NY[0]  <= (!INTERLACE || !ODD ? '0 : NSxREG[0].ZMY); end
+							                                 NY[0]  <= /*(!INTERLACE || !ODD ?*/ '0 /*: NSxREG[0].ZMY)*/; end
 							else if (IS_LAST_LINE)     begin NSY[0] <= NSxREG[0].SCY;
 							                                 NY[0]  <= (!INTERLACE || !ODD ? '0 : NSxREG[0].ZMY); end
 							else                       begin NY[0]  <= NY[0] + (!INTERLACE ? NSxREG[0].ZMY : NSxREG[0].ZMY<<1); end
@@ -1548,7 +1582,7 @@ module VDP2 (
 						end
 						3'b101: begin
 							if (NSxREG[1].LSCY && RD1) begin NSY[1] <= NSxREG[1].SCY + LS_WD[26:8];
-							                                 NY[1]  <= (!INTERLACE || !ODD ? '0 : NSxREG[1].ZMY); end
+							                                 NY[1]  <= /*(!INTERLACE || !ODD ?*/ '0 /*: NSxREG[1].ZMY)*/; end
 							else if (IS_LAST_LINE)     begin NSY[1] <= NSxREG[1].SCY;
 							                                 NY[1]  <= (!INTERLACE || !ODD ? '0 : NSxREG[1].ZMY); end     
 							else                       begin NY[1]  <= NY[1] + (!INTERLACE ? NSxREG[1].ZMY : NSxREG[1].ZMY<<1); end
